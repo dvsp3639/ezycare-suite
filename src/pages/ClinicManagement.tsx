@@ -41,6 +41,18 @@ const opdTypeColor: Record<string, string> = {
   "Follow Up": "bg-info/10 text-info",
 };
 
+const TIME_OPTIONS = [
+  "6:00 AM", "6:30 AM", "7:00 AM", "7:30 AM",
+  "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM",
+  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM",
+  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
+  "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
+  "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM",
+  "8:00 PM", "8:30 PM", "9:00 PM", "9:30 PM",
+  "10:00 PM",
+];
+
 const ClinicManagement = () => {
   const [activeTab, setActiveTab] = useState("slots");
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
@@ -435,19 +447,21 @@ const ClinicManagement = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">From</label>
-                    <Input
-                      value={editSlotDoctor.availableFrom}
-                      onChange={(e) => updateDoctorAvailability(editSlotDoctor.id, "availableFrom", e.target.value)}
-                      className="h-9"
-                    />
+                    <Select value={editSlotDoctor.availableFrom} onValueChange={(v) => updateDoctorAvailability(editSlotDoctor.id, "availableFrom", v)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">To</label>
-                    <Input
-                      value={editSlotDoctor.availableTo}
-                      onChange={(e) => updateDoctorAvailability(editSlotDoctor.id, "availableTo", e.target.value)}
-                      className="h-9"
-                    />
+                    <Select value={editSlotDoctor.availableTo} onValueChange={(v) => updateDoctorAvailability(editSlotDoctor.id, "availableTo", v)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
