@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon, CalendarDays, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   mockDoctorSchedules,
@@ -169,6 +169,9 @@ const ClinicManagement = () => {
           </TabsTrigger>
           <TabsTrigger value="patients">
             <Search className="h-4 w-4 mr-1.5" /> Patients
+          </TabsTrigger>
+          <TabsTrigger value="token-display">
+            <Monitor className="h-4 w-4 mr-1.5" /> Token Display
           </TabsTrigger>
         </TabsList>
 
@@ -424,6 +427,11 @@ const ClinicManagement = () => {
             </Table>
           </div>
         </TabsContent>
+
+        {/* ─── Token Display Board ─── */}
+        <TabsContent value="token-display">
+          <TokenDisplayBoard queue={queue} schedules={schedules} />
+        </TabsContent>
       </Tabs>
 
       {/* ─── Manage Slots Dialog ─── */}
@@ -621,5 +629,90 @@ const SummaryCard = ({ label, value, icon, accent }: { label: string; value: num
     <p className="text-2xl font-bold text-foreground">{value}</p>
   </div>
 );
+
+const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedules: DoctorSchedule[] }) => {
+  const doctorQueues = schedules.map((doc) => {
+    const docQueue = queue.filter((q) => q.doctorName === doc.doctorName);
+    const serving = docQueue.find((q) => q.status === "In Consultation");
+    const waiting = docQueue.filter((q) => q.status === "Waiting");
+    const completed = docQueue.filter((q) => q.status === "Completed");
+    const estWaitMin = waiting.length * 10;
+    return { doc, serving, waiting, completed, estWaitMin };
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Live token status — suitable for waiting area display</p>
+        <Badge variant="outline" className="animate-pulse text-success border-success/30 bg-success/10">● LIVE</Badge>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {doctorQueues.map(({ doc, serving, waiting, completed, estWaitMin }) => (
+          <div key={doc.id} className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="bg-primary/5 border-b border-border px-5 py-3">
+              <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
+              <p className="text-xs text-muted-foreground">{doc.specialization}</p>
+            </div>
+
+            <div className="p-5">
+              {/* Now Serving */}
+              <div className="text-center mb-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Now Serving</p>
+                {serving ? (
+                  <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                    <p className="text-4xl font-bold text-primary font-mono">{serving.tokenNo}</p>
+                    <p className="text-sm font-medium text-foreground mt-1">{serving.patientName}</p>
+                  </div>
+                ) : (
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <p className="text-2xl font-bold text-muted-foreground">—</p>
+                    <p className="text-xs text-muted-foreground mt-1">No active consultation</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Up Next */}
+              {waiting.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Up Next</p>
+                  <div className="flex flex-wrap gap-2">
+                    {waiting.slice(0, 6).map((w) => (
+                      <div key={w.id} className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-1.5 text-center">
+                        <p className="text-lg font-bold font-mono text-warning">{w.tokenNo}</p>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[80px]">{w.patientName}</p>
+                      </div>
+                    ))}
+                    {waiting.length > 6 && (
+                      <div className="flex items-center px-3">
+                        <span className="text-xs text-muted-foreground">+{waiting.length - 6} more</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-warning">{waiting.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Waiting</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-success">{completed.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Completed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-info">~{estWaitMin}m</p>
+                  <p className="text-[10px] text-muted-foreground">Est. Wait</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default ClinicManagement;
