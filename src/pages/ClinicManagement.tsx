@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Calendar, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   mockDoctorSchedules,
@@ -44,6 +47,7 @@ const ClinicManagement = () => {
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
+  const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [schedules, setSchedules] = useState(mockDoctorSchedules);
   const [queue, setQueue] = useState(mockQueue);
   const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
@@ -125,7 +129,7 @@ const ClinicManagement = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <SummaryCard label="Total Doctors" value={schedules.length} icon={<Users className="h-4 w-4" />} accent="text-primary" />
         <SummaryCard label="Waiting" value={waitingCount} icon={<Clock className="h-4 w-4" />} accent="text-warning" />
-        <SummaryCard label="In Consultation" value={inConsultCount} icon={<Calendar className="h-4 w-4" />} accent="text-info" />
+        <SummaryCard label="In Consultation" value={inConsultCount} icon={<CalendarIcon className="h-4 w-4" />} accent="text-info" />
         <SummaryCard label="Completed" value={completedCount} icon={<Users className="h-4 w-4" />} accent="text-success" />
       </div>
 
@@ -145,6 +149,23 @@ const ClinicManagement = () => {
         {/* ─── Doctor Slot Management ─── */}
         <TabsContent value="slots">
           <div className="flex items-center gap-3 mb-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  {format(slotDate, "dd/MM/yyyy")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={slotDate}
+                  onSelect={(d) => d && setSlotDate(d)}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
             <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
               <SelectTrigger className="w-[240px]">
                 <SelectValue placeholder="Filter by doctor" />
