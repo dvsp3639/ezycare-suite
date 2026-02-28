@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, startOfDay, isBefore, isToday } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,23 @@ const ClinicManagement = () => {
   const [schedules, setSchedules] = useState(mockDoctorSchedules);
   const [queue, setQueue] = useState(mockQueue);
   const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
+
+  // Date helpers
+  const isPastDate = isBefore(startOfDay(slotDate), startOfDay(new Date()));
+  const isTodayDate = isToday(slotDate);
+
+  const isSlotPast = (slotTime: string): boolean => {
+    if (!isTodayDate) return false;
+    const now = new Date();
+    const [time, period] = slotTime.split(" ");
+    const [h, m] = time.split(":").map(Number);
+    let hours = h;
+    if (period === "PM" && h !== 12) hours += 12;
+    if (period === "AM" && h === 12) hours = 0;
+    const slotDate_ = new Date();
+    slotDate_.setHours(hours, m, 0, 0);
+    return isBefore(slotDate_, now);
+  };
 
   // Derive dialog doctor from schedules state (fixes stale data bug)
   const editSlotDoctor = editSlotDoctorId
@@ -189,14 +206,19 @@ const ClinicManagement = () => {
                       <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
                       <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditSlotDoctorId(doc.id)}
-                    >
-                      <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
-                    </Button>
+                    {!isPastDate && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditSlotDoctorId(doc.id)}
+                      >
+                        <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
+                      </Button>
+                    )}
                   </div>
+                    {isPastDate && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">Read Only</Badge>
+                    )}
 
                   {/* Availability info */}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
@@ -207,6 +229,7 @@ const ClinicManagement = () => {
 
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {doc.timeSlots.filter(s => s.isActive).map((slot) => {
+                      const past = isPastDate || isSlotPast(slot.time);
                       const full = slot.bookedPatients >= slot.maxPatients;
                       const pct = (slot.bookedPatients / slot.maxPatients) * 100;
                       return (
@@ -214,7 +237,9 @@ const ClinicManagement = () => {
                           key={slot.time}
                           className={cn(
                             "rounded-lg border p-3 text-center transition-all",
-                            full
+                            past
+                              ? "border-border/50 bg-muted/40 opacity-50"
+                              : full
                               ? "border-destructive/30 bg-destructive/5"
                               : pct >= 60
                               ? "border-warning/30 bg-warning/5"
@@ -429,11 +454,14 @@ const ClinicManagement = () => {
 
               {/* Slot Configuration */}
               <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {editSlotDoctor.timeSlots.map((slot) => (
+                {editSlotDoctor.timeSlots.map((slot) => {
+                  const past = isSlotPast(slot.time);
+                  return (
                   <div
                     key={slot.time}
                     className={cn(
                       "flex items-center justify-between p-3 rounded-lg border transition-all",
+                      past ? "border-border/50 bg-muted/30 opacity-50" :
                       slot.isActive ? "border-border bg-card" : "border-border/50 bg-muted/30 opacity-60"
                     )}
                   >
@@ -441,11 +469,14 @@ const ClinicManagement = () => {
                       <Switch
                         checked={slot.isActive}
                         onCheckedChange={() => toggleSlotActive(editSlotDoctor.id, slot.time)}
-                        disabled={slot.bookedPatients > 0 && slot.isActive}
+                        disabled={past || (slot.bookedPatients > 0 && slot.isActive)}
                       />
-                      <span className={cn("text-sm font-medium", slot.isActive ? "text-foreground" : "text-muted-foreground")}>
-                        {slot.time}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-sm font-medium", slot.isActive && !past ? "text-foreground" : "text-muted-foreground")}>
+                          {slot.time}
+                        </span>
+                        {past && <Badge variant="outline" className="text-[10px] text-muted-foreground">Past</Badge>}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
@@ -457,7 +488,7 @@ const ClinicManagement = () => {
                           variant="outline"
                           className="h-7 w-7"
                           onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, -1)}
-                          disabled={!slot.isActive || slot.maxPatients <= slot.bookedPatients || slot.maxPatients <= 1}
+                          disabled={past || !slot.isActive || slot.maxPatients <= slot.bookedPatients || slot.maxPatients <= 1}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -467,16 +498,16 @@ const ClinicManagement = () => {
                           variant="outline"
                           className="h-7 w-7"
                           onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, 1)}
-                          disabled={!slot.isActive}
+                          disabled={past || !slot.isActive}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
-
               <Button onClick={() => { setEditSlotDoctorId(null); toast.success("Slot configuration saved"); }} className="w-full mt-2">
                 Save Configuration
               </Button>
