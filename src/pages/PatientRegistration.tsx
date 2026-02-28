@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,12 @@ import { toast } from "sonner";
 import { Search, UserPlus, Save, Printer, Calendar, Clock, X } from "lucide-react";
 import { mockPatients, mockDoctors, generateRegistrationNumber, type Patient } from "@/data/mockPatients";
 import TimeSlotPicker from "@/components/TimeSlotPicker";
+
+const formatDateDisplay = (dateStr: string) => {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+};
 
 const emptyPatient: Omit<Patient, "id" | "registrationNumber"> = {
   name: "", mobile: "", dob: "", gender: "Male", emergencyContact: "",
@@ -23,6 +29,7 @@ const PatientRegistration = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showAddNew, setShowAddNew] = useState(false);
 
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
@@ -42,6 +49,7 @@ const PatientRegistration = () => {
     setSelectedPatient(null);
     setIsRegistered(false);
     setShowOPD(false);
+    setShowAddNew(false);
     if (found.length === 0) {
       setForm({ ...emptyPatient, mobile: searchMobile });
     }
@@ -57,6 +65,15 @@ const PatientRegistration = () => {
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
+    setShowAddNew(false);
+  };
+
+  const handleAddNewPatient = () => {
+    setShowAddNew(true);
+    setSelectedPatient(null);
+    setIsRegistered(false);
+    setRegistrationNumber("");
+    setForm({ ...emptyPatient, mobile: searchMobile });
   };
 
   const updateField = (key: string, value: string) => {
@@ -68,10 +85,26 @@ const PatientRegistration = () => {
       toast.error("Please fill all required fields");
       return;
     }
+    // Check duplicate name+mobile (case insensitive)
+    const duplicate = mockPatients.find(
+      (p) => p.mobile === form.mobile && p.name.toLowerCase() === form.name.toLowerCase()
+    );
+    if (duplicate) {
+      toast.error("A patient with this name and mobile number already exists");
+      return;
+    }
     const regNum = generateRegistrationNumber();
+    const newPatient: Patient = {
+      id: Date.now().toString(),
+      registrationNumber: regNum,
+      ...form,
+    };
+    mockPatients.push(newPatient);
     setRegistrationNumber(regNum);
     setIsRegistered(true);
+    setSelectedPatient(newPatient);
     setShowSaveDialog(true);
+    setShowAddNew(false);
   };
 
   const handleOPDSave = (print: boolean) => {
@@ -80,11 +113,10 @@ const PatientRegistration = () => {
       return;
     }
     toast.success(`OPD booked successfully${print ? " — Printing..." : ""}`, {
-      description: `${form.name} | ${opdDate} | ${opdTimeSlot}`,
+      description: `${form.name} | ${formatDateDisplay(opdDate)} | ${opdTimeSlot}`,
     });
-    if (print) {
-      window.print();
-    }
+    if (print) window.print();
+    setShowOPD(false);
   };
 
   const resetForm = () => {
@@ -95,6 +127,7 @@ const PatientRegistration = () => {
     setSearchMobile("");
     setSearchResults(null);
     setShowOPD(false);
+    setShowAddNew(false);
   };
 
   return (
@@ -105,18 +138,20 @@ const PatientRegistration = () => {
           <h1 className="text-xl font-display font-bold text-foreground">Patient Registration</h1>
           <p className="text-sm text-muted-foreground">Search or register new patients</p>
         </div>
-        {form.name && !isRegistered && (
-          <Button onClick={handleSave} size="sm">
-            <Save className="mr-2 h-4 w-4" />
-            Save Details
-          </Button>
-        )}
-        {isRegistered && !showOPD && (
-          <Button onClick={() => setShowOPD(true)} size="sm">
-            <Calendar className="mr-2 h-4 w-4" />
-            Book OPD
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {((form.name && !isRegistered) || showAddNew) && (
+            <Button onClick={handleSave} size="sm">
+              <Save className="mr-2 h-4 w-4" />
+              Save Details
+            </Button>
+          )}
+          {isRegistered && (
+            <Button onClick={() => setShowOPD(true)} size="sm">
+              <Calendar className="mr-2 h-4 w-4" />
+              Book OPD
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Mobile Search */}
@@ -143,11 +178,17 @@ const PatientRegistration = () => {
       </div>
 
       {/* Search Results */}
-      {searchResults !== null && searchResults.length > 0 && !selectedPatient && (
+      {searchResults !== null && searchResults.length > 0 && !selectedPatient && !showAddNew && (
         <div className="bg-card rounded-xl border border-border p-5 mb-6 animate-fade-in">
-          <p className="text-sm font-medium text-foreground mb-3">
-            {searchResults.length} patient(s) found
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-foreground">
+              {searchResults.length} patient(s) found
+            </p>
+            <Button variant="outline" size="sm" onClick={handleAddNewPatient}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add New Patient
+            </Button>
+          </div>
           <div className="space-y-2">
             {searchResults.map((p) => (
               <button
@@ -157,7 +198,7 @@ const PatientRegistration = () => {
               >
                 <div>
                   <p className="font-semibold text-foreground">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.registrationNumber} · {p.gender} · DOB: {p.dob}</p>
+                  <p className="text-xs text-muted-foreground">{p.registrationNumber} · {p.gender} · DOB: {formatDateDisplay(p.dob)}</p>
                 </div>
                 <span className="text-xs text-primary font-medium">Select →</span>
               </button>
@@ -167,7 +208,7 @@ const PatientRegistration = () => {
       )}
 
       {/* No Results */}
-      {searchResults !== null && searchResults.length === 0 && (
+      {searchResults !== null && searchResults.length === 0 && !showAddNew && (
         <div className="bg-card rounded-xl border border-border p-5 mb-6 animate-fade-in text-center">
           <UserPlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm font-medium text-foreground">No patient found</p>
@@ -184,7 +225,7 @@ const PatientRegistration = () => {
       )}
 
       {/* Patient Form */}
-      {(searchResults !== null || selectedPatient) && (
+      {(searchResults !== null || selectedPatient || showAddNew) && (
         <div className="bg-card rounded-xl border border-border p-5 mb-6 animate-fade-in">
           <h3 className="text-sm font-semibold text-foreground mb-4">Patient Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -238,11 +279,14 @@ const PatientRegistration = () => {
         </div>
       )}
 
-      {/* OPD Booking Section */}
-      {showOPD && (
-        <div className="bg-card rounded-xl border border-border p-5 animate-fade-in">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Book OPD Appointment</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* OPD Booking Modal */}
+      <Dialog open={showOPD} onOpenChange={setShowOPD}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">Book OPD Appointment</DialogTitle>
+            <p className="text-sm text-muted-foreground">{form.name} · {registrationNumber}</p>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
               <Input type="date" value={opdDate} onChange={(e) => setOpdDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
@@ -279,8 +323,7 @@ const PatientRegistration = () => {
               </Button>
             </div>
           </div>
-
-          <div className="flex gap-3 mt-6 pt-4 border-t border-border">
+          <div className="flex gap-3 mt-4 pt-4 border-t border-border">
             <Button onClick={() => handleOPDSave(false)}>
               <Save className="mr-2 h-4 w-4" />
               Save
@@ -290,8 +333,8 @@ const PatientRegistration = () => {
               Save & Print
             </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Time Slot Picker Dialog */}
       <TimeSlotPicker

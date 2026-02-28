@@ -109,6 +109,6 @@
     box-shadow: 0 10px 25px -5px hsl(270 50% 45% / 0.12), 0 4px 6px -2px hsl(270 50% 45% / 0.06);
   }
   .login-gradient {
-    background: linear-gradient(135deg, hsl(270 50% 45%), hsl(270 60% 35%));
+    background: linear-gradient(135deg, hsl(200 30% 92%), hsl(180 25% 88%));
   }
 }

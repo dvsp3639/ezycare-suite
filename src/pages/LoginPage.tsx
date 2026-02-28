@@ -27,7 +27,7 @@ const LoginPage = () => {
       <div className="hidden lg:flex lg:w-1/2 login-gradient items-center justify-center p-12">
         <div className="text-center animate-fade-in">
           <img src={ezyopLogo} alt="EZY OP Logo" className="w-64 mx-auto mb-8 drop-shadow-lg" />
-          <p className="text-primary-foreground/80 text-lg font-light max-w-sm mx-auto">
+          <p className="text-foreground/60 text-lg font-light max-w-sm mx-auto">
             Complete Hospital & Clinic Management System
           </p>
         </div>
