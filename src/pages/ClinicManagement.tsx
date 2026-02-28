@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Calendar, Clock, Users, Search, Settings2, Plus, Minus } from "lucide-react";
+import { Calendar, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   mockDoctorSchedules,
@@ -16,6 +16,7 @@ import {
   mockClinicPatients,
   type DoctorSchedule,
   type QueueEntry,
+  type ClinicPatient,
 } from "@/data/mockClinicData";
 
 const formatDateDisplay = (dateStr: string) => {
@@ -42,9 +43,15 @@ const ClinicManagement = () => {
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
-  const [editSlotDoctor, setEditSlotDoctor] = useState<DoctorSchedule | null>(null);
+  const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [schedules, setSchedules] = useState(mockDoctorSchedules);
   const [queue, setQueue] = useState(mockQueue);
+  const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
+
+  // Derive dialog doctor from schedules state (fixes stale data bug)
+  const editSlotDoctor = editSlotDoctorId
+    ? schedules.find((d) => d.id === editSlotDoctorId) ?? null
+    : null;
 
   // Slot management
   const updateMaxPatients = (doctorId: string, slotTime: string, delta: number) => {
@@ -61,6 +68,27 @@ const ClinicManagement = () => {
             }
           : doc
       )
+    );
+  };
+
+  const toggleSlotActive = (doctorId: string, slotTime: string) => {
+    setSchedules((prev) =>
+      prev.map((doc) =>
+        doc.id === doctorId
+          ? {
+              ...doc,
+              timeSlots: doc.timeSlots.map((s) =>
+                s.time === slotTime ? { ...s, isActive: !s.isActive } : s
+              ),
+            }
+          : doc
+      )
+    );
+  };
+
+  const updateDoctorAvailability = (doctorId: string, field: "availableFrom" | "availableTo", value: string) => {
+    setSchedules((prev) =>
+      prev.map((doc) => (doc.id === doctorId ? { ...doc, [field]: value } : doc))
     );
   };
 
@@ -135,7 +163,7 @@ const ClinicManagement = () => {
               .filter((d) => selectedDoctor === "all" || d.id === selectedDoctor)
               .map((doc) => (
                 <div key={doc.id} className="bg-card rounded-xl border border-border p-5">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
                       <p className="text-xs text-muted-foreground">{doc.specialization}</p>
@@ -143,14 +171,21 @@ const ClinicManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditSlotDoctor(doc)}
+                      onClick={() => setEditSlotDoctorId(doc.id)}
                     >
                       <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
                     </Button>
                   </div>
 
+                  {/* Availability info */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+                    <span className="flex items-center gap-1"><ClockIcon className="h-3.5 w-3.5" /> {doc.availableFrom} – {doc.availableTo}</span>
+                    <span>{doc.consultationDuration} min/slot</span>
+                    <span>{doc.timeSlots.filter((s) => s.isActive).length} active slots</span>
+                  </div>
+
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                    {doc.timeSlots.map((slot) => {
+                    {doc.timeSlots.filter(s => s.isActive).map((slot) => {
                       const full = slot.bookedPatients >= slot.maxPatients;
                       const pct = (slot.bookedPatients / slot.maxPatients) * 100;
                       return (
@@ -299,7 +334,8 @@ const ClinicManagement = () => {
                   <TableHead>Doctor</TableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Last Visit</TableHead>
-                  <TableHead className="text-right">Visits</TableHead>
+                  <TableHead>Visits</TableHead>
+                  <TableHead className="text-right">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -312,14 +348,19 @@ const ClinicManagement = () => {
                     <TableCell className="text-sm">{p.doctor}</TableCell>
                     <TableCell className="text-sm">{p.diagnosis}</TableCell>
                     <TableCell className="text-sm">{formatDateDisplay(p.lastVisit)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                       <Badge variant="outline">{p.totalVisits}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedPatient(p)}>
+                        <Eye className="h-4 w-4 mr-1" /> View
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
                 {filteredPatients.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No patients found
                     </TableCell>
                   </TableRow>
@@ -330,48 +371,178 @@ const ClinicManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Manage Slots Dialog */}
-      <Dialog open={!!editSlotDoctor} onOpenChange={(v) => !v && setEditSlotDoctor(null)}>
-        <DialogContent className="max-w-md">
+      {/* ─── Manage Slots Dialog ─── */}
+      <Dialog open={!!editSlotDoctorId} onOpenChange={(v) => !v && setEditSlotDoctorId(null)}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">Manage Slots — {editSlotDoctor?.doctorName}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{editSlotDoctor?.specialization} · Max patients per slot</p>
+            <p className="text-sm text-muted-foreground">{editSlotDoctor?.specialization}</p>
           </DialogHeader>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {editSlotDoctor?.timeSlots.map((slot) => (
-              <div key={slot.time} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <span className="text-sm font-medium text-foreground">{slot.time}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {slot.bookedPatients} booked
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-7 w-7"
-                      onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, -1)}
-                      disabled={slot.maxPatients <= slot.bookedPatients || slot.maxPatients <= 1}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-8 text-center font-semibold text-foreground text-sm">{slot.maxPatients}</span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-7 w-7"
-                      onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+
+          {editSlotDoctor && (
+            <>
+              {/* Availability Hours */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <ClockIcon className="h-4 w-4" /> Availability Hours
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">From</label>
+                    <Input
+                      value={editSlotDoctor.availableFrom}
+                      onChange={(e) => updateDoctorAvailability(editSlotDoctor.id, "availableFrom", e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">To</label>
+                    <Input
+                      value={editSlotDoctor.availableTo}
+                      onChange={(e) => updateDoctorAvailability(editSlotDoctor.id, "availableTo", e.target.value)}
+                      className="h-9"
+                    />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-          <Button onClick={() => { setEditSlotDoctor(null); toast.success("Slot configuration saved"); }} className="w-full mt-2">
-            Save Configuration
-          </Button>
+
+              {/* Slot Configuration */}
+              <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                {editSlotDoctor.timeSlots.map((slot) => (
+                  <div
+                    key={slot.time}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border transition-all",
+                      slot.isActive ? "border-border bg-card" : "border-border/50 bg-muted/30 opacity-60"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={slot.isActive}
+                        onCheckedChange={() => toggleSlotActive(editSlotDoctor.id, slot.time)}
+                        disabled={slot.bookedPatients > 0 && slot.isActive}
+                      />
+                      <span className={cn("text-sm font-medium", slot.isActive ? "text-foreground" : "text-muted-foreground")}>
+                        {slot.time}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {slot.bookedPatients} booked
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, -1)}
+                          disabled={!slot.isActive || slot.maxPatients <= slot.bookedPatients || slot.maxPatients <= 1}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center font-semibold text-foreground text-sm">{slot.maxPatients}</span>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, 1)}
+                          disabled={!slot.isActive}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button onClick={() => { setEditSlotDoctorId(null); toast.success("Slot configuration saved"); }} className="w-full mt-2">
+                Save Configuration
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Patient Detail Dialog ─── */}
+      <Dialog open={!!selectedPatient} onOpenChange={(v) => !v && setSelectedPatient(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {selectedPatient && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-display">{selectedPatient.name}</DialogTitle>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">{selectedPatient.registrationNumber}</Badge>
+                  <Badge variant="outline" className="text-xs">{selectedPatient.age} yrs · {selectedPatient.gender}</Badge>
+                  <Badge variant="outline" className="text-xs">{selectedPatient.mobile}</Badge>
+                </div>
+              </DialogHeader>
+
+              {/* Current Overview */}
+              <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Current Doctor</p>
+                  <p className="font-medium text-foreground">{selectedPatient.doctor}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Latest Diagnosis</p>
+                  <p className="font-medium text-foreground">{selectedPatient.diagnosis}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Visits</p>
+                  <p className="font-medium text-foreground">{selectedPatient.totalVisits}</p>
+                </div>
+              </div>
+
+              {/* Visit History */}
+              <div>
+                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" /> Visit History
+                </h4>
+                <div className="space-y-3">
+                  {selectedPatient.visitHistory.map((visit) => (
+                    <div key={visit.id} className="border border-border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{formatDateDisplay(visit.date)}</span>
+                          <Badge variant="outline" className={cn("text-xs", opdTypeColor[visit.opdType])}>
+                            {visit.opdType}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{visit.doctor}</span>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Diagnosis</p>
+                        <p className="text-sm font-medium text-foreground">{visit.diagnosis}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Pill className="h-3 w-3" /> Prescription
+                        </p>
+                        <ul className="space-y-0.5">
+                          {visit.prescription.map((rx, i) => (
+                            <li key={i} className="text-sm text-foreground flex items-start gap-1.5">
+                              <span className="text-primary mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                              {rx}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {visit.notes && (
+                        <div className="bg-muted/50 rounded p-2">
+                          <p className="text-xs text-muted-foreground">Doctor's Notes</p>
+                          <p className="text-sm text-foreground">{visit.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
