@@ -4,18 +4,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon, CalendarDays, Monitor } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon, CalendarDays, Monitor, Stethoscope, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useClinicData } from "@/contexts/ClinicDataContext";
 import {
-  mockDoctorSchedules,
-  mockQueue,
   mockClinicPatients,
   type DoctorSchedule,
   type QueueEntry,
@@ -51,15 +52,21 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 
 
 const ClinicManagement = () => {
+  const { schedules, setSchedules, queue, updateQueueStatus, updateQueueConsultation } = useClinicData();
+
   const [activeTab, setActiveTab] = useState("slots");
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
-  const [schedules, setSchedules] = useState(mockDoctorSchedules);
-  const [queue, setQueue] = useState(mockQueue);
   const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
+
+  // Consultation dialog state
+  const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
+  const [consultDiagnosis, setConsultDiagnosis] = useState("");
+  const [consultPrescription, setConsultPrescription] = useState("");
+  const [consultNotes, setConsultNotes] = useState("");
 
   // Date helpers
   const isPastDate = isBefore(startOfDay(slotDate), startOfDay(new Date()));
@@ -78,7 +85,6 @@ const ClinicManagement = () => {
     return isBefore(slotDate_, now);
   };
 
-  // Derive dialog doctor from schedules state (fixes stale data bug)
   const editSlotDoctor = editSlotDoctorId
     ? schedules.find((d) => d.id === editSlotDoctorId) ?? null
     : null;
@@ -123,9 +129,36 @@ const ClinicManagement = () => {
   };
 
   // Queue actions
-  const updateQueueStatus = (id: string, status: QueueEntry["status"]) => {
-    setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
-    toast.success(`Status updated to ${status}`);
+  const handleStartConsultation = (entry: QueueEntry) => {
+    updateQueueStatus(entry.id, "In Consultation");
+    toast.success(`Started consultation for ${entry.patientName}`);
+  };
+
+  const handleOpenConsultDialog = (entry: QueueEntry) => {
+    setConsultPatient(entry);
+    setConsultDiagnosis(entry.diagnosis || "");
+    setConsultPrescription(entry.prescription?.join("\n") || "");
+    setConsultNotes(entry.doctorNotes || "");
+  };
+
+  const handleCompleteConsultation = () => {
+    if (!consultPatient) return;
+    if (!consultDiagnosis.trim()) {
+      toast.error("Please enter a diagnosis before completing");
+      return;
+    }
+    const prescriptionList = consultPrescription
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    updateQueueConsultation(consultPatient.id, {
+      diagnosis: consultDiagnosis,
+      prescription: prescriptionList,
+      notes: consultNotes,
+    });
+    toast.success(`Consultation completed for ${consultPatient.patientName}`);
+    setConsultPatient(null);
   };
 
   const filteredQueue =
@@ -232,7 +265,6 @@ const ClinicManagement = () => {
                       <Badge variant="outline" className="text-xs text-muted-foreground">Read Only</Badge>
                     )}
 
-                  {/* Availability info */}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
                     <span className="flex items-center gap-1"><ClockIcon className="h-3.5 w-3.5" /> {doc.availableFrom} – {doc.availableTo}</span>
                     <span>{doc.consultationDuration} min/slot</span>
@@ -341,15 +373,20 @@ const ClinicManagement = () => {
                         {q.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
                       {q.status === "Waiting" && (
-                        <Button size="sm" variant="outline" onClick={() => updateQueueStatus(q.id, "In Consultation")}>
+                        <Button size="sm" variant="outline" onClick={() => handleStartConsultation(q)}>
                           Start
                         </Button>
                       )}
                       {q.status === "In Consultation" && (
-                        <Button size="sm" variant="outline" onClick={() => updateQueueStatus(q.id, "Completed")}>
-                          Complete
+                        <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
+                          <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
+                        </Button>
+                      )}
+                      {q.status === "Completed" && q.diagnosis && (
+                        <Button size="sm" variant="ghost" onClick={() => handleOpenConsultDialog(q)}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> View
                         </Button>
                       )}
                     </TableCell>
@@ -444,7 +481,6 @@ const ClinicManagement = () => {
 
           {editSlotDoctor && (
             <>
-              {/* Availability Hours */}
               <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                 <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <ClockIcon className="h-4 w-4" /> Availability Hours
@@ -471,7 +507,6 @@ const ClinicManagement = () => {
                 </div>
               </div>
 
-              {/* Slot Configuration */}
               <div className="space-y-2 max-h-[320px] overflow-y-auto">
                 {editSlotDoctor.timeSlots.map((slot) => {
                   const past = isSlotPast(slot.time);
@@ -535,6 +570,79 @@ const ClinicManagement = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ─── Consultation Dialog ─── */}
+      <Dialog open={!!consultPatient} onOpenChange={(v) => !v && setConsultPatient(null)}>
+        <DialogContent className="max-w-xl">
+          {consultPatient && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-primary" />
+                  {consultPatient.status === "Completed" ? "Consultation Summary" : "Consultation"}
+                </DialogTitle>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">{consultPatient.patientName}</Badge>
+                  <Badge variant="outline" className="text-xs font-mono">{consultPatient.registrationNumber}</Badge>
+                  <Badge variant="outline" className={cn("text-xs", opdTypeColor[consultPatient.opdType])}>
+                    {consultPatient.opdType}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">{consultPatient.timeSlot}</Badge>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Diagnosis *</Label>
+                  <Input
+                    value={consultDiagnosis}
+                    onChange={(e) => setConsultDiagnosis(e.target.value)}
+                    placeholder="e.g., Type 2 Diabetes, Viral Fever"
+                    disabled={consultPatient.status === "Completed"}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    <Pill className="h-3 w-3 inline mr-1" /> Prescription
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">One medicine per line (e.g., Paracetamol 500mg – twice daily)</p>
+                  <Textarea
+                    value={consultPrescription}
+                    onChange={(e) => setConsultPrescription(e.target.value)}
+                    placeholder={"Metformin 500mg – twice daily\nVitamin D3 60k – weekly"}
+                    rows={4}
+                    disabled={consultPatient.status === "Completed"}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    <FileText className="h-3 w-3 inline mr-1" /> Doctor's Notes
+                  </Label>
+                  <Textarea
+                    value={consultNotes}
+                    onChange={(e) => setConsultNotes(e.target.value)}
+                    placeholder="Clinical observations, follow-up instructions, etc."
+                    rows={3}
+                    disabled={consultPatient.status === "Completed"}
+                  />
+                </div>
+              </div>
+
+              {consultPatient.status !== "Completed" && (
+                <DialogFooter className="pt-4 border-t border-border">
+                  <Button variant="outline" onClick={() => setConsultPatient(null)}>Cancel</Button>
+                  <Button onClick={handleCompleteConsultation}>
+                    <Stethoscope className="h-4 w-4 mr-1.5" />
+                    Complete Consultation
+                  </Button>
+                </DialogFooter>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Patient Detail Dialog ─── */}
       <Dialog open={!!selectedPatient} onOpenChange={(v) => !v && setSelectedPatient(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -549,7 +657,6 @@ const ClinicManagement = () => {
                 </div>
               </DialogHeader>
 
-              {/* Current Overview */}
               <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Current Doctor</p>
@@ -565,7 +672,6 @@ const ClinicManagement = () => {
                 </div>
               </div>
 
-              {/* Visit History */}
               <div>
                 <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
                   <FileText className="h-4 w-4" /> Visit History
@@ -656,7 +762,6 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
             </div>
 
             <div className="p-5">
-              {/* Now Serving */}
               <div className="text-center mb-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Now Serving</p>
                 {serving ? (
@@ -672,7 +777,6 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
                 )}
               </div>
 
-              {/* Up Next */}
               {waiting.length > 0 && (
                 <div className="mb-4">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Up Next</p>
@@ -692,7 +796,6 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
                 </div>
               )}
 
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
                 <div className="text-center">
                   <p className="text-lg font-bold text-warning">{waiting.length}</p>
