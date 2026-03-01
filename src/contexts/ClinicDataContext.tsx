@@ -8,6 +8,7 @@ import {
   type ClinicPatient,
   type Vitals,
   type LabOrder,
+  type LabResult,
   type PrescriptionItem,
 } from "@/data/mockClinicData";
 
@@ -24,6 +25,10 @@ interface ClinicDataContextType {
   updateQueueLabOrders: (id: string, labOrders: LabOrder[]) => void;
   updateQueueFollowUp: (id: string, followUpDate: string) => void;
   incrementSlotBooked: (doctorId: string, slotTime: string) => void;
+  // Diagnostics workflow
+  allLabOrders: LabOrder[];
+  updateLabOrderStatus: (labOrderId: string, status: LabOrder["status"]) => void;
+  updateLabOrderResults: (labOrderId: string, results: LabResult[], reportNotes?: string) => void;
 }
 
 const ClinicDataContext = createContext<ClinicDataContextType | null>(null);
@@ -83,9 +88,40 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
+  // Collect all lab orders from all queue entries
+  const allLabOrders = queue.flatMap((q) =>
+    (q.labOrders || []).map((lab) => ({ ...lab }))
+  );
+
+  const updateLabOrderStatus = useCallback((labOrderId: string, status: LabOrder["status"]) => {
+    setQueue((prev) =>
+      prev.map((q) => ({
+        ...q,
+        labOrders: q.labOrders?.map((lab) =>
+          lab.id === labOrderId
+            ? { ...lab, status, ...(status === "Sample Collected" ? { sampleCollectedAt: new Date().toLocaleTimeString() } : {}), ...(status === "Completed" ? { completedAt: new Date().toLocaleTimeString() } : {}) }
+            : lab
+        ),
+      }))
+    );
+  }, []);
+
+  const updateLabOrderResults = useCallback((labOrderId: string, results: LabResult[], reportNotes?: string) => {
+    setQueue((prev) =>
+      prev.map((q) => ({
+        ...q,
+        labOrders: q.labOrders?.map((lab) =>
+          lab.id === labOrderId
+            ? { ...lab, results, reportNotes, status: "Completed" as const, completedAt: new Date().toLocaleTimeString() }
+            : lab
+        ),
+      }))
+    );
+  }, []);
+
   return (
     <ClinicDataContext.Provider
-      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked }}
+      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked, allLabOrders, updateLabOrderStatus, updateLabOrderResults }}
     >
       {children}
     </ClinicDataContext.Provider>

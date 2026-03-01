@@ -11,6 +11,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import PatientRegistration from "./pages/PatientRegistration";
 import ClinicManagement from "./pages/ClinicManagement";
 import Pharmacy from "./pages/Pharmacy";
+import Diagnostics from "./pages/Diagnostics";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const AppRoutes = () => (
     <Route path="/patient-registration" element={<ProtectedRoute><PatientRegistration /></ProtectedRoute>} />
     <Route path="/clinic-management" element={<ProtectedRoute><ClinicManagement /></ProtectedRoute>} />
     <Route path="/pharmacy" element={<ProtectedRoute><Pharmacy /></ProtectedRoute>} />
+    <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />
