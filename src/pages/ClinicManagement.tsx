@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import {
   Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon,
   CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
-  CalendarPlus, Trash2, CheckCircle2,
+  CalendarPlus, Trash2, CheckCircle2, Save, Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
@@ -69,7 +69,7 @@ const emptyVitals = (): Vitals => ({
 
 const ClinicManagement = () => {
   const {
-    schedules, setSchedules, queue,
+    schedules, setSchedules, queue, setQueue,
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
   } = useClinicData();
 
@@ -174,6 +174,35 @@ const ClinicManagement = () => {
     setConsultFollowUp(entry.followUpDate ? new Date(entry.followUpDate) : undefined);
   };
 
+  const handleSaveData = () => {
+    if (!consultPatient) return;
+    // Save vitals
+    if (consultVitals.bp || consultVitals.temperature) {
+      updateQueueVitals(consultPatient.id, consultVitals);
+    }
+    // Send lab orders to diagnostics
+    if (consultLabOrders.length > 0) {
+      updateQueueLabOrders(consultPatient.id, consultLabOrders);
+    }
+    // Send prescription to pharmacy (saved on queue entry)
+    const prescriptionLines = consultPrescriptions
+      .filter((p) => p.medicine.trim())
+      .map((p) => `${p.medicine} ${p.dosage} – ${p.frequency}${p.duration ? ` for ${p.duration}` : ""}${p.instructions ? ` (${p.instructions})` : ""}`);
+    if (prescriptionLines.length > 0 || consultDiagnosis.trim()) {
+      setQueue((prev) =>
+        prev.map((q) =>
+          q.id === consultPatient.id
+            ? { ...q, diagnosis: consultDiagnosis || q.diagnosis, prescription: prescriptionLines.length > 0 ? prescriptionLines : q.prescription, structuredPrescription: consultPrescriptions.filter((p) => p.medicine.trim()), doctorNotes: consultNotes || q.doctorNotes }
+            : q
+        )
+      );
+    }
+    if (consultFollowUp) {
+      updateQueueFollowUp(consultPatient.id, format(consultFollowUp, "yyyy-MM-dd"));
+    }
+    toast.success(`Data saved & sent to Pharmacy/Diagnostics for ${consultPatient.patientName}`);
+  };
+
   const handleCompleteConsultation = () => {
     if (!consultPatient) return;
     if (!consultDiagnosis.trim()) {
@@ -213,12 +242,14 @@ const ClinicManagement = () => {
 
   const addLabOrder = () => {
     if (!newLabTest.trim() || !consultPatient) return;
+    const testDef = labTestCatalog.find((t) => t.name === newLabTest);
     const newOrder: LabOrder = {
       id: `lab-${Date.now()}`,
       testName: newLabTest,
       category: newLabCategory,
       priority: newLabPriority,
       status: "Ordered",
+      price: testDef?.price || 0,
       clinicalNotes: newLabClinicalNotes || undefined,
       orderedBy: consultPatient.doctorName,
       orderedAt: new Date().toLocaleTimeString(),
@@ -651,9 +682,9 @@ const ClinicManagement = () => {
               <Tabs value={consultTab} onValueChange={setConsultTab}>
                 <TabsList className="w-full grid grid-cols-5">
                   <TabsTrigger value="vitals" className="text-xs"><Activity className="h-3.5 w-3.5 mr-1" /> Vitals</TabsTrigger>
+                  <TabsTrigger value="labs" className="text-xs"><FlaskConical className="h-3.5 w-3.5 mr-1" /> Labs</TabsTrigger>
                   <TabsTrigger value="diagnosis" className="text-xs"><Stethoscope className="h-3.5 w-3.5 mr-1" /> Diagnosis</TabsTrigger>
                   <TabsTrigger value="prescription" className="text-xs"><Pill className="h-3.5 w-3.5 mr-1" /> Rx</TabsTrigger>
-                  <TabsTrigger value="labs" className="text-xs"><FlaskConical className="h-3.5 w-3.5 mr-1" /> Labs</TabsTrigger>
                   <TabsTrigger value="followup" className="text-xs"><CalendarPlus className="h-3.5 w-3.5 mr-1" /> Follow-up</TabsTrigger>
                 </TabsList>
 
@@ -832,6 +863,16 @@ const ClinicManagement = () => {
                                     </TableBody>
                                   </Table>
                                   {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
+                                  {lab.reportFiles && lab.reportFiles.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-border space-y-1">
+                                      <p className="text-xs font-semibold text-foreground flex items-center gap-1"><Download className="h-3 w-3" /> Attached Files</p>
+                                      {lab.reportFiles.map((file, fi) => (
+                                        <a key={fi} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-info hover:underline">
+                                          <FileText className="h-3 w-3" /> {file.name}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
                                 </PopoverContent>
                               </Popover>
                             )}
@@ -886,9 +927,14 @@ const ClinicManagement = () => {
                 <div className="flex items-center gap-2">
                   <Button variant="outline" onClick={() => setConsultPatient(null)}>{isReadOnly ? "Close" : "Cancel"}</Button>
                   {!isReadOnly && (
-                    <Button onClick={handleCompleteConsultation}>
-                      <Stethoscope className="h-4 w-4 mr-1.5" /> Complete Consultation
-                    </Button>
+                    <>
+                      <Button variant="secondary" onClick={handleSaveData}>
+                        <Save className="h-4 w-4 mr-1.5" /> Save & Send
+                      </Button>
+                      <Button onClick={handleCompleteConsultation}>
+                        <Stethoscope className="h-4 w-4 mr-1.5" /> Complete Consultation
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

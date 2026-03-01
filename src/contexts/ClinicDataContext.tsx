@@ -28,7 +28,8 @@ interface ClinicDataContextType {
   // Diagnostics workflow
   allLabOrders: LabOrder[];
   updateLabOrderStatus: (labOrderId: string, status: LabOrder["status"]) => void;
-  updateLabOrderResults: (labOrderId: string, results: LabResult[], reportNotes?: string) => void;
+  updateLabOrderResults: (labOrderId: string, results: LabResult[], reportNotes?: string, reportFiles?: { name: string; url: string; type: string }[]) => void;
+  updateLabOrderPayment: (labOrderId: string, paymentMode: "Cash" | "Credit") => void;
 }
 
 const ClinicDataContext = createContext<ClinicDataContextType | null>(null);
@@ -106,13 +107,26 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
-  const updateLabOrderResults = useCallback((labOrderId: string, results: LabResult[], reportNotes?: string) => {
+  const updateLabOrderResults = useCallback((labOrderId: string, results: LabResult[], reportNotes?: string, reportFiles?: { name: string; url: string; type: string }[]) => {
     setQueue((prev) =>
       prev.map((q) => ({
         ...q,
         labOrders: q.labOrders?.map((lab) =>
           lab.id === labOrderId
-            ? { ...lab, results, reportNotes, status: "Completed" as const, completedAt: new Date().toLocaleTimeString() }
+            ? { ...lab, results, reportNotes, reportFiles, status: "Completed" as const, completedAt: new Date().toLocaleTimeString() }
+            : lab
+        ),
+      }))
+    );
+  }, []);
+
+  const updateLabOrderPayment = useCallback((labOrderId: string, paymentMode: "Cash" | "Credit") => {
+    setQueue((prev) =>
+      prev.map((q) => ({
+        ...q,
+        labOrders: q.labOrders?.map((lab) =>
+          lab.id === labOrderId
+            ? { ...lab, paymentStatus: "Paid" as const, paymentMode }
             : lab
         ),
       }))
@@ -121,7 +135,7 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <ClinicDataContext.Provider
-      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked, allLabOrders, updateLabOrderStatus, updateLabOrderResults }}
+      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked, allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment }}
     >
       {children}
     </ClinicDataContext.Provider>
