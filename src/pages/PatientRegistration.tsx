@@ -11,6 +11,7 @@ import { Search, UserPlus, Save, Printer, Calendar, Clock, X } from "lucide-reac
 import { mockPatients, generateRegistrationNumber, type Patient } from "@/data/mockPatients";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { cn } from "@/lib/utils";
+import TimeSlotPicker from "@/components/TimeSlotPicker";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -41,6 +42,7 @@ const PatientRegistration = () => {
   const [opdType, setOpdType] = useState("");
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const handleSearch = () => {
     if (searchMobile.length < 10) {
@@ -350,34 +352,29 @@ const PatientRegistration = () => {
               {!opdDoctor ? (
                 <p className="text-xs text-muted-foreground pt-2">Select a doctor first</p>
               ) : (
-                <div className="grid grid-cols-3 gap-1.5 max-h-[200px] overflow-y-auto border border-border rounded-lg p-2">
-                  {selectedDoctorSchedule?.timeSlots
-                    .filter((s) => s.isActive)
-                    .map((slot) => {
-                      const full = slot.bookedPatients >= slot.maxPatients;
-                      const selected = opdTimeSlot === slot.time;
-                      return (
-                        <button
-                          key={slot.time}
-                          disabled={full}
-                          onClick={() => setOpdTimeSlot(slot.time)}
-                          className={cn(
-                            "p-2 rounded-md text-xs font-medium transition-all border",
-                            selected
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : full
-                              ? "bg-muted text-muted-foreground/40 border-transparent cursor-not-allowed line-through"
-                              : "border-border bg-card text-foreground hover:border-primary hover:bg-accent cursor-pointer"
-                          )}
-                        >
-                          <span>{slot.time}</span>
-                          <span className={cn("block text-[10px]", full ? "text-muted-foreground/30" : "text-muted-foreground")}>
-                            {slot.bookedPatients}/{slot.maxPatients}
-                          </span>
-                        </button>
-                      );
-                    })}
-                </div>
+                <>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between h-10"
+                    onClick={() => setShowTimePicker(true)}
+                  >
+                    <span className={opdTimeSlot ? "text-foreground" : "text-muted-foreground"}>
+                      {opdTimeSlot || "Select time slot"}
+                    </span>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                  {selectedDoctorSchedule && (
+                    <TimeSlotPicker
+                      open={showTimePicker}
+                      onOpenChange={setShowTimePicker}
+                      onSelect={setOpdTimeSlot}
+                      selectedTime={opdTimeSlot}
+                      slots={selectedDoctorSchedule.timeSlots}
+                      doctorName={selectedDoctorSchedule.doctorName}
+                      selectedDate={opdDate}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
