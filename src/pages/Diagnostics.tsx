@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   FlaskConical, Search, ClipboardList, TestTube, FileCheck, Eye, Printer,
-  AlertTriangle, CheckCircle2, Clock, Beaker, ArrowRight,
+  AlertTriangle, CheckCircle2, Clock, Beaker, ArrowRight, IndianRupee,
+  Upload, FileImage, FileText, Download, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
@@ -28,7 +29,7 @@ const statusColors: Record<string, string> = {
 };
 
 const Diagnostics = () => {
-  const { allLabOrders, updateLabOrderStatus, updateLabOrderResults } = useClinicData();
+  const { allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment } = useClinicData();
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -38,9 +39,14 @@ const Diagnostics = () => {
   const [resultOrder, setResultOrder] = useState<LabOrder | null>(null);
   const [resultValues, setResultValues] = useState<LabResult[]>([]);
   const [reportNotes, setReportNotes] = useState("");
+  const [reportFiles, setReportFiles] = useState<{ name: string; url: string; type: string }[]>([]);
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<LabOrder | null>(null);
+
+  // Payment dialog
+  const [paymentOrder, setPaymentOrder] = useState<LabOrder | null>(null);
+  const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit">("Cash");
 
   const pendingOrders = useMemo(() =>
     allLabOrders.filter((o) => o.status !== "Completed"), [allLabOrders]
@@ -69,9 +75,28 @@ const Diagnostics = () => {
   const inProgressCount = allLabOrders.filter((o) => o.status === "In Progress").length;
   const completedCount = completedOrders.length;
 
-  const handleCollectSample = (order: LabOrder) => {
-    updateLabOrderStatus(order.id, "Sample Collected");
-    toast.success(`Sample collected for ${order.testName} — ${order.patientName}`);
+  // Payment: show payment dialog before accepting (collecting sample)
+  const handleAcceptOrder = (order: LabOrder) => {
+    if (order.paymentStatus === "Paid") {
+      // Already paid, go directly to collect sample
+      updateLabOrderStatus(order.id, "Sample Collected");
+      toast.success(`Sample collected for ${order.testName} — ${order.patientName}`);
+    } else {
+      setPaymentOrder(order);
+      setPaymentMode("Cash");
+    }
+  };
+
+  const handleConfirmPayment = () => {
+    if (!paymentOrder) return;
+    updateLabOrderPayment(paymentOrder.id, paymentMode);
+    toast.success(`Payment ₹${paymentOrder.price} received via ${paymentMode}`);
+    // After payment, collect sample
+    setTimeout(() => {
+      updateLabOrderStatus(paymentOrder.id, "Sample Collected");
+      toast.success(`Sample collected for ${paymentOrder.testName}`);
+    }, 300);
+    setPaymentOrder(null);
   };
 
   const handleStartProcessing = (order: LabOrder) => {
@@ -81,7 +106,6 @@ const Diagnostics = () => {
 
   const handleOpenResultEntry = (order: LabOrder) => {
     setResultOrder(order);
-    // Find test definition to pre-populate parameters
     const testDef = labTestCatalog.find((t) => t.name === order.testName);
     if (testDef) {
       setResultValues(
@@ -97,16 +121,31 @@ const Diagnostics = () => {
       setResultValues([{ parameter: "Result", value: "", unit: "", normalRange: "", isAbnormal: false }]);
     }
     setReportNotes("");
+    setReportFiles(order.reportFiles || []);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      const url = URL.createObjectURL(file);
+      setReportFiles((prev) => [...prev, { name: file.name, url, type: file.type }]);
+    });
+    e.target.value = "";
+  };
+
+  const removeFile = (idx: number) => {
+    setReportFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleSaveResults = () => {
     if (!resultOrder) return;
     const filledResults = resultValues.filter((r) => r.value.trim());
-    if (filledResults.length === 0) {
-      toast.error("Please enter at least one result value");
+    if (filledResults.length === 0 && reportFiles.length === 0) {
+      toast.error("Please enter results or upload report files");
       return;
     }
-    updateLabOrderResults(resultOrder.id, filledResults, reportNotes || undefined);
+    updateLabOrderResults(resultOrder.id, filledResults, reportNotes || undefined, reportFiles.length > 0 ? reportFiles : undefined);
     toast.success(`Report saved for ${resultOrder.testName} — ${resultOrder.patientName}`);
     setResultOrder(null);
   };
@@ -156,6 +195,8 @@ const Diagnostics = () => {
         <div><strong>Priority:</strong> ${order.priority}</div>
         <div><strong>Ordered At:</strong> ${order.orderedAt}</div>
         <div><strong>Completed At:</strong> ${order.completedAt || "—"}</div>
+        <div><strong>Amount:</strong> ₹${order.price}</div>
+        <div><strong>Payment:</strong> ${order.paymentStatus || "—"} ${order.paymentMode ? `(${order.paymentMode})` : ""}</div>
       </div>
       <div class="section">
         <h3>Test Results</h3>
@@ -184,6 +225,11 @@ const Diagnostics = () => {
     `);
     printWindow.document.close();
     printWindow.print();
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return <FileImage className="h-4 w-4 text-info" />;
+    return <FileText className="h-4 w-4 text-warning" />;
   };
 
   return (
@@ -256,6 +302,14 @@ const Diagnostics = () => {
                           </Badge>
                         )}
                         <Badge variant="outline" className={cn("text-[10px]", statusColors[order.status])}>{order.status}</Badge>
+                        <Badge variant="outline" className="text-[10px] text-foreground">
+                          <IndianRupee className="h-3 w-3 mr-0.5" /> ₹{order.price}
+                        </Badge>
+                        {order.paymentStatus === "Paid" && (
+                          <Badge variant="outline" className="text-[10px] text-success border-success/20 bg-success/10">
+                            <CheckCircle2 className="h-3 w-3 mr-0.5" /> Paid ({order.paymentMode})
+                          </Badge>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span><strong className="text-foreground">Patient:</strong> {order.patientName}</span>
@@ -274,8 +328,8 @@ const Diagnostics = () => {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {order.status === "Ordered" && (
-                        <Button size="sm" variant="outline" onClick={() => handleCollectSample(order)}>
-                          <TestTube className="h-3.5 w-3.5 mr-1" /> Collect Sample
+                        <Button size="sm" variant="outline" onClick={() => handleAcceptOrder(order)}>
+                          <IndianRupee className="h-3.5 w-3.5 mr-1" /> Accept & Collect
                         </Button>
                       )}
                       {order.status === "Sample Collected" && (
@@ -293,6 +347,8 @@ const Diagnostics = () => {
                   {/* Visual workflow stepper */}
                   <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border">
                     <StepIndicator label="Ordered" active={true} done={order.status !== "Ordered"} />
+                    <div className={cn("flex-1 h-0.5", order.status !== "Ordered" ? "bg-success" : "bg-border")} />
+                    <StepIndicator label="Payment" active={order.paymentStatus === "Paid"} done={order.paymentStatus === "Paid"} />
                     <div className={cn("flex-1 h-0.5", order.status !== "Ordered" ? "bg-success" : "bg-border")} />
                     <StepIndicator label="Sample" active={order.status === "Sample Collected" || order.status === "In Progress"} done={order.status === "In Progress"} />
                     <div className={cn("flex-1 h-0.5", order.status === "In Progress" ? "bg-success" : "bg-border")} />
@@ -322,9 +378,11 @@ const Diagnostics = () => {
                     <TableHead>Category</TableHead>
                     <TableHead>Patient</TableHead>
                     <TableHead>Ordered By</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Abnormal</TableHead>
+                    <TableHead>Files</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -342,6 +400,7 @@ const Diagnostics = () => {
                           <p className="text-xs text-muted-foreground font-mono">{order.patientRegNo}</p>
                         </TableCell>
                         <TableCell className="text-sm">{order.orderedBy}</TableCell>
+                        <TableCell className="text-sm font-medium">₹{order.price}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={cn("text-[10px]", order.priority === "Urgent" ? "text-destructive border-destructive/30" : "text-muted-foreground")}>{order.priority}</Badge>
                         </TableCell>
@@ -353,6 +412,15 @@ const Diagnostics = () => {
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] text-success border-success/20">Normal</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {order.reportFiles && order.reportFiles.length > 0 ? (
+                            <Badge variant="outline" className="text-[10px] text-info border-info/20 bg-info/10">
+                              <Upload className="h-3 w-3 mr-0.5" /> {order.reportFiles.length}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
@@ -373,7 +441,67 @@ const Diagnostics = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Result Entry Dialog */}
+      {/* Payment Summary Dialog */}
+      <Dialog open={!!paymentOrder} onOpenChange={(v) => !v && setPaymentOrder(null)}>
+        <DialogContent className="max-w-md">
+          {paymentOrder && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <IndianRupee className="h-5 w-5 text-primary" /> Payment Summary
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground">Patient:</span> <strong className="text-foreground">{paymentOrder.patientName}</strong></div>
+                  <div><span className="text-muted-foreground">Reg No:</span> <strong className="text-foreground font-mono">{paymentOrder.patientRegNo}</strong></div>
+                  <div><span className="text-muted-foreground">Test:</span> <strong className="text-foreground">{paymentOrder.testName}</strong></div>
+                  <div><span className="text-muted-foreground">Category:</span> <strong className="text-foreground">{paymentOrder.category}</strong></div>
+                  <div><span className="text-muted-foreground">Priority:</span> <strong className={paymentOrder.priority === "Urgent" ? "text-destructive" : "text-foreground"}>{paymentOrder.priority}</strong></div>
+                  <div><span className="text-muted-foreground">Ordered By:</span> <strong className="text-foreground">{paymentOrder.orderedBy}</strong></div>
+                </div>
+
+                <div className="border-t border-border pt-3 mt-3">
+                  <div className="flex items-center justify-between text-lg font-bold">
+                    <span className="text-foreground">Total Amount</span>
+                    <span className="text-primary">₹{paymentOrder.price}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Payment Mode</Label>
+                <div className="flex gap-3">
+                  <Button
+                    variant={paymentMode === "Cash" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setPaymentMode("Cash")}
+                  >
+                    💵 Cash
+                  </Button>
+                  <Button
+                    variant={paymentMode === "Credit" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setPaymentMode("Credit")}
+                  >
+                    💳 Credit
+                  </Button>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPaymentOrder(null)}>Cancel</Button>
+                <Button onClick={handleConfirmPayment}>
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Confirm Payment & Collect Sample
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Result Entry Dialog with File Upload */}
       <Dialog open={!!resultOrder} onOpenChange={(v) => !v && setResultOrder(null)}>
         <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           {resultOrder && (
@@ -425,6 +553,50 @@ const Diagnostics = () => {
                 ))}
               </div>
 
+              {/* File Upload Section */}
+              <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <Upload className="h-4 w-4" /> Upload Report Files
+                  </Label>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    <Button size="sm" variant="outline" asChild>
+                      <span><Upload className="h-3.5 w-3.5 mr-1" /> Choose Files</span>
+                    </Button>
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">Accepts PDF, DOC, DOCX, JPG, PNG, WEBP</p>
+                {reportFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {reportFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {getFileIcon(file.type)}
+                          <span className="text-sm text-foreground truncate">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <a href={file.url} target="_blank" rel="noopener noreferrer">
+                            <Button size="icon" variant="ghost" className="h-7 w-7">
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </a>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFile(idx)}>
+                            <X className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Report Remarks (optional)</Label>
                 <Textarea
@@ -468,6 +640,8 @@ const Diagnostics = () => {
                 <div><span className="text-muted-foreground">Priority:</span> <strong className={viewOrder.priority === "Urgent" ? "text-destructive" : "text-foreground"}>{viewOrder.priority}</strong></div>
                 <div><span className="text-muted-foreground">Ordered:</span> <strong className="text-foreground">{viewOrder.orderedAt}</strong></div>
                 <div><span className="text-muted-foreground">Completed:</span> <strong className="text-foreground">{viewOrder.completedAt}</strong></div>
+                <div><span className="text-muted-foreground">Amount:</span> <strong className="text-foreground">₹{viewOrder.price}</strong></div>
+                <div><span className="text-muted-foreground">Payment:</span> <strong className="text-success">{viewOrder.paymentStatus} ({viewOrder.paymentMode})</strong></div>
               </div>
 
               <Table>
@@ -498,6 +672,37 @@ const Diagnostics = () => {
                   ))}
                 </TableBody>
               </Table>
+
+              {/* Report Files visible to doctor */}
+              {viewOrder.reportFiles && viewOrder.reportFiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <Upload className="h-4 w-4" /> Attached Report Files
+                  </Label>
+                  <div className="space-y-2">
+                    {viewOrder.reportFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-muted/50 border border-border rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {file.type.startsWith("image/") ? <FileImage className="h-4 w-4 text-info" /> : <FileText className="h-4 w-4 text-warning" />}
+                          <span className="text-sm text-foreground truncate">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <a href={file.url} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="ghost" className="h-7 text-xs">
+                              <Eye className="h-3.5 w-3.5 mr-1" /> View
+                            </Button>
+                          </a>
+                          <a href={file.url} download={file.name}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs">
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {viewOrder.reportNotes && (
                 <div className="bg-muted/50 rounded-lg p-3">

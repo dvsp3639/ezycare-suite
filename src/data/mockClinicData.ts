@@ -48,6 +48,9 @@ export interface LabOrder {
   category: LabCategory;
   priority: "Routine" | "Urgent";
   status: "Ordered" | "Sample Collected" | "In Progress" | "Completed";
+  price: number;
+  paymentStatus?: "Pending" | "Paid";
+  paymentMode?: "Cash" | "Credit";
   clinicalNotes?: string;
   orderedBy: string;
   orderedAt: string;
@@ -57,6 +60,7 @@ export interface LabOrder {
   completedAt?: string;
   results?: LabResult[];
   reportNotes?: string;
+  reportFiles?: { name: string; url: string; type: string }[];
 }
 
 export interface QueueEntry {
