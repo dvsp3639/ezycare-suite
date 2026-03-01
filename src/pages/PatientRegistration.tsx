@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Search, UserPlus, Save, Printer, Calendar, Clock, X } from "lucide-react";
-import { mockPatients, mockDoctors, generateRegistrationNumber, type Patient } from "@/data/mockPatients";
-import TimeSlotPicker from "@/components/TimeSlotPicker";
+import { mockPatients, generateRegistrationNumber, type Patient } from "@/data/mockPatients";
+import { useClinicData } from "@/contexts/ClinicDataContext";
+import { cn } from "@/lib/utils";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -22,6 +24,8 @@ const emptyPatient: Omit<Patient, "id" | "registrationNumber"> = {
 };
 
 const PatientRegistration = () => {
+  const { schedules, addToQueue, incrementSlotBooked } = useClinicData();
+
   const [searchMobile, setSearchMobile] = useState("");
   const [searchResults, setSearchResults] = useState<Patient[] | null>(null);
   const [form, setForm] = useState(emptyPatient);
@@ -37,7 +41,6 @@ const PatientRegistration = () => {
   const [opdType, setOpdType] = useState("");
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
-  const [showTimeSlots, setShowTimeSlots] = useState(false);
 
   const handleSearch = () => {
     if (searchMobile.length < 10) {
@@ -85,7 +88,6 @@ const PatientRegistration = () => {
       toast.error("Please fill all required fields");
       return;
     }
-    // Check duplicate name+mobile (case insensitive)
     const duplicate = mockPatients.find(
       (p) => p.mobile === form.mobile && p.name.toLowerCase() === form.name.toLowerCase()
     );
@@ -107,16 +109,44 @@ const PatientRegistration = () => {
     setShowAddNew(false);
   };
 
+  // Get selected doctor's schedule for time slots
+  const selectedDoctorSchedule = schedules.find((d) => d.id === opdDoctor);
+
   const handleOPDSave = (print: boolean) => {
     if (!opdDate || !opdType || !opdDoctor || !opdTimeSlot) {
       toast.error("Please fill all OPD booking details");
       return;
     }
+
+    const doctor = schedules.find((d) => d.id === opdDoctor);
+    if (!doctor) return;
+
+    // Add to queue
+    const now = new Date();
+    const checkInTime = `${now.getHours() > 12 ? now.getHours() - 12 : now.getHours()}:${now.getMinutes().toString().padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
+
+    addToQueue({
+      patientName: form.name,
+      registrationNumber: registrationNumber,
+      doctorName: doctor.doctorName,
+      timeSlot: opdTimeSlot,
+      opdType: opdType as "Normal" | "Emergency" | "Follow Up",
+      status: "Waiting",
+      checkInTime,
+    });
+
+    // Increment booked count on the slot
+    incrementSlotBooked(opdDoctor, opdTimeSlot);
+
     toast.success(`OPD booked successfully${print ? " — Printing..." : ""}`, {
-      description: `${form.name} | ${formatDateDisplay(opdDate)} | ${opdTimeSlot}`,
+      description: `${form.name} | ${formatDateDisplay(opdDate)} | ${opdTimeSlot} | Token assigned`,
     });
     if (print) window.print();
     setShowOPD(false);
+    setOpdDate("");
+    setOpdType("");
+    setOpdDoctor("");
+    setOpdTimeSlot("");
   };
 
   const resetForm = () => {
@@ -289,7 +319,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <Input type="date" value={opdDate} onChange={(e) => setOpdDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); }} min={new Date().toISOString().split("T")[0]} />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
@@ -304,12 +334,12 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Doctor *</Label>
-              <Select value={opdDoctor} onValueChange={setOpdDoctor}>
+              <Select value={opdDoctor} onValueChange={(v) => { setOpdDoctor(v); setOpdTimeSlot(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>
-                  {mockDoctors.map((d) => (
+                  {schedules.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
-                      {d.name} — {d.specialization}
+                      {d.doctorName} — {d.specialization}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -317,12 +347,48 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Time Slot *</Label>
-              <Button variant="outline" onClick={() => setShowTimeSlots(true)} className="w-full justify-start h-10">
-                <Clock className="mr-2 h-4 w-4" />
-                {opdTimeSlot || "Select time slot"}
-              </Button>
+              {!opdDoctor ? (
+                <p className="text-xs text-muted-foreground pt-2">Select a doctor first</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5 max-h-[200px] overflow-y-auto border border-border rounded-lg p-2">
+                  {selectedDoctorSchedule?.timeSlots
+                    .filter((s) => s.isActive)
+                    .map((slot) => {
+                      const full = slot.bookedPatients >= slot.maxPatients;
+                      const selected = opdTimeSlot === slot.time;
+                      return (
+                        <button
+                          key={slot.time}
+                          disabled={full}
+                          onClick={() => setOpdTimeSlot(slot.time)}
+                          className={cn(
+                            "p-2 rounded-md text-xs font-medium transition-all border",
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : full
+                              ? "bg-muted text-muted-foreground/40 border-transparent cursor-not-allowed line-through"
+                              : "border-border bg-card text-foreground hover:border-primary hover:bg-accent cursor-pointer"
+                          )}
+                        >
+                          <span>{slot.time}</span>
+                          <span className={cn("block text-[10px]", full ? "text-muted-foreground/30" : "text-muted-foreground")}>
+                            {slot.bookedPatients}/{slot.maxPatients}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           </div>
+          {opdTimeSlot && selectedDoctorSchedule && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span>
+                {selectedDoctorSchedule.doctorName} · {opdTimeSlot} · {selectedDoctorSchedule.consultationDuration} min consultation
+              </span>
+            </div>
+          )}
           <div className="flex gap-3 mt-4 pt-4 border-t border-border">
             <Button onClick={() => handleOPDSave(false)}>
               <Save className="mr-2 h-4 w-4" />
@@ -335,14 +401,6 @@ const PatientRegistration = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Time Slot Picker Dialog */}
-      <TimeSlotPicker
-        open={showTimeSlots}
-        onOpenChange={setShowTimeSlots}
-        onSelect={setOpdTimeSlot}
-        selectedTime={opdTimeSlot}
-      />
 
       {/* Save Confirmation Dialog */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>

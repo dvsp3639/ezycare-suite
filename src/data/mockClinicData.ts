@@ -25,6 +25,9 @@ export interface QueueEntry {
   opdType: "Normal" | "Emergency" | "Follow Up";
   status: "Waiting" | "In Consultation" | "Completed" | "No Show";
   checkInTime: string;
+  diagnosis?: string;
+  prescription?: string[];
+  doctorNotes?: string;
 }
 
 export interface PatientVisit {
