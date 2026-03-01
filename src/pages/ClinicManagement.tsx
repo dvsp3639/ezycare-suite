@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import {
   Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon,
   CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
-  CalendarPlus, Trash2,
+  CalendarPlus, Trash2, CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
@@ -27,8 +27,10 @@ import {
   type ClinicPatient,
   type PrescriptionItem,
   type LabOrder,
+  type LabCategory,
   type Vitals,
 } from "@/data/mockClinicData";
+import { labTestCatalog, labCategoryColors } from "@/data/mockDiagnosticsData";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -90,6 +92,8 @@ const ClinicManagement = () => {
   const [consultFollowUp, setConsultFollowUp] = useState<Date | undefined>();
   const [newLabTest, setNewLabTest] = useState("");
   const [newLabPriority, setNewLabPriority] = useState<"Routine" | "Urgent">("Routine");
+  const [newLabCategory, setNewLabCategory] = useState<LabCategory>("Blood");
+  const [newLabClinicalNotes, setNewLabClinicalNotes] = useState("");
 
   // Vitals dialog (separate for nurse entry from queue)
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
@@ -208,10 +212,23 @@ const ClinicManagement = () => {
   };
 
   const addLabOrder = () => {
-    if (!newLabTest.trim()) return;
-    setConsultLabOrders((prev) => [...prev, { id: `lab-${Date.now()}`, testName: newLabTest, priority: newLabPriority, status: "Ordered" }]);
+    if (!newLabTest.trim() || !consultPatient) return;
+    const newOrder: LabOrder = {
+      id: `lab-${Date.now()}`,
+      testName: newLabTest,
+      category: newLabCategory,
+      priority: newLabPriority,
+      status: "Ordered",
+      clinicalNotes: newLabClinicalNotes || undefined,
+      orderedBy: consultPatient.doctorName,
+      orderedAt: new Date().toLocaleTimeString(),
+      patientName: consultPatient.patientName,
+      patientRegNo: consultPatient.registrationNumber,
+    };
+    setConsultLabOrders((prev) => [...prev, newOrder]);
     setNewLabTest("");
     setNewLabPriority("Routine");
+    setNewLabClinicalNotes("");
   };
 
   const removeLabOrder = (id: string) => setConsultLabOrders((prev) => prev.filter((l) => l.id !== id));
@@ -726,34 +743,102 @@ const ClinicManagement = () => {
                 </TabsContent>
 
                 {/* Labs Tab */}
-                <TabsContent value="labs" className="mt-4 space-y-3">
+                <TabsContent value="labs" className="mt-4 space-y-4">
                   <Label className="text-sm font-semibold flex items-center gap-1"><FlaskConical className="h-4 w-4" /> Lab Test Orders</Label>
                   {!isReadOnly && (
-                    <div className="flex items-center gap-2">
-                      <Input value={newLabTest} onChange={(e) => setNewLabTest(e.target.value)} placeholder="Test name (e.g. CBC, Blood Sugar)" className="flex-1" />
-                      <Select value={newLabPriority} onValueChange={(v) => setNewLabPriority(v as "Routine" | "Urgent")}>
-                        <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Routine">Routine</SelectItem>
-                          <SelectItem value="Urgent">Urgent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button size="sm" onClick={addLabOrder}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
+                    <div className="space-y-3 bg-muted/30 rounded-lg p-4 border border-border">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Category</Label>
+                          <Select value={newLabCategory} onValueChange={(v) => { setNewLabCategory(v as LabCategory); setNewLabTest(""); }}>
+                            <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Blood">🩸 Blood</SelectItem>
+                              <SelectItem value="Urine">🧪 Urine</SelectItem>
+                              <SelectItem value="Radiology">📷 Radiology</SelectItem>
+                              <SelectItem value="Serology">🔬 Serology</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Priority</Label>
+                          <Select value={newLabPriority} onValueChange={(v) => setNewLabPriority(v as "Routine" | "Urgent")}>
+                            <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Routine">Routine</SelectItem>
+                              <SelectItem value="Urgent">🔴 Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Select Test</Label>
+                        <Select value={newLabTest} onValueChange={setNewLabTest}>
+                          <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Choose a test..." /></SelectTrigger>
+                          <SelectContent>
+                            {labTestCatalog.filter((t) => t.category === newLabCategory).map((t) => (
+                              <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Clinical Notes (optional)</Label>
+                        <Input value={newLabClinicalNotes} onChange={(e) => setNewLabClinicalNotes(e.target.value)} placeholder="e.g. Fasting sample, suspected typhoid..." className="text-xs" />
+                      </div>
+                      <Button size="sm" onClick={addLabOrder} disabled={!newLabTest}><Plus className="h-3.5 w-3.5 mr-1" /> Add Test</Button>
                     </div>
                   )}
                   {consultLabOrders.length > 0 ? (
                     <div className="space-y-2">
                       {consultLabOrders.map((lab) => (
-                        <div key={lab.id} className="flex items-center justify-between border border-border rounded-lg p-3 bg-muted/30">
-                          <div className="flex items-center gap-2">
+                        <div key={lab.id} className="flex items-center justify-between border border-border rounded-lg p-3 bg-card">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <FlaskConical className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm font-medium text-foreground">{lab.testName}</span>
-                            <Badge variant="outline" className={cn("text-xs", lab.priority === "Urgent" ? "text-destructive border-destructive/30" : "text-muted-foreground")}>{lab.priority}</Badge>
-                            <Badge variant="outline" className="text-xs">{lab.status}</Badge>
+                            <Badge variant="outline" className={cn("text-[10px]", labCategoryColors[lab.category])}>{lab.category}</Badge>
+                            <Badge variant="outline" className={cn("text-[10px]", lab.priority === "Urgent" ? "text-destructive border-destructive/30 bg-destructive/10" : "text-muted-foreground")}>{lab.priority}</Badge>
+                            <Badge variant="outline" className={cn("text-[10px]", lab.status === "Completed" ? "text-success border-success/20 bg-success/10" : lab.status === "In Progress" ? "text-info border-info/20 bg-info/10" : "text-muted-foreground")}>{lab.status}</Badge>
+                            {lab.status === "Completed" && lab.results && (
+                              <Badge variant="outline" className="text-[10px] text-success border-success/20 bg-success/10 cursor-pointer">
+                                <CheckCircle2 className="h-3 w-3 mr-0.5" /> Report Ready
+                              </Badge>
+                            )}
                           </div>
-                          {!isReadOnly && (
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeLabOrder(lab.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {lab.status === "Completed" && lab.results && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs"><Eye className="h-3 w-3 mr-1" /> View</Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 max-h-60 overflow-y-auto" align="end">
+                                  <h4 className="text-sm font-semibold mb-2">{lab.testName} Report</h4>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs p-1">Parameter</TableHead>
+                                        <TableHead className="text-xs p-1">Value</TableHead>
+                                        <TableHead className="text-xs p-1">Normal</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {lab.results.map((r, i) => (
+                                        <TableRow key={i}>
+                                          <TableCell className={cn("text-xs p-1", r.isAbnormal && "text-destructive font-semibold")}>{r.parameter}</TableCell>
+                                          <TableCell className={cn("text-xs p-1 font-mono", r.isAbnormal && "text-destructive font-bold")}>{r.value} {r.unit}</TableCell>
+                                          <TableCell className="text-xs p-1 text-muted-foreground">{r.normalRange}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                  {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {!isReadOnly && lab.status === "Ordered" && (
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeLabOrder(lab.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

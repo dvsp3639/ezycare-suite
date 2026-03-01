@@ -32,12 +32,31 @@ export interface PrescriptionItem {
   instructions: string;
 }
 
+export type LabCategory = "Blood" | "Urine" | "Radiology" | "Serology";
+
+export interface LabResult {
+  parameter: string;
+  value: string;
+  unit: string;
+  normalRange: string;
+  isAbnormal: boolean;
+}
+
 export interface LabOrder {
   id: string;
   testName: string;
+  category: LabCategory;
   priority: "Routine" | "Urgent";
-  status: "Ordered" | "Sample Collected" | "Completed";
-  notes?: string;
+  status: "Ordered" | "Sample Collected" | "In Progress" | "Completed";
+  clinicalNotes?: string;
+  orderedBy: string;
+  orderedAt: string;
+  patientName: string;
+  patientRegNo: string;
+  sampleCollectedAt?: string;
+  completedAt?: string;
+  results?: LabResult[];
+  reportNotes?: string;
 }
 
 export interface QueueEntry {
