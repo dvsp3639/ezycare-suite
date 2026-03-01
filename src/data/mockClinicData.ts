@@ -15,6 +15,31 @@ export interface DoctorSchedule {
   timeSlots: TimeSlot[];
 }
 
+export interface Vitals {
+  bp: string;
+  temperature: string;
+  weight: string;
+  height: string;
+  spo2: string;
+  pulse: string;
+}
+
+export interface PrescriptionItem {
+  medicine: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+}
+
+export interface LabOrder {
+  id: string;
+  testName: string;
+  priority: "Routine" | "Urgent";
+  status: "Ordered" | "Sample Collected" | "Completed";
+  notes?: string;
+}
+
 export interface QueueEntry {
   id: string;
   tokenNo: number;
@@ -27,7 +52,11 @@ export interface QueueEntry {
   checkInTime: string;
   diagnosis?: string;
   prescription?: string[];
+  structuredPrescription?: PrescriptionItem[];
   doctorNotes?: string;
+  vitals?: Vitals;
+  labOrders?: LabOrder[];
+  followUpDate?: string;
 }
 
 export interface PatientVisit {
