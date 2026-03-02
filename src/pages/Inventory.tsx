@@ -11,16 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3, Settings,
+  Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3,
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
-  Building2, Star, Printer, Download, IndianRupee, Archive, Clock, XCircle,
+  Building2, IndianRupee, Clock, XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockInventory, mockTransfers, mockVendors,
+  mockInventory, mockTransfers,
   inventoryCategories, departments, categoryColors,
   getExpiryStatus, getStockStatus,
-  type InventoryItem, type InventoryCategory, type Department, type StockTransfer, type Vendor,
+  type InventoryItem, type InventoryCategory, type Department, type StockTransfer,
 } from "@/data/mockInventoryData";
 import { labTestCatalog, type LabTestDefinition } from "@/data/mockDiagnosticsData";
 import type { LabCategory } from "@/data/mockClinicData";
@@ -30,9 +30,9 @@ const Inventory = () => {
   const [activeTab, setActiveTab] = useState("stock");
   const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
   const [transfers, setTransfers] = useState<StockTransfer[]>(mockTransfers);
-  const [vendors] = useState<Vendor[]>(mockVendors);
   const [labTests, setLabTests] = useState<LabTestDefinition[]>(labTestCatalog);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
 
   // Stock filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,12 +59,32 @@ const Inventory = () => {
 
   // Lab test management
   const [showAddTest, setShowAddTest] = useState(false);
-  const [testForm, setTestForm] = useState({ name: "", category: "Blood" as LabCategory, price: 0, parameters: "" });
+  const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
+  const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  const [showAddLabCategory, setShowAddLabCategory] = useState(false);
+  const [newLabCategory, setNewLabCategory] = useState("");
+  const [editLabCategory, setEditLabCategory] = useState<{ old: string; new: string } | null>(null);
+
+  // Pharma filters
+  const [pharmaSearch, setPharmaSearch] = useState("");
 
   // Report tab
   const [reportType, setReportType] = useState("summary");
+
+  // Pharma filtered inventory
+  const pharmaInventory = useMemo(() => {
+    return inventory.filter((item) => {
+      const isPharma = item.department === "Pharmacy" || item.category === "Medicine";
+      const matchSearch = !pharmaSearch ||
+        item.name.toLowerCase().includes(pharmaSearch.toLowerCase()) ||
+        item.sku.toLowerCase().includes(pharmaSearch.toLowerCase());
+      return isPharma && matchSearch;
+    });
+  }, [inventory, pharmaSearch]);
+
+  const allLabCategories = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
 
   // ──── Filtered Inventory ────
   const filteredInventory = useMemo(() => {
@@ -207,13 +227,38 @@ const Inventory = () => {
     const newTest: LabTestDefinition = {
       id: `lt-${Date.now()}`,
       name: testForm.name,
-      category: testForm.category,
+      category: testForm.category as LabCategory,
       price: testForm.price,
       parameters: params.length > 0 ? params : [{ name: "Result", unit: "", normalRange: "Normal" }],
     };
     setLabTests((prev) => [...prev, newTest]);
     toast.success(`Test "${testForm.name}" added`);
     setShowAddTest(false);
+    setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+  };
+
+  const handleEditTest = (test: LabTestDefinition) => {
+    setEditTest(test);
+    setTestForm({
+      name: test.name,
+      category: test.category,
+      price: test.price,
+      parameters: test.parameters.map((p) => p.name).join(", "),
+    });
+  };
+
+  const handleSaveEditTest = () => {
+    if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
+    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normalRange: "" }));
+    setLabTests((prev) => prev.map((t) => t.id === editTest.id ? {
+      ...t,
+      name: testForm.name,
+      category: testForm.category as LabCategory,
+      price: testForm.price,
+      parameters: params.length > 0 ? params : t.parameters,
+    } : t));
+    toast.success(`Test "${testForm.name}" updated`);
+    setEditTest(null);
     setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
   };
 
@@ -231,6 +276,33 @@ const Inventory = () => {
     toast.success(`Category "${newCategory}" added`);
     setNewCategory("");
     setShowAddCategory(false);
+  };
+
+  const handleAddLabCategory = () => {
+    if (!newLabCategory.trim()) return;
+    const allExisting = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
+    if (allExisting.includes(newLabCategory.trim())) { toast.error("Category already exists"); return; }
+    setLabCustomCategories((prev) => [...prev, newLabCategory.trim()]);
+    toast.success(`Lab category "${newLabCategory}" added`);
+    setNewLabCategory("");
+    setShowAddLabCategory(false);
+  };
+
+  const handleEditLabCategory = () => {
+    if (!editLabCategory || !editLabCategory.new.trim()) return;
+    // Rename in custom categories
+    setLabCustomCategories((prev) => prev.map((c) => c === editLabCategory.old ? editLabCategory.new.trim() : c));
+    // Update tests with old category name
+    setLabTests((prev) => prev.map((t) => t.category === editLabCategory.old ? { ...t, category: editLabCategory.new.trim() as LabCategory } : t));
+    toast.success(`Category renamed to "${editLabCategory.new}"`);
+    setEditLabCategory(null);
+  };
+
+  const handleRemoveLabCategory = (cat: string) => {
+    const testsInCat = labTests.filter((t) => t.category === cat);
+    if (testsInCat.length > 0) { toast.error(`Cannot remove — ${testsInCat.length} tests in this category`); return; }
+    setLabCustomCategories((prev) => prev.filter((c) => c !== cat));
+    toast.success(`Category "${cat}" removed`);
   };
 
   const allCategories = [...inventoryCategories, ...customCategories];
@@ -283,10 +355,10 @@ const Inventory = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="stock"><Package className="h-4 w-4 mr-1" /> Stock</TabsTrigger>
+          <TabsTrigger value="pharma"><IndianRupee className="h-4 w-4 mr-1" /> Pharma</TabsTrigger>
           <TabsTrigger value="diagnostics"><Scan className="h-4 w-4 mr-1" /> Diagnostics</TabsTrigger>
           <TabsTrigger value="transfers"><ArrowLeftRight className="h-4 w-4 mr-1" /> Transfers</TabsTrigger>
           <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-1" /> Reports</TabsTrigger>
-          <TabsTrigger value="vendors"><Building2 className="h-4 w-4 mr-1" /> Vendors</TabsTrigger>
         </TabsList>
 
         {/* ════════ STOCK TAB ════════ */}
@@ -397,15 +469,119 @@ const Inventory = () => {
           </div>
         </TabsContent>
 
+        {/* ════════ PHARMA TAB ════════ */}
+        <TabsContent value="pharma">
+          <div className="flex items-center justify-between mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={pharmaSearch} onChange={(e) => setPharmaSearch(e.target.value)} placeholder="Search pharma stock..." className="pl-9 h-9" />
+            </div>
+            <Button size="sm" onClick={() => { setShowAddItem(true); setFormData({ category: "Medicine", department: "Pharmacy", unit: "Strip (10)", gstPercent: 12, stock: 0, minStock: 10, consumptionRate: 0 }); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add Medicine
+            </Button>
+          </div>
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Medicine</TableHead>
+                    <TableHead>Batch</TableHead>
+                    <TableHead className="text-right">Unit Price (₹)</TableHead>
+                    <TableHead className="text-right">Selling Price (₹)</TableHead>
+                    <TableHead className="text-right">GST %</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead>Expiry</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pharmaInventory.length === 0 ? (
+                    <TableRow><TableCell colSpan={9} className="text-center py-12 text-muted-foreground">No pharma items found</TableCell></TableRow>
+                  ) : (
+                    pharmaInventory.map((item) => {
+                      const expiry = getExpiryStatus(item.expiryDate);
+                      const stockSt = getStockStatus(item.stock, item.minStock);
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm text-foreground">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">{item.sku} · {item.manufacturer}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{item.batchNo}</TableCell>
+                          <TableCell className="text-right text-sm">₹{item.unitPrice}</TableCell>
+                          <TableCell className="text-right text-sm font-medium">₹{item.sellingPrice}</TableCell>
+                          <TableCell className="text-right text-xs">{item.gstPercent}%</TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-medium text-sm">{item.stock}</span>
+                            <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                          </TableCell>
+                          <TableCell>
+                            {item.expiryDate ? (
+                              <span className={cn("text-xs px-1.5 py-0.5 rounded", expiry.color)}>{expiry.label}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn("text-xs px-1.5 py-0.5 rounded font-medium", stockSt.color)}>{stockSt.label}</span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditItem(item)}>
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(item.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">Manage lab test catalog — add/remove tests and categories</p>
-            <Button size="sm" onClick={() => setShowAddTest(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add Test
-            </Button>
+            <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Category
+              </Button>
+              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setShowAddTest(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Add Test
+              </Button>
+            </div>
           </div>
-          {(["Blood", "Urine", "Radiology", "Serology"] as LabCategory[]).map((cat) => {
+
+          {/* Category management chips */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {allLabCategories.map((cat) => {
+              const isCustom = labCustomCategories.includes(cat);
+              return (
+                <Badge key={cat} variant="outline" className="text-xs py-1 px-2 gap-1.5">
+                  {cat} ({labTests.filter((t) => t.category === cat).length})
+                  {isCustom && (
+                    <>
+                      <button onClick={() => setEditLabCategory({ old: cat, new: cat })} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
+                      <button onClick={() => handleRemoveLabCategory(cat)} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
+                    </>
+                  )}
+                </Badge>
+              );
+            })}
+          </div>
+
+          {allLabCategories.map((cat) => {
             const tests = labTests.filter((t) => t.category === cat);
             if (tests.length === 0) return null;
             return (
@@ -421,7 +597,7 @@ const Inventory = () => {
                         <TableHead>Test Name</TableHead>
                         <TableHead>Parameters</TableHead>
                         <TableHead className="text-right">Price (₹)</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -431,9 +607,14 @@ const Inventory = () => {
                           <TableCell className="text-xs text-muted-foreground">{t.parameters.map((p) => p.name).join(", ")}</TableCell>
                           <TableCell className="text-right text-sm">₹{t.price}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveTest(t.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTest(t)}>
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveTest(t.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -712,35 +893,8 @@ const Inventory = () => {
           )}
         </TabsContent>
 
-        {/* ════════ VENDORS TAB ════════ */}
-        <TabsContent value="vendors">
-          <p className="text-sm text-muted-foreground mb-4">Compare vendors by rating, delivery speed, and categories</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {vendors.map((v) => (
-              <div key={v.id} className="bg-card rounded-xl border border-border p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-foreground">{v.name}</h3>
-                  <div className="flex items-center gap-0.5">
-                    <Star className="h-3.5 w-3.5 text-warning fill-warning" />
-                    <span className="text-xs font-medium">{v.rating}</span>
-                  </div>
-                </div>
-                <div className="space-y-1 text-xs text-muted-foreground mb-3">
-                  <p>📞 {v.contact}</p>
-                  <p>✉ {v.email}</p>
-                  <p>GST: {v.gstNo}</p>
-                  <p>Avg Delivery: <span className="font-medium text-foreground">{v.avgDeliveryDays} days</span></p>
-                  <p>Last Order: {v.lastOrderDate}</p>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {v.categories.map((c) => (
-                    <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
+
+
       </Tabs>
 
       {/* ════════ DIALOGS ════════ */}
@@ -902,10 +1056,10 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Test Dialog */}
-      <Dialog open={showAddTest} onOpenChange={setShowAddTest}>
+      {/* Add/Edit Test Dialog */}
+      <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) { setShowAddTest(false); setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); } }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add Diagnostic Test</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label className="text-xs">Test Name *</Label>
@@ -913,13 +1067,12 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Category</Label>
-              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v as LabCategory }))}>
+              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Blood">🩸 Blood</SelectItem>
-                  <SelectItem value="Urine">🧪 Urine</SelectItem>
-                  <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                  <SelectItem value="Serology">🔬 Serology</SelectItem>
+                  {allLabCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -933,13 +1086,13 @@ const Inventory = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddTest(false)}>Cancel</Button>
-            <Button onClick={handleAddTest}>Add Test</Button>
+            <Button variant="outline" onClick={() => { setShowAddTest(false); setEditTest(null); }}>Cancel</Button>
+            <Button onClick={editTest ? handleSaveEditTest : handleAddTest}>{editTest ? "Save Changes" : "Add Test"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Category Dialog */}
+      {/* Add Inventory Category Dialog */}
       <Dialog open={showAddCategory} onOpenChange={setShowAddCategory}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Add Inventory Category</DialogTitle></DialogHeader>
@@ -950,6 +1103,36 @@ const Inventory = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddCategory(false)}>Cancel</Button>
             <Button onClick={handleAddCategory}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Lab Category Dialog */}
+      <Dialog open={showAddLabCategory} onOpenChange={setShowAddLabCategory}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Add Lab Test Category</DialogTitle></DialogHeader>
+          <div>
+            <Label className="text-xs">Category Name</Label>
+            <Input value={newLabCategory} onChange={(e) => setNewLabCategory(e.target.value)} placeholder="e.g. Microbiology" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddLabCategory(false)}>Cancel</Button>
+            <Button onClick={handleAddLabCategory}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Lab Category Dialog */}
+      <Dialog open={!!editLabCategory} onOpenChange={(open) => { if (!open) setEditLabCategory(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Edit Lab Category</DialogTitle></DialogHeader>
+          <div>
+            <Label className="text-xs">Category Name</Label>
+            <Input value={editLabCategory?.new || ""} onChange={(e) => setEditLabCategory((p) => p ? { ...p, new: e.target.value } : null)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLabCategory(null)}>Cancel</Button>
+            <Button onClick={handleEditLabCategory}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
