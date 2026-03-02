@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3,
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
-  Building2, IndianRupee, Clock, XCircle,
+  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,6 +24,59 @@ import {
 } from "@/data/mockInventoryData";
 import { labTestCatalog, type LabTestDefinition } from "@/data/mockDiagnosticsData";
 import type { LabCategory } from "@/data/mockClinicData";
+
+// ──── Asset Types ────
+export type AssetStatus = "Active" | "Under Maintenance" | "Retired" | "Disposed";
+export type AssetCondition = "Good" | "Fair" | "Poor" | "Non-functional";
+
+export interface HospitalAsset {
+  id: string;
+  name: string;
+  assetTag: string;
+  category: string;
+  department: Department;
+  location: string;
+  manufacturer: string;
+  model: string;
+  serialNo: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  warrantyExpiry?: string;
+  status: AssetStatus;
+  condition: AssetCondition;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
+  assignedTo?: string;
+  notes?: string;
+}
+
+const assetStatuses: AssetStatus[] = ["Active", "Under Maintenance", "Retired", "Disposed"];
+const assetConditions: AssetCondition[] = ["Good", "Fair", "Poor", "Non-functional"];
+const assetCategories = ["Medical Equipment", "Furniture", "IT Equipment", "Vehicles", "Infrastructure", "Instruments"];
+
+const statusColors: Record<AssetStatus, string> = {
+  Active: "text-success bg-success/10",
+  "Under Maintenance": "text-warning bg-warning/10",
+  Retired: "text-muted-foreground bg-muted",
+  Disposed: "text-destructive bg-destructive/10",
+};
+const conditionColors: Record<AssetCondition, string> = {
+  Good: "text-success bg-success/10",
+  Fair: "text-warning bg-warning/10",
+  Poor: "text-destructive bg-destructive/10",
+  "Non-functional": "text-destructive bg-destructive/10",
+};
+
+const mockAssets: HospitalAsset[] = [
+  { id: "ast-1", name: "Ventilator", assetTag: "AST-0001", category: "Medical Equipment", department: "ICU", location: "ICU Bed 3", manufacturer: "Draeger", model: "Savina 300", serialNo: "SN-V001", purchaseDate: "2024-06-15", purchaseCost: 1500000, warrantyExpiry: "2027-06-15", status: "Active", condition: "Good", lastMaintenanceDate: "2026-01-10", nextMaintenanceDate: "2026-04-10", assignedTo: "Dr. Mehta" },
+  { id: "ast-2", name: "Defibrillator", assetTag: "AST-0002", category: "Medical Equipment", department: "Emergency", location: "ER Bay 1", manufacturer: "Philips", model: "HeartStart MRx", serialNo: "SN-D002", purchaseDate: "2023-03-20", purchaseCost: 800000, warrantyExpiry: "2026-03-20", status: "Active", condition: "Good", lastMaintenanceDate: "2026-02-01", nextMaintenanceDate: "2026-05-01" },
+  { id: "ast-3", name: "Patient Monitor", assetTag: "AST-0003", category: "Medical Equipment", department: "Ward A", location: "Room 201", manufacturer: "GE Healthcare", model: "CARESCAPE B450", serialNo: "SN-PM003", purchaseDate: "2025-01-10", purchaseCost: 350000, warrantyExpiry: "2028-01-10", status: "Active", condition: "Good", lastMaintenanceDate: "2025-12-15", nextMaintenanceDate: "2026-06-15" },
+  { id: "ast-4", name: "X-Ray Machine", assetTag: "AST-0004", category: "Medical Equipment", department: "Lab", location: "Radiology Room", manufacturer: "Siemens", model: "Multix Impact", serialNo: "SN-XR004", purchaseDate: "2022-08-01", purchaseCost: 5000000, warrantyExpiry: "2025-08-01", status: "Under Maintenance", condition: "Fair", lastMaintenanceDate: "2026-02-20", nextMaintenanceDate: "2026-03-20", notes: "Annual calibration pending" },
+  { id: "ast-5", name: "Hospital Bed (Electric)", assetTag: "AST-0005", category: "Furniture", department: "Ward B", location: "Room 305", manufacturer: "Stryker", model: "InTouch", serialNo: "SN-HB005", purchaseDate: "2024-01-15", purchaseCost: 250000, status: "Active", condition: "Good" },
+  { id: "ast-6", name: "Autoclave Sterilizer", assetTag: "AST-0006", category: "Instruments", department: "OT", location: "Sterilization Unit", manufacturer: "Tuttnauer", model: "3870EA", serialNo: "SN-AC006", purchaseDate: "2023-05-01", purchaseCost: 400000, warrantyExpiry: "2026-05-01", status: "Active", condition: "Fair", lastMaintenanceDate: "2026-01-15", nextMaintenanceDate: "2026-07-15" },
+  { id: "ast-7", name: "Desktop Computer", assetTag: "AST-0007", category: "IT Equipment", department: "Admin", location: "Reception", manufacturer: "Dell", model: "OptiPlex 7090", serialNo: "SN-PC007", purchaseDate: "2025-06-01", purchaseCost: 65000, warrantyExpiry: "2028-06-01", status: "Active", condition: "Good" },
+  { id: "ast-8", name: "Ambulance", assetTag: "AST-0008", category: "Vehicles", department: "Emergency", location: "Parking Bay A", manufacturer: "Force Motors", model: "Traveller", serialNo: "SN-AMB008", purchaseDate: "2024-09-01", purchaseCost: 2500000, status: "Active", condition: "Good", lastMaintenanceDate: "2026-02-10", nextMaintenanceDate: "2026-05-10" },
+];
 
 // ──── Main Component ────
 const Inventory = () => {
@@ -39,6 +92,15 @@ const Inventory = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<string>("all");
+
+  // Assets
+  const [assets, setAssets] = useState<HospitalAsset[]>(mockAssets);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetCatFilter, setAssetCatFilter] = useState("all");
+  const [assetStatusFilter, setAssetStatusFilter] = useState("all");
+  const [showAddAsset, setShowAddAsset] = useState(false);
+  const [editAsset, setEditAsset] = useState<HospitalAsset | null>(null);
+  const [assetForm, setAssetForm] = useState<Partial<HospitalAsset>>({});
 
   // Dialogs
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -324,6 +386,61 @@ const Inventory = () => {
     return { byCat, byDept, fastMoving, slowMoving, deadStock, expiryItems };
   }, [inventory]);
 
+  // ──── Asset Handlers ────
+  const filteredAssets = useMemo(() => {
+    return assets.filter((a) => {
+      const matchSearch = !assetSearch ||
+        a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+        a.assetTag.toLowerCase().includes(assetSearch.toLowerCase()) ||
+        a.serialNo.toLowerCase().includes(assetSearch.toLowerCase());
+      const matchCat = assetCatFilter === "all" || a.category === assetCatFilter;
+      const matchStatus = assetStatusFilter === "all" || a.status === assetStatusFilter;
+      return matchSearch && matchCat && matchStatus;
+    });
+  }, [assets, assetSearch, assetCatFilter, assetStatusFilter]);
+
+  const totalAssetValue = assets.reduce((s, a) => s + a.purchaseCost, 0);
+  const maintenanceDue = assets.filter((a) => {
+    if (!a.nextMaintenanceDate) return false;
+    return new Date(a.nextMaintenanceDate).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000;
+  }).length;
+
+  const handleOpenAddAsset = () => {
+    setShowAddAsset(true);
+    setAssetForm({ category: "Medical Equipment", department: "Store", status: "Active", condition: "Good", purchaseDate: format(new Date(), "yyyy-MM-dd") });
+  };
+  const handleOpenEditAsset = (asset: HospitalAsset) => {
+    setEditAsset(asset);
+    setAssetForm({ ...asset });
+  };
+  const handleSaveAsset = () => {
+    if (!assetForm.name || !assetForm.assetTag) { toast.error("Name and Asset Tag required"); return; }
+    if (editAsset) {
+      setAssets((prev) => prev.map((a) => a.id === editAsset.id ? { ...a, ...assetForm } as HospitalAsset : a));
+      toast.success(`${assetForm.name} updated`);
+      setEditAsset(null);
+    } else {
+      const newAsset: HospitalAsset = {
+        id: `ast-${Date.now()}`, name: assetForm.name || "", assetTag: assetForm.assetTag || "",
+        category: assetForm.category || "Medical Equipment", department: (assetForm.department as Department) || "Store",
+        location: assetForm.location || "", manufacturer: assetForm.manufacturer || "", model: assetForm.model || "",
+        serialNo: assetForm.serialNo || "", purchaseDate: assetForm.purchaseDate || format(new Date(), "yyyy-MM-dd"),
+        purchaseCost: assetForm.purchaseCost || 0, warrantyExpiry: assetForm.warrantyExpiry,
+        status: (assetForm.status as AssetStatus) || "Active", condition: (assetForm.condition as AssetCondition) || "Good",
+        lastMaintenanceDate: assetForm.lastMaintenanceDate, nextMaintenanceDate: assetForm.nextMaintenanceDate,
+        assignedTo: assetForm.assignedTo, notes: assetForm.notes,
+      };
+      setAssets((prev) => [...prev, newAsset]);
+      toast.success(`${newAsset.name} added`);
+      setShowAddAsset(false);
+    }
+    setAssetForm({});
+  };
+  const handleDeleteAsset = (id: string) => {
+    setAssets((prev) => prev.filter((a) => a.id !== id));
+    toast.success("Asset removed");
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
       <div className="flex items-center justify-between mb-6">
@@ -358,6 +475,7 @@ const Inventory = () => {
           <TabsTrigger value="pharma"><IndianRupee className="h-4 w-4 mr-1" /> Pharma</TabsTrigger>
           <TabsTrigger value="diagnostics"><Scan className="h-4 w-4 mr-1" /> Diagnostics</TabsTrigger>
           <TabsTrigger value="transfers"><ArrowLeftRight className="h-4 w-4 mr-1" /> Transfers</TabsTrigger>
+          <TabsTrigger value="assets"><Landmark className="h-4 w-4 mr-1" /> Assets</TabsTrigger>
           <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-1" /> Reports</TabsTrigger>
         </TabsList>
 
@@ -893,6 +1011,95 @@ const Inventory = () => {
           )}
         </TabsContent>
 
+        {/* ════════ ASSETS TAB ════════ */}
+        <TabsContent value="assets">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)} placeholder="Search name, tag, serial..." className="pl-9 h-9" />
+            </div>
+            <Select value={assetCatFilter} onValueChange={setAssetCatFilter}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {assetCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={assetStatusFilter} onValueChange={setAssetStatusFilter}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {assetStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={handleOpenAddAsset}><Plus className="h-4 w-4 mr-1" /> Add Asset</Button>
+          </div>
+
+          {/* Asset Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Total Assets" value={assets.length} icon={<Landmark className="h-4 w-4" />} accent="text-primary" />
+            <StatCard label="Asset Value" value={`₹${(totalAssetValue / 100000).toFixed(1)}L`} icon={<IndianRupee className="h-4 w-4" />} accent="text-info" />
+            <StatCard label="Active" value={assets.filter((a) => a.status === "Active").length} icon={<CheckCircle2 className="h-4 w-4" />} accent="text-success" />
+            <StatCard label="Maintenance Due" value={maintenanceDue} icon={<Wrench className="h-4 w-4" />} accent="text-warning" />
+          </div>
+
+          <div className="rounded-xl border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Asset Tag</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Condition</TableHead>
+                  <TableHead>Cost</TableHead>
+                  <TableHead>Warranty</TableHead>
+                  <TableHead>Next Maintenance</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAssets.length === 0 ? (
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No assets found</TableCell></TableRow>
+                ) : filteredAssets.map((asset) => {
+                  const warrantyOk = asset.warrantyExpiry ? new Date(asset.warrantyExpiry) > new Date() : false;
+                  const maintDue = asset.nextMaintenanceDate ? new Date(asset.nextMaintenanceDate).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000 : false;
+                  return (
+                    <TableRow key={asset.id}>
+                      <TableCell className="font-mono text-xs">{asset.assetTag}</TableCell>
+                      <TableCell className="font-medium">{asset.name}<br /><span className="text-xs text-muted-foreground">{asset.manufacturer} {asset.model}</span></TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{asset.category}</Badge></TableCell>
+                      <TableCell className="text-xs">{asset.department}</TableCell>
+                      <TableCell className="text-xs">{asset.location}</TableCell>
+                      <TableCell><Badge className={cn("text-xs", statusColors[asset.status])}>{asset.status}</Badge></TableCell>
+                      <TableCell><Badge className={cn("text-xs", conditionColors[asset.condition])}>{asset.condition}</Badge></TableCell>
+                      <TableCell className="text-xs">₹{asset.purchaseCost.toLocaleString()}</TableCell>
+                      <TableCell className="text-xs">
+                        {asset.warrantyExpiry ? (
+                          <span className={warrantyOk ? "text-success" : "text-destructive"}>{warrantyOk ? "Valid" : "Expired"} · {asset.warrantyExpiry}</span>
+                        ) : <span className="text-muted-foreground">N/A</span>}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {asset.nextMaintenanceDate ? (
+                          <span className={maintDue ? "text-warning font-medium" : ""}>{asset.nextMaintenanceDate}{maintDue && " ⚠"}</span>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEditAsset(asset)}><Edit className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteAsset(asset.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
 
 
       </Tabs>
@@ -1133,6 +1340,99 @@ const Inventory = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditLabCategory(null)}>Cancel</Button>
             <Button onClick={handleEditLabCategory}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Asset Dialog */}
+      <Dialog open={showAddAsset || !!editAsset} onOpenChange={(open) => { if (!open) { setShowAddAsset(false); setEditAsset(null); setAssetForm({}); } }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editAsset ? "Edit Asset" : "Add Hospital Asset"}</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Asset Name *</Label>
+              <Input value={assetForm.name || ""} onChange={(e) => setAssetForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Ventilator" />
+            </div>
+            <div>
+              <Label className="text-xs">Asset Tag *</Label>
+              <Input value={assetForm.assetTag || ""} onChange={(e) => setAssetForm((p) => ({ ...p, assetTag: e.target.value }))} placeholder="AST-0009" />
+            </div>
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Select value={assetForm.category || "Medical Equipment"} onValueChange={(v) => setAssetForm((p) => ({ ...p, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{assetCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Select value={assetForm.department || "Store"} onValueChange={(v) => setAssetForm((p) => ({ ...p, department: v as Department }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Location</Label>
+              <Input value={assetForm.location || ""} onChange={(e) => setAssetForm((p) => ({ ...p, location: e.target.value }))} placeholder="e.g. ICU Bed 3" />
+            </div>
+            <div>
+              <Label className="text-xs">Manufacturer</Label>
+              <Input value={assetForm.manufacturer || ""} onChange={(e) => setAssetForm((p) => ({ ...p, manufacturer: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Model</Label>
+              <Input value={assetForm.model || ""} onChange={(e) => setAssetForm((p) => ({ ...p, model: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Serial No</Label>
+              <Input value={assetForm.serialNo || ""} onChange={(e) => setAssetForm((p) => ({ ...p, serialNo: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Purchase Date</Label>
+              <Input type="date" value={assetForm.purchaseDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, purchaseDate: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Purchase Cost (₹)</Label>
+              <Input type="number" value={assetForm.purchaseCost || 0} onChange={(e) => setAssetForm((p) => ({ ...p, purchaseCost: +e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Warranty Expiry</Label>
+              <Input type="date" value={assetForm.warrantyExpiry || ""} onChange={(e) => setAssetForm((p) => ({ ...p, warrantyExpiry: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Status</Label>
+              <Select value={assetForm.status || "Active"} onValueChange={(v) => setAssetForm((p) => ({ ...p, status: v as AssetStatus }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{assetStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Condition</Label>
+              <Select value={assetForm.condition || "Good"} onValueChange={(v) => setAssetForm((p) => ({ ...p, condition: v as AssetCondition }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{assetConditions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Assigned To</Label>
+              <Input value={assetForm.assignedTo || ""} onChange={(e) => setAssetForm((p) => ({ ...p, assignedTo: e.target.value }))} placeholder="e.g. Dr. Mehta" />
+            </div>
+            <div>
+              <Label className="text-xs">Last Maintenance</Label>
+              <Input type="date" value={assetForm.lastMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, lastMaintenanceDate: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Next Maintenance</Label>
+              <Input type="date" value={assetForm.nextMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, nextMaintenanceDate: e.target.value }))} />
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs">Notes</Label>
+              <Textarea value={assetForm.notes || ""} onChange={(e) => setAssetForm((p) => ({ ...p, notes: e.target.value }))} rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddAsset(false); setEditAsset(null); setAssetForm({}); }}>Cancel</Button>
+            <Button onClick={handleSaveAsset}>{editAsset ? "Save Changes" : "Add Asset"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
