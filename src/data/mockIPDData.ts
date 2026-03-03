@@ -2,7 +2,7 @@ import type { Department } from "./mockInventoryData";
 
 // ──── Ward & Bed Types ────
 export type WardType = "General" | "Semi-Private" | "Private" | "ICU" | "NICU" | "Isolation" | "Maternity" | "Pediatric";
-export type BedStatus = "Available" | "Occupied" | "Reserved" | "Under Maintenance";
+export type BedStatus = "Available" | "Occupied" | "Under Maintenance";
 
 export interface Ward {
   id: string;
@@ -163,8 +163,6 @@ const generateBeds = (): Bed[] => {
       if (i <= 2 && patIdx < occupiedPatients.length) {
         status = "Occupied";
         patient = occupiedPatients[patIdx++];
-      } else if (i === 3 && ward.id === "w-1") {
-        status = "Reserved";
       } else if (i === ward.totalBeds && ward.id === "w-5") {
         status = "Under Maintenance";
       }
@@ -266,7 +264,6 @@ export const mockDischargeSummaries: DischargeSummary[] = [
 export const bedStatusColors: Record<BedStatus, string> = {
   Available: "bg-success/20 text-success border-success/40",
   Occupied: "bg-destructive/20 text-destructive border-destructive/40",
-  Reserved: "bg-warning/20 text-warning border-warning/40",
   "Under Maintenance": "bg-muted text-muted-foreground border-border",
 };
 

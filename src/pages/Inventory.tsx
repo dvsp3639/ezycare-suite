@@ -132,6 +132,11 @@ const Inventory = () => {
   // Pharma filters
   const [pharmaSearch, setPharmaSearch] = useState("");
 
+  // Ward CRUD
+  const [showWardDialog, setShowWardDialog] = useState(false);
+  const [wardEditId, setWardEditId] = useState<string | null>(null);
+  const [wardForm, setWardForm] = useState<{ name: string; department: Department; totalBeds: number; chargePerDay: number }>({ name: "", department: "Ward A", totalBeds: 10, chargePerDay: 500 });
+
   // Report tab
   const [reportType, setReportType] = useState("summary");
 
@@ -856,27 +861,59 @@ const Inventory = () => {
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2"><BedDouble className="h-4 w-4 text-info" /> Bed Inventory</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {bedItems.map((bed) => (
-                      <div key={bed.id} className="rounded-xl border border-border bg-card p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="text-sm font-bold text-foreground">{bed.name}</h4>
-                          <Badge variant="outline" className="text-[10px] bg-info/10 text-info border-info/20">{bed.sku}</Badge>
+                    {bedItems.map((bed) => {
+                      const isMaintenanceMode = bed.stock === 0 && bed.name.includes("(Maintenance)");
+                      return (
+                        <div key={bed.id} className={cn("rounded-xl border bg-card p-4 hover:shadow-md transition-shadow", isMaintenanceMode ? "border-warning/40 bg-warning/5" : "border-border")}>
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="text-sm font-bold text-foreground">{bed.name}</h4>
+                            <div className="flex items-center gap-1">
+                              <Badge variant="outline" className="text-[10px] bg-info/10 text-info border-info/20">{bed.sku}</Badge>
+                            </div>
+                          </div>
+                          <div className="space-y-1.5 text-xs text-muted-foreground">
+                            <div className="flex justify-between"><span>Manufacturer</span><span className="text-foreground font-medium">{bed.manufacturer}</span></div>
+                            <div className="flex justify-between"><span>Stock</span><span className="text-foreground font-bold">{bed.stock} units</span></div>
+                            <div className="flex justify-between"><span>Unit Price</span><span className="text-foreground">₹{bed.unitPrice.toLocaleString()}</span></div>
+                            <div className="flex justify-between"><span>Department</span><span className="text-foreground">{bed.department}</span></div>
+                            <div className="flex justify-between"><span>Last Updated</span><span>{bed.lastUpdated}</span></div>
+                          </div>
+                          <div className="mt-3 pt-2 border-t border-border flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs flex-1"
+                              onClick={() => {
+                                setInventory((prev) => prev.map((i) => {
+                                  if (i.id !== bed.id) return i;
+                                  const goingToMaintenance = i.stock > 0;
+                                  return {
+                                    ...i,
+                                    stock: goingToMaintenance ? 0 : bed.minStock || 1,
+                                    lastUpdated: format(new Date(), "yyyy-MM-dd"),
+                                  };
+                                }));
+                                toast.success(bed.stock > 0 ? `${bed.name} set to maintenance` : `${bed.name} restored from maintenance`);
+                              }}
+                            >
+                              <Wrench className="h-3 w-3 mr-1" />
+                              {bed.stock === 0 ? "Restore" : "Maintenance"}
+                            </Button>
+                          </div>
                         </div>
-                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                          <div className="flex justify-between"><span>Manufacturer</span><span className="text-foreground font-medium">{bed.manufacturer}</span></div>
-                          <div className="flex justify-between"><span>Stock</span><span className="text-foreground font-bold">{bed.stock} units</span></div>
-                          <div className="flex justify-between"><span>Unit Price</span><span className="text-foreground">₹{bed.unitPrice.toLocaleString()}</span></div>
-                          <div className="flex justify-between"><span>Department</span><span className="text-foreground">{bed.department}</span></div>
-                          <div className="flex justify-between"><span>Last Updated</span><span>{bed.lastUpdated}</span></div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Wards Section */}
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Ward Configuration</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Ward Configuration</h3>
+                    <Button size="sm" className="h-8" onClick={() => { setShowWardDialog(true); setWardEditId(null); setWardForm({ name: "", department: "Ward A" as Department, totalBeds: 10, chargePerDay: 500 }); }}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Ward
+                    </Button>
+                  </div>
                   <div className="rounded-lg border border-border overflow-hidden">
                     <Table>
                       <TableHeader>
@@ -887,6 +924,7 @@ const Inventory = () => {
                           <TableHead>Total Beds</TableHead>
                           <TableHead>Charge/Day</TableHead>
                           <TableHead>Last Updated</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -898,6 +936,23 @@ const Inventory = () => {
                             <TableCell className="font-bold">{ward.stock}</TableCell>
                             <TableCell className="text-sm">₹{ward.sellingPrice.toLocaleString()}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{ward.lastUpdated}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                  setWardEditId(ward.id);
+                                  setWardForm({ name: ward.name, department: ward.department, totalBeds: ward.stock, chargePerDay: ward.sellingPrice });
+                                  setShowWardDialog(true);
+                                }}>
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => {
+                                  setInventory((prev) => prev.filter((i) => i.id !== ward.id));
+                                  toast.success(`${ward.name} removed`);
+                                }}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1520,6 +1575,77 @@ const Inventory = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowAddAsset(false); setEditAsset(null); setAssetForm({}); }}>Cancel</Button>
             <Button onClick={handleSaveAsset}>{editAsset ? "Save Changes" : "Add Asset"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ward Add/Edit Dialog */}
+      <Dialog open={showWardDialog} onOpenChange={(open) => { if (!open) { setShowWardDialog(false); setWardEditId(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{wardEditId ? "Edit Ward" : "Add New Ward"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Ward Name *</Label>
+              <Input value={wardForm.name} onChange={(e) => setWardForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Pediatric Ward" />
+            </div>
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Select value={wardForm.department} onValueChange={(v) => setWardForm((p) => ({ ...p, department: v as Department }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Total Beds</Label>
+              <Input type="number" min={1} value={wardForm.totalBeds} onChange={(e) => setWardForm((p) => ({ ...p, totalBeds: +e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Charge Per Day (₹)</Label>
+              <Input type="number" min={0} value={wardForm.chargePerDay} onChange={(e) => setWardForm((p) => ({ ...p, chargePerDay: +e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowWardDialog(false); setWardEditId(null); }}>Cancel</Button>
+            <Button onClick={() => {
+              if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
+              if (wardEditId) {
+                setInventory((prev) => prev.map((i) => i.id === wardEditId ? {
+                  ...i,
+                  name: wardForm.name,
+                  department: wardForm.department,
+                  stock: wardForm.totalBeds,
+                  sellingPrice: wardForm.chargePerDay,
+                  lastUpdated: format(new Date(), "yyyy-MM-dd"),
+                } : i));
+                toast.success(`${wardForm.name} updated`);
+              } else {
+                const newWard: InventoryItem = {
+                  id: `inv-ward-${Date.now()}`,
+                  name: wardForm.name,
+                  category: "Wards",
+                  sku: `WRD-${String(inventory.filter((i) => i.category === "Wards").length + 1).padStart(3, "0")}`,
+                  batchNo: `W${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`,
+                  manufacturer: "N/A",
+                  unitPrice: 0,
+                  sellingPrice: wardForm.chargePerDay,
+                  stock: wardForm.totalBeds,
+                  minStock: 0,
+                  unit: "Beds",
+                  hsnCode: "N/A",
+                  gstPercent: 0,
+                  department: wardForm.department,
+                  barcode: `${Date.now()}`,
+                  lastUpdated: format(new Date(), "yyyy-MM-dd"),
+                  vendor: "N/A",
+                  purchaseDate: format(new Date(), "yyyy-MM-dd"),
+                  consumptionRate: 0,
+                };
+                setInventory((prev) => [...prev, newWard]);
+                toast.success(`${wardForm.name} added`);
+              }
+              setShowWardDialog(false);
+              setWardEditId(null);
+            }}>{wardEditId ? "Save Changes" : "Add Ward"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

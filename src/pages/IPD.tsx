@@ -446,12 +446,11 @@ const IPD = () => {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="Available">Available</SelectItem>
                 <SelectItem value="Occupied">Occupied</SelectItem>
-                <SelectItem value="Reserved">Reserved</SelectItem>
                 <SelectItem value="Under Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-4 ml-auto">
-              {(["Available", "Occupied", "Reserved", "Under Maintenance"] as BedStatus[]).map((s) => (
+              {(["Available", "Occupied", "Under Maintenance"] as BedStatus[]).map((s) => (
                 <div key={s} className="flex items-center gap-1.5 text-xs">
                   <div className={cn("w-3 h-3 rounded-full border", bedStatusColors[s])} />
                   <span className="text-muted-foreground">{s}</span>
@@ -509,14 +508,14 @@ const IPD = () => {
                         <button
                           key={bed.id}
                           onClick={() => handleBedClick(bed)}
-                          disabled={bed.status === "Under Maintenance" || bed.status === "Reserved"}
+                          disabled={bed.status === "Under Maintenance"}
                           className={cn(
                             "relative group rounded-xl border-2 p-2.5 text-center transition-all duration-200",
                             "focus:outline-none focus:ring-2 focus:ring-primary/50",
                             bedStatusColors[bed.status],
                             bed.status === "Available" && "hover:scale-110 hover:shadow-lg hover:shadow-success/20 cursor-pointer hover:border-success",
                             bed.status === "Occupied" && "hover:scale-105 hover:shadow-md cursor-pointer",
-                            (bed.status === "Under Maintenance" || bed.status === "Reserved") && "opacity-60 cursor-not-allowed",
+                            bed.status === "Under Maintenance" && "opacity-60 cursor-not-allowed",
                           )}
                           title={bed.patientName ? `${bed.patientName} — Click to view` : bed.status === "Available" ? "Click to assign patient" : bed.status}
                         >
