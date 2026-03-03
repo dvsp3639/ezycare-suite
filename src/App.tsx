@@ -14,6 +14,8 @@ import Pharmacy from "./pages/Pharmacy";
 import Diagnostics from "./pages/Diagnostics";
 import Inventory from "./pages/Inventory";
 import DayCare from "./pages/DayCare";
+import IPD from "./pages/IPD";
+import StaffPayroll from "./pages/StaffPayroll";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +43,8 @@ const AppRoutes = () => (
     <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
     <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
     <Route path="/day-care" element={<ProtectedRoute><DayCare /></ProtectedRoute>} />
+    <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
+    <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />
