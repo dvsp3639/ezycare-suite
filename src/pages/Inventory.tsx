@@ -24,6 +24,7 @@ import {
 } from "@/data/mockInventoryData";
 import { labTestCatalog, type LabTestDefinition } from "@/data/mockDiagnosticsData";
 import type { LabCategory } from "@/data/mockClinicData";
+import { useWardsBeds } from "@/contexts/WardsBedContext";
 
 // ──── Asset Types ────
 export type AssetStatus = "Active" | "Under Maintenance" | "Retired" | "Disposed";
@@ -80,8 +81,9 @@ const mockAssets: HospitalAsset[] = [
 
 // ──── Main Component ────
 const Inventory = () => {
+  const { wardInventoryItems, addWard, updateWard, deleteWard, toggleBedMaintenance } = useWardsBeds();
   const [activeTab, setActiveTab] = useState("stock");
-  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
+  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory.filter((i) => i.category !== "Wards"));
   const [transfers, setTransfers] = useState<StockTransfer[]>(mockTransfers);
   const [labTests, setLabTests] = useState<LabTestDefinition[]>(labTestCatalog);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -832,7 +834,7 @@ const Inventory = () => {
         <TabsContent value="beds-wards">
           {(() => {
             const bedItems = inventory.filter((i) => i.category === "Beds");
-            const wardItems = inventory.filter((i) => i.category === "Wards");
+            const wardItems = wardInventoryItems;
             const totalBedStock = bedItems.reduce((s, i) => s + i.stock, 0);
             const totalBedValue = bedItems.reduce((s, i) => s + i.unitPrice * i.stock, 0);
             return (
@@ -946,7 +948,7 @@ const Inventory = () => {
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => {
-                                  setInventory((prev) => prev.filter((i) => i.id !== ward.id));
+                                  deleteWard(ward.id);
                                   toast.success(`${ward.name} removed`);
                                 }}>
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1609,38 +1611,10 @@ const Inventory = () => {
             <Button onClick={() => {
               if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
               if (wardEditId) {
-                setInventory((prev) => prev.map((i) => i.id === wardEditId ? {
-                  ...i,
-                  name: wardForm.name,
-                  department: wardForm.department,
-                  stock: wardForm.totalBeds,
-                  sellingPrice: wardForm.chargePerDay,
-                  lastUpdated: format(new Date(), "yyyy-MM-dd"),
-                } : i));
+                updateWard(wardEditId, wardForm);
                 toast.success(`${wardForm.name} updated`);
               } else {
-                const newWard: InventoryItem = {
-                  id: `inv-ward-${Date.now()}`,
-                  name: wardForm.name,
-                  category: "Wards",
-                  sku: `WRD-${String(inventory.filter((i) => i.category === "Wards").length + 1).padStart(3, "0")}`,
-                  batchNo: `W${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`,
-                  manufacturer: "N/A",
-                  unitPrice: 0,
-                  sellingPrice: wardForm.chargePerDay,
-                  stock: wardForm.totalBeds,
-                  minStock: 0,
-                  unit: "Beds",
-                  hsnCode: "N/A",
-                  gstPercent: 0,
-                  department: wardForm.department,
-                  barcode: `${Date.now()}`,
-                  lastUpdated: format(new Date(), "yyyy-MM-dd"),
-                  vendor: "N/A",
-                  purchaseDate: format(new Date(), "yyyy-MM-dd"),
-                  consumptionRate: 0,
-                };
-                setInventory((prev) => [...prev, newWard]);
+                addWard(wardForm);
                 toast.success(`${wardForm.name} added`);
               }
               setShowWardDialog(false);

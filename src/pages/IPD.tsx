@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockWards, mockBeds, mockAdmissions, mockDoctorNotes, mockNurseNotes,
+  mockAdmissions, mockDoctorNotes, mockNurseNotes,
   mockMedicineEntries, mockSurgicalEntries, mockDiagnosticEntries,
   mockBedTransfers, mockDischargeSummaries, bedStatusColors, wardTypeColors,
   type Ward, type Bed, type BedStatus, type IPDAdmission, type AdmissionStatus,
@@ -26,6 +26,7 @@ import {
   type DiagnosticEntry, type BedTransfer, type DischargeSummary,
 } from "@/data/mockIPDData";
 import { mockPatients, mockDoctors } from "@/data/mockPatients";
+import { useWardsBeds } from "@/contexts/WardsBedContext";
 
 const admissionStatusColors: Record<AdmissionStatus, string> = {
   Active: "bg-success/10 text-success border-success/30",
@@ -35,10 +36,9 @@ const admissionStatusColors: Record<AdmissionStatus, string> = {
 };
 
 const IPD = () => {
+  const { wards, beds, setBeds } = useWardsBeds();
   const [activeTab, setActiveTab] = useState("admissions");
   const [admissions, setAdmissions] = useState<IPDAdmission[]>(mockAdmissions);
-  const [wards] = useState<Ward[]>(mockWards);
-  const [beds, setBeds] = useState<Bed[]>(mockBeds);
   const [doctorNotes, setDoctorNotes] = useState<DoctorVisitNote[]>(mockDoctorNotes);
   const [nurseNotes, setNurseNotes] = useState<NurseNote[]>(mockNurseNotes);
   const [medicineEntries, setMedicineEntries] = useState<MedicineEntry[]>(mockMedicineEntries);
