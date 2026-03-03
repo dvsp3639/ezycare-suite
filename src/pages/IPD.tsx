@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import {
   BedDouble, Search, Plus, User, Phone, Stethoscope, FileText, ArrowLeftRight,
   IndianRupee, Clock, CheckCircle, AlertTriangle, Edit, Trash2, Eye, Activity,
-  ClipboardList, Pill, Scissors, Microscope, Receipt, ChevronRight,
+  ClipboardList, Pill, Scissors, Microscope, Receipt, ChevronRight, Printer,
+  UserPlus, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,7 @@ const IPD = () => {
   const [admStatusFilter, setAdmStatusFilter] = useState("all");
   const [selectedAdmission, setSelectedAdmission] = useState<IPDAdmission | null>(null);
   const [bedWardFilter, setBedWardFilter] = useState("all");
+  const [bedStatusFilter, setBedStatusFilter] = useState("all");
 
   // Dialogs
   const [showAdmitDialog, setShowAdmitDialog] = useState(false);
@@ -62,6 +64,13 @@ const IPD = () => {
   const [showBedTransferDialog, setShowBedTransferDialog] = useState(false);
   const [showDischargeDialog, setShowDischargeDialog] = useState(false);
   const [showBillDialog, setShowBillDialog] = useState(false);
+  const [showBedAllocateDialog, setShowBedAllocateDialog] = useState(false);
+  const [showDischargeSummaryDialog, setShowDischargeSummaryDialog] = useState(false);
+  const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
+  const [viewingDischarge, setViewingDischarge] = useState<DischargeSummary | null>(null);
+
+  // Print ref
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Forms
   const [admitForm, setAdmitForm] = useState<Partial<IPDAdmission>>({});
@@ -72,6 +81,7 @@ const IPD = () => {
   const [diagForm, setDiagForm] = useState({ testName: "", cost: 0 });
   const [transferForm, setTransferForm] = useState({ toWard: "", toBed: "", reason: "" });
   const [dischargeForm, setDischargeForm] = useState({ conditionAtDischarge: "", finalDiagnosis: "", treatmentSummary: "", followUpDate: "", followUpInstructions: "", medicationsOnDischarge: "" });
+  const [allocateForm, setAllocateForm] = useState({ patientId: "", admittingDoctor: "", department: "", diagnosis: "", referredBy: "", insuranceInfo: "" });
 
   // ──── Computed ────
   const filteredAdmissions = useMemo(() => admissions.filter((a) => {
@@ -108,15 +118,72 @@ const IPD = () => {
     return { days, wardCharges, medTotal, surgTotal, diagTotal, grandTotal: wardCharges + medTotal + surgTotal + diagTotal };
   }, [selectedAdmission, admMedicines, admSurgicals, admDiagnostics, wards]);
 
+  // Bill for any admission (for discharge summary view)
+  const getBillForAdmission = (adm: IPDAdmission) => {
+    const ward = wards.find((w) => w.id === adm.wardId);
+    const admDate = new Date(adm.admissionDate);
+    const endDate = adm.dischargeDate ? new Date(adm.dischargeDate) : new Date();
+    const days = Math.max(1, Math.ceil((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const wardCharges = days * (ward?.chargePerDay || 0);
+    const meds = medicineEntries.filter((m) => m.admissionId === adm.id);
+    const surgs = surgicalEntries.filter((s) => s.admissionId === adm.id);
+    const diags = diagnosticEntries.filter((d) => d.admissionId === adm.id);
+    const medTotal = meds.reduce((s, m) => s + m.total, 0);
+    const surgTotal = surgs.reduce((s, m) => s + m.cost, 0);
+    const diagTotal = diags.reduce((s, m) => s + m.cost, 0);
+    return { days, wardCharges, medTotal, surgTotal, diagTotal, grandTotal: wardCharges + medTotal + surgTotal + diagTotal, meds, surgs, diags };
+  };
+
   // ──── Handlers ────
-  const handleAdmit = () => {
-    if (!admitForm.patientId || !admitForm.admittingDoctor || !admitForm.bedId) {
-      toast.error("Patient, doctor, and bed are required"); return;
+  const handleBedClick = (bed: Bed) => {
+    if (bed.status === "Available") {
+      setSelectedBed(bed);
+      setAllocateForm({ patientId: "", admittingDoctor: "", department: "", diagnosis: "", referredBy: "", insuranceInfo: "" });
+      setShowBedAllocateDialog(true);
+    } else if (bed.status === "Occupied" && bed.admissionId) {
+      const adm = admissions.find((a) => a.id === bed.admissionId);
+      if (adm) {
+        setSelectedAdmission(adm);
+        setActiveTab("daily-entries");
+      }
     }
+  };
+
+  const handleAllocateBed = () => {
+    if (!selectedBed || !allocateForm.patientId || !allocateForm.admittingDoctor) {
+      toast.error("Patient and doctor are required"); return;
+    }
+    const patient = mockPatients.find((p) => p.id === allocateForm.patientId);
+    const ward = wards.find((w) => w.id === selectedBed.wardId);
+    if (!patient || !ward) return;
+
+    const newAdm: IPDAdmission = {
+      id: `adm-${Date.now()}`, patientId: patient.id, patientName: patient.name,
+      registrationNumber: patient.registrationNumber, age: new Date().getFullYear() - new Date(patient.dob).getFullYear(),
+      gender: patient.gender, contactNumber: patient.mobile, referredBy: allocateForm.referredBy,
+      admittingDoctor: allocateForm.admittingDoctor, department: allocateForm.department || "General Medicine",
+      diagnosis: allocateForm.diagnosis || "", wardId: ward.id, wardName: ward.name,
+      bedId: selectedBed.id, bedNumber: selectedBed.bedNumber, admissionDate: new Date().toLocaleString(),
+      status: "Active", emergencyContact: patient.emergencyContact, insuranceInfo: allocateForm.insuranceInfo || undefined,
+    };
+    setAdmissions((prev) => [newAdm, ...prev]);
+    setBeds((prev) => prev.map((b) => b.id === selectedBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: newAdm.id } : b));
+    toast.success(`${patient.name} admitted to ${ward.name} - ${selectedBed.bedNumber}`);
+    setShowBedAllocateDialog(false);
+    setSelectedBed(null);
+  };
+
+  const handleAdmit = () => {
+    if (!admitForm.patientId || !admitForm.admittingDoctor) {
+      toast.error("Patient and doctor are required"); return;
+    }
+    // Find first available bed
+    const availableBed = beds.find((b) => b.status === "Available");
+    if (!availableBed) { toast.error("No beds available. Please free up a bed first."); return; }
+
     const patient = mockPatients.find((p) => p.id === admitForm.patientId);
-    const bed = beds.find((b) => b.id === admitForm.bedId);
-    const ward = wards.find((w) => w.id === bed?.wardId);
-    if (!patient || !bed || !ward) return;
+    const ward = wards.find((w) => w.id === availableBed.wardId);
+    if (!patient || !ward) return;
 
     const newAdm: IPDAdmission = {
       id: `adm-${Date.now()}`, patientId: patient.id, patientName: patient.name,
@@ -124,12 +191,12 @@ const IPD = () => {
       gender: patient.gender, contactNumber: patient.mobile, referredBy: admitForm.referredBy || "",
       admittingDoctor: admitForm.admittingDoctor || "", department: admitForm.department || "General Medicine",
       diagnosis: admitForm.diagnosis || "", wardId: ward.id, wardName: ward.name,
-      bedId: bed.id, bedNumber: bed.bedNumber, admissionDate: new Date().toLocaleString(),
+      bedId: availableBed.id, bedNumber: availableBed.bedNumber, admissionDate: new Date().toLocaleString(),
       status: "Active", emergencyContact: patient.emergencyContact, insuranceInfo: admitForm.insuranceInfo,
     };
     setAdmissions((prev) => [newAdm, ...prev]);
-    setBeds((prev) => prev.map((b) => b.id === bed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: newAdm.id } : b));
-    toast.success(`${patient.name} admitted to ${ward.name} - ${bed.bedNumber}`);
+    setBeds((prev) => prev.map((b) => b.id === availableBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: newAdm.id } : b));
+    toast.success(`${patient.name} admitted — assigned to ${ward.name} / ${availableBed.bedNumber}. You can transfer bed from Bed Management.`);
     setShowAdmitDialog(false);
     setAdmitForm({});
   };
@@ -213,18 +280,13 @@ const IPD = () => {
       transferDate: new Date().toLocaleString(), transferredBy: "Current User",
     };
     setBedTransfers((prev) => [...prev, transfer]);
-
-    // Update beds
     setBeds((prev) => prev.map((b) => {
       if (b.id === selectedAdmission.bedId) return { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined };
       if (b.id === destBed.id) return { ...b, status: "Occupied" as BedStatus, patientId: selectedAdmission.patientId, patientName: selectedAdmission.patientName, admissionId: selectedAdmission.id };
       return b;
     }));
-
-    // Update admission
     setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : a));
     setSelectedAdmission((prev) => prev ? { ...prev, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : null);
-
     toast.success(`Patient transferred to ${destWard.name} - ${destBed.bedNumber}`);
     setShowBedTransferDialog(false);
     setTransferForm({ toWard: "", toBed: "", reason: "" });
@@ -249,7 +311,36 @@ const IPD = () => {
     setDischargeForm({ conditionAtDischarge: "", finalDiagnosis: "", treatmentSummary: "", followUpDate: "", followUpInstructions: "", medicationsOnDischarge: "" });
   };
 
-  const availableBedsForAdmission = beds.filter((b) => b.status === "Available");
+  const handlePrintDischarge = () => {
+    if (!printRef.current) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Discharge Summary</title>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        h2 { font-size: 16px; color: #444; border-bottom: 2px solid #0066cc; padding-bottom: 4px; margin-top: 24px; }
+        .header { text-align: center; border-bottom: 3px solid #0066cc; padding-bottom: 16px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        .value { font-size: 13px; font-weight: 600; }
+        .section { margin-bottom: 16px; }
+        .bill-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #eee; }
+        .bill-total { font-weight: bold; font-size: 15px; border-top: 2px solid #333; padding-top: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: 600; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      ${printRef.current.innerHTML}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  };
+
   const availableBedsForTransfer = selectedAdmission ? beds.filter((b) => b.status === "Available" && b.id !== selectedAdmission.bedId) : [];
 
   return (
@@ -262,7 +353,7 @@ const IPD = () => {
           <p className="text-sm text-muted-foreground">Admissions, bed management, daily entries & discharge</p>
         </div>
         <Button size="sm" onClick={() => { setShowAdmitDialog(true); setAdmitForm({}); }}>
-          <Plus className="h-4 w-4 mr-1" /> Admit Patient
+          <Plus className="h-4 w-4 mr-1" /> Quick Admit
         </Button>
       </div>
 
@@ -341,7 +432,7 @@ const IPD = () => {
 
         {/* ════════ BED MANAGEMENT TAB ════════ */}
         <TabsContent value="beds">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-5">
             <Select value={bedWardFilter} onValueChange={setBedWardFilter}>
               <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Filter by ward" /></SelectTrigger>
               <SelectContent>
@@ -349,48 +440,97 @@ const IPD = () => {
                 {wards.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-3 ml-auto">
+            <Select value={bedStatusFilter} onValueChange={setBedStatusFilter}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Bed Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Available">Available</SelectItem>
+                <SelectItem value="Occupied">Occupied</SelectItem>
+                <SelectItem value="Reserved">Reserved</SelectItem>
+                <SelectItem value="Under Maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-4 ml-auto">
               {(["Available", "Occupied", "Reserved", "Under Maintenance"] as BedStatus[]).map((s) => (
                 <div key={s} className="flex items-center gap-1.5 text-xs">
-                  <div className={cn("w-3 h-3 rounded-sm border", bedStatusColors[s])} />
+                  <div className={cn("w-3 h-3 rounded-full border", bedStatusColors[s])} />
                   <span className="text-muted-foreground">{s}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="space-y-6">
+          <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1">
+            <UserPlus className="h-3.5 w-3.5" /> Click on an <span className="font-semibold text-success">available</span> bed to assign a patient • Click on an <span className="font-semibold text-destructive">occupied</span> bed to view patient details
+          </p>
+
+          <div className="space-y-5">
             {wards.filter((w) => bedWardFilter === "all" || w.id === bedWardFilter).map((ward) => {
-              const wardBeds = beds.filter((b) => b.wardId === ward.id);
-              const occupied = wardBeds.filter((b) => b.status === "Occupied").length;
+              const wardBeds = beds.filter((b) => b.wardId === ward.id && (bedStatusFilter === "all" || b.status === bedStatusFilter));
+              const allWardBeds = beds.filter((b) => b.wardId === ward.id);
+              const occupied = allWardBeds.filter((b) => b.status === "Occupied").length;
+              const available = allWardBeds.filter((b) => b.status === "Available").length;
+              const occupancyPercent = Math.round((occupied / allWardBeds.length) * 100);
+
+              if (wardBeds.length === 0 && bedStatusFilter !== "all") return null;
+
               return (
-                <Card key={ward.id} className="border border-border">
-                  <CardHeader className="pb-3">
+                <Card key={ward.id} className="border border-border overflow-hidden">
+                  <CardHeader className="pb-3 bg-muted/20">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Badge className={cn("text-xs", wardTypeColors[ward.type])}>{ward.type}</Badge>
-                        <CardTitle className="text-sm font-semibold">{ward.name}</CardTitle>
-                        <span className="text-xs text-muted-foreground">{ward.floor}</span>
+                        <Badge className={cn("text-xs font-semibold", wardTypeColors[ward.type])}>{ward.type}</Badge>
+                        <CardTitle className="text-sm font-bold">{ward.name}</CardTitle>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{ward.floor}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{occupied}/{ward.totalBeds} occupied</span>
-                        <span>₹{ward.chargePerDay}/day</span>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="text-success font-semibold">{available} free</span>
+                            <span>•</span>
+                            <span className="text-destructive font-semibold">{occupied} used</span>
+                            <span>•</span>
+                            <span>{allWardBeds.length} total</span>
+                          </div>
+                          <div className="w-32 h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full transition-all", occupancyPercent > 80 ? "bg-destructive" : occupancyPercent > 50 ? "bg-warning" : "bg-success")}
+                              style={{ width: `${occupancyPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-medium">₹{ward.chargePerDay}/day</span>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5">
                       {wardBeds.map((bed) => (
-                        <div key={bed.id} className={cn(
-                          "relative group rounded-lg border-2 p-2 text-center transition-all hover:scale-105 cursor-default",
-                          bedStatusColors[bed.status],
-                        )} title={bed.patientName ? `${bed.patientName}` : bed.status}>
-                          <BedDouble className="h-5 w-5 mx-auto mb-0.5" />
+                        <button
+                          key={bed.id}
+                          onClick={() => handleBedClick(bed)}
+                          disabled={bed.status === "Under Maintenance" || bed.status === "Reserved"}
+                          className={cn(
+                            "relative group rounded-xl border-2 p-2.5 text-center transition-all duration-200",
+                            "focus:outline-none focus:ring-2 focus:ring-primary/50",
+                            bedStatusColors[bed.status],
+                            bed.status === "Available" && "hover:scale-110 hover:shadow-lg hover:shadow-success/20 cursor-pointer hover:border-success",
+                            bed.status === "Occupied" && "hover:scale-105 hover:shadow-md cursor-pointer",
+                            (bed.status === "Under Maintenance" || bed.status === "Reserved") && "opacity-60 cursor-not-allowed",
+                          )}
+                          title={bed.patientName ? `${bed.patientName} — Click to view` : bed.status === "Available" ? "Click to assign patient" : bed.status}
+                        >
+                          <BedDouble className={cn("h-5 w-5 mx-auto mb-1", bed.status === "Available" && "group-hover:animate-pulse")} />
                           <p className="text-[10px] font-bold leading-tight">{bed.bedNumber.split("-").pop()}</p>
                           {bed.patientName && (
-                            <p className="text-[8px] truncate leading-tight mt-0.5 opacity-80">{bed.patientName.split(" ")[0]}</p>
+                            <p className="text-[8px] truncate leading-tight mt-0.5 opacity-80 max-w-full">{bed.patientName.split(" ")[0]}</p>
                           )}
-                        </div>
+                          {bed.status === "Available" && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-success border-2 border-card opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Plus className="h-2 w-2 text-card m-[1px]" />
+                            </div>
+                          )}
+                        </button>
                       ))}
                     </div>
                   </CardContent>
@@ -440,6 +580,30 @@ const IPD = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Discharge Summary Card (if discharged) */}
+              {admDischarge && (
+                <Card className="border-2 border-info/30 bg-info/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4 text-info" /> Discharge Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                      <div><p className="text-[10px] text-muted-foreground uppercase">Discharge Date</p><p className="text-foreground">{admDischarge.dischargeDate}</p></div>
+                      <div><p className="text-[10px] text-muted-foreground uppercase">Condition</p><p className="text-foreground">{admDischarge.conditionAtDischarge}</p></div>
+                      <div className="col-span-2"><p className="text-[10px] text-muted-foreground uppercase">Final Diagnosis</p><p className="text-foreground">{admDischarge.finalDiagnosis}</p></div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { setViewingDischarge(admDischarge); setShowDischargeSummaryDialog(true); }}>
+                        <Eye className="h-3.5 w-3.5 mr-1" /> View Full Summary
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setViewingDischarge(admDischarge); setShowDischargeSummaryDialog(true); setTimeout(handlePrintDischarge, 300); }}>
+                        <Printer className="h-3.5 w-3.5 mr-1" /> Print
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Doctor Visit Notes */}
               <Card className="border border-border">
@@ -590,9 +754,14 @@ const IPD = () => {
                         <Badge variant="outline" className={cn("text-xs", ds.paymentStatus === "Paid" ? "bg-success/10 text-success" : ds.paymentStatus === "Partial" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive")}>{ds.paymentStatus}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { const a = admissions.find((x) => x.id === ds.admissionId); if (a) { setSelectedAdmission(a); setActiveTab("daily-entries"); } }}>
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setViewingDischarge(ds); setShowDischargeSummaryDialog(true); }} title="View Summary">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setViewingDischarge(ds); setShowDischargeSummaryDialog(true); setTimeout(handlePrintDischarge, 300); }} title="Print">
+                            <Printer className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -608,18 +777,58 @@ const IPD = () => {
 
       {/* ═══════════ DIALOGS ═══════════ */}
 
-      {/* Admit Patient Dialog */}
+      {/* Bed Allocate Dialog */}
+      <Dialog open={showBedAllocateDialog} onOpenChange={setShowBedAllocateDialog}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-success" /> Assign Patient to Bed
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBed && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-success/5 border border-success/20 p-3 flex items-center gap-3">
+                <BedDouble className="h-8 w-8 text-success" />
+                <div>
+                  <p className="text-sm font-bold text-foreground">{selectedBed.wardName} — Bed {selectedBed.bedNumber}</p>
+                  <p className="text-xs text-muted-foreground">{wards.find(w => w.id === selectedBed.wardId)?.type} • ₹{wards.find(w => w.id === selectedBed.wardId)?.chargePerDay}/day</p>
+                </div>
+              </div>
+              <div><Label>Patient *</Label>
+                <Select value={allocateForm.patientId} onValueChange={(v) => setAllocateForm({ ...allocateForm, patientId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select registered patient" /></SelectTrigger>
+                  <SelectContent>{mockPatients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Admitting Doctor *</Label>
+                <Select value={allocateForm.admittingDoctor} onValueChange={(v) => setAllocateForm({ ...allocateForm, admittingDoctor: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                  <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Department</Label><Input value={allocateForm.department} onChange={(e) => setAllocateForm({ ...allocateForm, department: e.target.value })} placeholder="e.g. General Medicine" /></div>
+              <div><Label>Diagnosis</Label><Textarea value={allocateForm.diagnosis} onChange={(e) => setAllocateForm({ ...allocateForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" rows={2} /></div>
+              <div><Label>Referred By</Label><Input value={allocateForm.referredBy} onChange={(e) => setAllocateForm({ ...allocateForm, referredBy: e.target.value })} /></div>
+              <div><Label>Insurance (Optional)</Label><Input value={allocateForm.insuranceInfo} onChange={(e) => setAllocateForm({ ...allocateForm, insuranceInfo: e.target.value })} /></div>
+            </div>
+          )}
+          <DialogFooter><Button onClick={handleAllocateBed} className="bg-success hover:bg-success/90"><UserPlus className="h-4 w-4 mr-1" /> Assign & Admit</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Admit Dialog (no bed selection) */}
       <Dialog open={showAdmitDialog} onOpenChange={setShowAdmitDialog}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Admit Patient (IPD)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Quick Admit Patient</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2 mb-2">A bed will be automatically assigned. You can transfer later from Bed Management.</p>
           <div className="space-y-3">
-            <div><Label>Patient</Label>
+            <div><Label>Patient *</Label>
               <Select value={admitForm.patientId || ""} onValueChange={(v) => setAdmitForm({ ...admitForm, patientId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
                 <SelectContent>{mockPatients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Admitting Doctor</Label>
+            <div><Label>Admitting Doctor *</Label>
               <Select value={admitForm.admittingDoctor || ""} onValueChange={(v) => setAdmitForm({ ...admitForm, admittingDoctor: v })}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
@@ -627,16 +836,79 @@ const IPD = () => {
             </div>
             <div><Label>Department</Label><Input value={admitForm.department || ""} onChange={(e) => setAdmitForm({ ...admitForm, department: e.target.value })} placeholder="e.g. General Medicine" /></div>
             <div><Label>Diagnosis</Label><Textarea value={admitForm.diagnosis || ""} onChange={(e) => setAdmitForm({ ...admitForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" /></div>
-            <div><Label>Bed</Label>
-              <Select value={admitForm.bedId || ""} onValueChange={(v) => setAdmitForm({ ...admitForm, bedId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select available bed" /></SelectTrigger>
-                <SelectContent>{availableBedsForAdmission.map((b) => <SelectItem key={b.id} value={b.id}>{b.wardName} / {b.bedNumber}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
             <div><Label>Referred By</Label><Input value={admitForm.referredBy || ""} onChange={(e) => setAdmitForm({ ...admitForm, referredBy: e.target.value })} /></div>
             <div><Label>Insurance Info (Optional)</Label><Input value={admitForm.insuranceInfo || ""} onChange={(e) => setAdmitForm({ ...admitForm, insuranceInfo: e.target.value })} /></div>
           </div>
           <DialogFooter><Button onClick={handleAdmit}>Admit Patient</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discharge Summary View Dialog */}
+      <Dialog open={showDischargeSummaryDialog} onOpenChange={setShowDischargeSummaryDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" /> Discharge Summary
+            </DialogTitle>
+          </DialogHeader>
+          {viewingDischarge && (() => {
+            const adm = admissions.find((a) => a.id === viewingDischarge.admissionId);
+            if (!adm) return null;
+            const bill = getBillForAdmission(adm);
+            return (
+              <div ref={printRef}>
+                <div className="header" style={{ textAlign: "center", borderBottom: "3px solid hsl(var(--primary))", paddingBottom: "16px", marginBottom: "20px" }}>
+                  <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0 }}>🏥 Hospital Discharge Summary</h1>
+                  <p style={{ fontSize: "12px", color: "#666", margin: "4px 0 0" }}>EzyOp Healthcare Management System</p>
+                </div>
+
+                <h2 style={{ fontSize: "14px", fontWeight: "bold", borderBottom: "2px solid hsl(var(--primary))", paddingBottom: "4px", marginTop: "16px" }}>Patient Information</h2>
+                <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Name</span><span className="font-medium">{adm.patientName}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Reg. No.</span><span className="font-medium">{adm.registrationNumber}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Age / Gender</span><span>{adm.age}y / {adm.gender}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Contact</span><span>{adm.contactNumber}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Admission Date</span><span>{adm.admissionDate}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Discharge Date</span><span>{viewingDischarge.dischargeDate}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Ward / Bed</span><span>{adm.wardName} / {adm.bedNumber}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Doctor</span><span>{adm.admittingDoctor}</span></div>
+                </div>
+
+                <h2 style={{ fontSize: "14px", fontWeight: "bold", borderBottom: "2px solid hsl(var(--primary))", paddingBottom: "4px", marginTop: "20px" }}>Clinical Details</h2>
+                <div className="space-y-2 mt-2 text-sm">
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Final Diagnosis</span><span className="font-medium">{viewingDischarge.finalDiagnosis}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Condition at Discharge</span><span>{viewingDischarge.conditionAtDischarge}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Treatment Summary</span><span>{viewingDischarge.treatmentSummary}</span></div>
+                  <div><span className="text-[10px] text-muted-foreground uppercase block">Medications on Discharge</span><span>{viewingDischarge.medicationsOnDischarge}</span></div>
+                </div>
+
+                {viewingDischarge.followUpDate && (
+                  <>
+                    <h2 style={{ fontSize: "14px", fontWeight: "bold", borderBottom: "2px solid hsl(var(--primary))", paddingBottom: "4px", marginTop: "20px" }}>Follow-Up</h2>
+                    <div className="space-y-2 mt-2 text-sm">
+                      <div><span className="text-[10px] text-muted-foreground uppercase block">Follow-up Date</span><span className="font-medium">{viewingDischarge.followUpDate}</span></div>
+                      <div><span className="text-[10px] text-muted-foreground uppercase block">Instructions</span><span>{viewingDischarge.followUpInstructions}</span></div>
+                    </div>
+                  </>
+                )}
+
+                <h2 style={{ fontSize: "14px", fontWeight: "bold", borderBottom: "2px solid hsl(var(--primary))", paddingBottom: "4px", marginTop: "20px" }}>Bill Summary</h2>
+                <div className="mt-2 space-y-1 text-sm">
+                  <div className="flex justify-between py-1 border-b border-border"><span>Ward Charges ({bill.days} days)</span><span className="font-medium">₹{bill.wardCharges.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-1 border-b border-border"><span>Medicines ({bill.meds.length} items)</span><span className="font-medium">₹{bill.medTotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-1 border-b border-border"><span>Surgical ({bill.surgs.length} procedures)</span><span className="font-medium">₹{bill.surgTotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-1 border-b border-border"><span>Diagnostics ({bill.diags.length} tests)</span><span className="font-medium">₹{bill.diagTotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-2 border-t-2 border-foreground text-base font-bold"><span>Grand Total</span><span>₹{bill.grandTotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-1"><span>Paid</span><span className="font-medium">₹{viewingDischarge.paidAmount.toLocaleString()}</span></div>
+                  <div className="flex justify-between py-1"><span>Balance</span><span className={cn("font-bold", (bill.grandTotal - viewingDischarge.paidAmount) > 0 ? "text-destructive" : "text-success")}>₹{(bill.grandTotal - viewingDischarge.paidAmount).toLocaleString()}</span></div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDischargeSummaryDialog(false)}>Close</Button>
+            <Button onClick={handlePrintDischarge}><Printer className="h-4 w-4 mr-1" /> Print Summary</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -754,7 +1026,7 @@ const IPD = () => {
           <DialogHeader><DialogTitle>Discharge Patient</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Condition at Discharge</Label><Input value={dischargeForm.conditionAtDischarge} onChange={(e) => setDischargeForm({ ...dischargeForm, conditionAtDischarge: e.target.value })} placeholder="Stable, afebrile..." /></div>
-            <div><Label>Final Diagnosis</Label><Textarea value={dischargeForm.finalDiagnosis} onChange={(e) => setDischargeForm({ ...dischargeForm, finalDiagnosis: e.target.value })} rows={2} /></div>
+            <div><Label>Final Diagnosis *</Label><Textarea value={dischargeForm.finalDiagnosis} onChange={(e) => setDischargeForm({ ...dischargeForm, finalDiagnosis: e.target.value })} rows={2} /></div>
             <div><Label>Treatment Summary</Label><Textarea value={dischargeForm.treatmentSummary} onChange={(e) => setDischargeForm({ ...dischargeForm, treatmentSummary: e.target.value })} rows={3} /></div>
             <div><Label>Follow-up Date</Label><Input type="date" value={dischargeForm.followUpDate} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpDate: e.target.value })} /></div>
             <div><Label>Follow-up Instructions</Label><Textarea value={dischargeForm.followUpInstructions} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpInstructions: e.target.value })} rows={2} /></div>

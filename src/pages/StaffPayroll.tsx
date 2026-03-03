@@ -49,12 +49,14 @@ const StaffPayroll = () => {
   const [staffSearch, setStaffSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
 
   // Dialogs
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showStaffProfile, setShowStaffProfile] = useState(false);
   const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [showMarkAttendance, setShowMarkAttendance] = useState(false);
 
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
@@ -241,34 +243,107 @@ const StaffPayroll = () => {
 
         {/* ════════ ATTENDANCE TAB ════════ */}
         <TabsContent value="attendance">
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Check In</TableHead>
-                  <TableHead>Check Out</TableHead>
-                  <TableHead>Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attendance.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.staffName}</TableCell>
-                    <TableCell className="text-sm">{a.date}</TableCell>
-                    <TableCell className="text-sm">{a.checkIn || "—"}</TableCell>
-                    <TableCell className="text-sm">{a.checkOut || "—"}</TableCell>
-                    <TableCell className="text-sm">{a.hoursWorked ? `${a.hoursWorked}h` : "—"}</TableCell>
-                    <TableCell><Badge variant="outline" className={cn("text-xs", attendanceColors[a.status])}>{a.status}</Badge></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{a.notes || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="w-[170px] h-9" />
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground ml-2">
+              {(() => {
+                const dayAttendance = attendance.filter((a) => a.date === attendanceDate);
+                const present = dayAttendance.filter((a) => a.status === "Present").length;
+                const absent = dayAttendance.filter((a) => a.status === "Absent").length;
+                const onLeave = dayAttendance.filter((a) => a.status === "On Leave").length;
+                const halfDay = dayAttendance.filter((a) => a.status === "Half Day").length;
+                return (
+                  <>
+                    <span className="text-success font-semibold">{present} Present</span>
+                    <span className="text-destructive font-semibold">{absent} Absent</span>
+                    <span className="text-info font-semibold">{onLeave} On Leave</span>
+                    <span className="text-warning font-semibold">{halfDay} Half Day</span>
+                  </>
+                );
+              })()}
+            </div>
+            <Button size="sm" className="ml-auto" onClick={() => setShowMarkAttendance(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Mark Attendance
+            </Button>
           </div>
+
+          <p className="text-xs text-muted-foreground mb-3">
+            💡 <strong>How attendance works:</strong> Click "Mark Attendance" to record check-in for staff. When they leave, click the clock-out button next to their entry. The system auto-calculates hours worked and overtime.
+          </p>
+
+          {(() => {
+            const dayRecords = attendance.filter((a) => a.date === attendanceDate);
+            const unmarkedStaff = staff.filter((s) => s.status === "Active" && !dayRecords.find((r) => r.staffId === s.id));
+            return (
+              <div className="space-y-4">
+                {/* Unmarked Staff Warning */}
+                {unmarkedStaff.length > 0 && (
+                  <div className="rounded-lg bg-warning/5 border border-warning/20 p-3">
+                    <p className="text-xs font-semibold text-warning mb-2 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {unmarkedStaff.length} staff not yet marked for {attendanceDate}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {unmarkedStaff.map((s) => (
+                        <Badge key={s.id} variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">{s.name}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Attendance Records */}
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead>Staff</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Check In</TableHead>
+                        <TableHead>Check Out</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dayRecords.map((a) => {
+                        const staffMember = staff.find((s) => s.id === a.staffId);
+                        return (
+                          <TableRow key={a.id}>
+                            <TableCell className="font-medium">{a.staffName}</TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-[10px]", staffMember ? roleColors[staffMember.role] : "")}>{staffMember?.role}</Badge></TableCell>
+                            <TableCell className="text-sm font-medium text-success">{a.checkIn || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-destructive">{a.checkOut || "—"}</TableCell>
+                            <TableCell className="text-sm">{a.hoursWorked ? <span className="font-semibold">{a.hoursWorked}h</span> : "—"}</TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-xs", attendanceColors[a.status])}>{a.status}</Badge></TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{a.notes || "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {a.checkIn && !a.checkOut && a.status === "Present" && (
+                                <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => {
+                                  const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                                  setAttendance((prev) => prev.map((r) => r.id === a.id ? {
+                                    ...r, checkOut: now,
+                                    hoursWorked: Math.round((Date.now() - new Date(`${a.date} ${a.checkIn}`).getTime()) / (1000 * 60 * 60) * 10) / 10,
+                                  } : r));
+                                  toast.success(`${a.staffName} checked out at ${now}`);
+                                }}>
+                                  <Clock className="h-3 w-3 mr-1" /> Clock Out
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {dayRecords.length === 0 && (
+                        <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No attendance records for this date. Click "Mark Attendance" to start.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            );
+          })()}
         </TabsContent>
 
         {/* ════════ LEAVES TAB ════════ */}
@@ -552,6 +627,61 @@ const StaffPayroll = () => {
             <div><Label>Reason</Label><Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} rows={2} /></div>
           </div>
           <DialogFooter><Button onClick={handleApplyLeave}>Submit</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Attendance Dialog */}
+      <Dialog open={showMarkAttendance} onOpenChange={setShowMarkAttendance}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary" /> Mark Daily Attendance — {attendanceDate}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">Select staff members and mark their attendance. Check-in time is recorded automatically.</p>
+          <div className="space-y-2 mt-2">
+            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staffId === s.id && a.date === attendanceDate)).map((s) => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+                    {s.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{s.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{s.role} • {s.department}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-success border-success/30 hover:bg-success/10" onClick={() => {
+                    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, checkIn: now, status: "Present" };
+                    setAttendance((prev) => [...prev, rec]);
+                    toast.success(`${s.name} checked in at ${now}`);
+                  }}>
+                    <CheckCircle className="h-3 w-3 mr-1" /> Present
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10" onClick={() => {
+                    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, checkIn: now, status: "Half Day", hoursWorked: 4 };
+                    setAttendance((prev) => [...prev, rec]);
+                    toast.success(`${s.name} marked as half day`);
+                  }}>
+                    Half Day
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
+                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, status: "Absent" };
+                    setAttendance((prev) => [...prev, rec]);
+                    toast.info(`${s.name} marked absent`);
+                  }}>
+                    <XCircle className="h-3 w-3 mr-1" /> Absent
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staffId === s.id && a.date === attendanceDate)).length === 0 && (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                <CheckCircle className="h-8 w-8 mx-auto mb-2 text-success" />
+                <p>All staff attendance has been marked for {attendanceDate}!</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShowMarkAttendance(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

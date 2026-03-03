@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3,
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
-  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck,
+  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -475,6 +475,7 @@ const Inventory = () => {
           <TabsTrigger value="pharma"><IndianRupee className="h-4 w-4 mr-1" /> Pharma</TabsTrigger>
           <TabsTrigger value="diagnostics"><Scan className="h-4 w-4 mr-1" /> Diagnostics</TabsTrigger>
           <TabsTrigger value="transfers"><ArrowLeftRight className="h-4 w-4 mr-1" /> Transfers</TabsTrigger>
+          <TabsTrigger value="beds-wards"><BedDouble className="h-4 w-4 mr-1" /> Beds & Wards</TabsTrigger>
           <TabsTrigger value="assets"><Landmark className="h-4 w-4 mr-1" /> Assets</TabsTrigger>
           <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-1" /> Reports</TabsTrigger>
         </TabsList>
@@ -820,6 +821,92 @@ const Inventory = () => {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        {/* ════════ BEDS & WARDS TAB ════════ */}
+        <TabsContent value="beds-wards">
+          {(() => {
+            const bedItems = inventory.filter((i) => i.category === "Beds");
+            const wardItems = inventory.filter((i) => i.category === "Wards");
+            const totalBedStock = bedItems.reduce((s, i) => s + i.stock, 0);
+            const totalBedValue = bedItems.reduce((s, i) => s + i.unitPrice * i.stock, 0);
+            return (
+              <div className="space-y-6">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-info/10 text-info"><BedDouble className="h-5 w-5" /></div>
+                    <div><p className="text-xs text-muted-foreground">Total Bed Types</p><p className="text-lg font-bold text-foreground">{bedItems.length}</p></div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-success/10 text-success"><CheckCircle2 className="h-5 w-5" /></div>
+                    <div><p className="text-xs text-muted-foreground">Total Bed Units</p><p className="text-lg font-bold text-foreground">{totalBedStock}</p></div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></div>
+                    <div><p className="text-xs text-muted-foreground">Total Wards</p><p className="text-lg font-bold text-foreground">{wardItems.length}</p></div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-warning/10 text-warning"><IndianRupee className="h-5 w-5" /></div>
+                    <div><p className="text-xs text-muted-foreground">Bed Asset Value</p><p className="text-lg font-bold text-foreground">₹{(totalBedValue / 100000).toFixed(1)}L</p></div>
+                  </div>
+                </div>
+
+                {/* Beds Section */}
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2"><BedDouble className="h-4 w-4 text-info" /> Bed Inventory</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {bedItems.map((bed) => (
+                      <div key={bed.id} className="rounded-xl border border-border bg-card p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-bold text-foreground">{bed.name}</h4>
+                          <Badge variant="outline" className="text-[10px] bg-info/10 text-info border-info/20">{bed.sku}</Badge>
+                        </div>
+                        <div className="space-y-1.5 text-xs text-muted-foreground">
+                          <div className="flex justify-between"><span>Manufacturer</span><span className="text-foreground font-medium">{bed.manufacturer}</span></div>
+                          <div className="flex justify-between"><span>Stock</span><span className="text-foreground font-bold">{bed.stock} units</span></div>
+                          <div className="flex justify-between"><span>Unit Price</span><span className="text-foreground">₹{bed.unitPrice.toLocaleString()}</span></div>
+                          <div className="flex justify-between"><span>Department</span><span className="text-foreground">{bed.department}</span></div>
+                          <div className="flex justify-between"><span>Last Updated</span><span>{bed.lastUpdated}</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Wards Section */}
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Ward Configuration</h3>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Ward Name</TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Total Beds</TableHead>
+                          <TableHead>Charge/Day</TableHead>
+                          <TableHead>Last Updated</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {wardItems.map((ward) => (
+                          <TableRow key={ward.id} className="hover:bg-muted/30">
+                            <TableCell className="font-medium">{ward.name}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{ward.sku}</TableCell>
+                            <TableCell className="text-sm">{ward.department}</TableCell>
+                            <TableCell className="font-bold">{ward.stock}</TableCell>
+                            <TableCell className="text-sm">₹{ward.sellingPrice.toLocaleString()}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{ward.lastUpdated}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </TabsContent>
 
         {/* ════════ REPORTS TAB ════════ */}
