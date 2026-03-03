@@ -1,4 +1,4 @@
-export type InventoryCategory = "Medicine" | "Surgical Items" | "Lab Reagents" | "Consumables" | "Equipment" | "Stationery" | "Cleaning Material";
+export type InventoryCategory = "Medicine" | "Surgical Items" | "Lab Reagents" | "Consumables" | "Equipment" | "Stationery" | "Cleaning Material" | "Beds" | "Wards";
 
 export type Department = "Store" | "Pharmacy" | "ICU" | "OT" | "Lab" | "Ward A" | "Ward B" | "Emergency" | "Admin";
 
@@ -51,7 +51,7 @@ export interface Vendor {
 }
 
 export const inventoryCategories: InventoryCategory[] = [
-  "Medicine", "Surgical Items", "Lab Reagents", "Consumables", "Equipment", "Stationery", "Cleaning Material",
+  "Medicine", "Surgical Items", "Lab Reagents", "Consumables", "Equipment", "Stationery", "Cleaning Material", "Beds", "Wards",
 ];
 
 export const departments: Department[] = [
@@ -66,6 +66,8 @@ export const categoryColors: Record<InventoryCategory, string> = {
   Equipment: "bg-success/10 text-success border-success/20",
   Stationery: "bg-muted text-muted-foreground border-muted",
   "Cleaning Material": "bg-accent text-accent-foreground border-accent",
+  Beds: "bg-info/10 text-info border-info/20",
+  Wards: "bg-primary/10 text-primary border-primary/20",
 };
 
 export const mockInventory: InventoryItem[] = [
@@ -106,6 +108,23 @@ export const mockInventory: InventoryItem[] = [
   { id: "inv-22", name: "Floor Disinfectant 5L", category: "Cleaning Material", sku: "CLN-001", batchNo: "CL2026-001", manufacturer: "Lizol", unitPrice: 250, sellingPrice: 250, stock: 30, minStock: 10, unit: "Can", hsnCode: "3808", gstPercent: 18, department: "Store", barcode: "8901234022", lastUpdated: "2026-03-01", vendor: "CleanCare Dist.", purchaseDate: "2026-02-10", consumptionRate: 8 },
   { id: "inv-23", name: "Hand Sanitizer 500ml", category: "Cleaning Material", sku: "CLN-002", batchNo: "CL2026-002", manufacturer: "Dettol", unitPrice: 120, sellingPrice: 180, stock: 60, minStock: 20, unit: "Bottle", hsnCode: "3808", gstPercent: 18, expiryDate: "2027-06-30", department: "Store", barcode: "8901234023", lastUpdated: "2026-02-28", vendor: "CleanCare Dist.", purchaseDate: "2026-02-05", consumptionRate: 15 },
   { id: "inv-24", name: "Biomedical Waste Bags (Red)", category: "Cleaning Material", sku: "CLN-003", batchNo: "CL2026-003", manufacturer: "SafeDispose", unitPrice: 5, sellingPrice: 5, stock: 500, minStock: 100, unit: "Piece", hsnCode: "3923", gstPercent: 18, department: "Store", barcode: "8901234024", lastUpdated: "2026-03-01", vendor: "CleanCare Dist.", purchaseDate: "2026-01-20", consumptionRate: 100 },
+
+  // Beds
+  { id: "inv-25", name: "General Ward Bed", category: "Beds", sku: "BED-001", batchNo: "BD2026-001", manufacturer: "Stryker", unitPrice: 25000, sellingPrice: 25000, stock: 40, minStock: 5, unit: "Piece", hsnCode: "9402", gstPercent: 18, department: "Store", barcode: "8901234025", lastUpdated: "2026-03-01", vendor: "MedEquip Traders", purchaseDate: "2024-01-15", consumptionRate: 0 },
+  { id: "inv-26", name: "ICU Bed (Motorized)", category: "Beds", sku: "BED-002", batchNo: "BD2026-002", manufacturer: "Hill-Rom", unitPrice: 250000, sellingPrice: 250000, stock: 6, minStock: 1, unit: "Piece", hsnCode: "9402", gstPercent: 18, department: "ICU", barcode: "8901234026", lastUpdated: "2026-03-01", vendor: "MedEquip Traders", purchaseDate: "2024-06-10", consumptionRate: 0 },
+  { id: "inv-27", name: "Semi-Fowler Bed", category: "Beds", sku: "BED-003", batchNo: "BD2026-003", manufacturer: "Paramount", unitPrice: 45000, sellingPrice: 45000, stock: 10, minStock: 2, unit: "Piece", hsnCode: "9402", gstPercent: 18, department: "Store", barcode: "8901234027", lastUpdated: "2026-03-01", vendor: "MedEquip Traders", purchaseDate: "2025-03-20", consumptionRate: 0 },
+  { id: "inv-28", name: "Pediatric Crib", category: "Beds", sku: "BED-004", batchNo: "BD2026-004", manufacturer: "Stryker", unitPrice: 35000, sellingPrice: 35000, stock: 4, minStock: 1, unit: "Piece", hsnCode: "9402", gstPercent: 18, department: "Store", barcode: "8901234028", lastUpdated: "2026-02-15", vendor: "MedEquip Traders", purchaseDate: "2025-01-10", consumptionRate: 0 },
+  { id: "inv-29", name: "Maternity Bed", category: "Beds", sku: "BED-005", batchNo: "BD2026-005", manufacturer: "Paramount", unitPrice: 55000, sellingPrice: 55000, stock: 10, minStock: 2, unit: "Piece", hsnCode: "9402", gstPercent: 18, department: "Store", barcode: "8901234029", lastUpdated: "2026-02-20", vendor: "MedEquip Traders", purchaseDate: "2024-09-15", consumptionRate: 0 },
+
+  // Wards
+  { id: "inv-30", name: "General Ward A", category: "Wards", sku: "WRD-001", batchNo: "W2026-001", manufacturer: "N/A", unitPrice: 0, sellingPrice: 500, stock: 20, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward A", barcode: "8901234030", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-31", name: "General Ward B", category: "Wards", sku: "WRD-002", batchNo: "W2026-002", manufacturer: "N/A", unitPrice: 0, sellingPrice: 500, stock: 20, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward B", barcode: "8901234031", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-32", name: "Semi-Private Ward", category: "Wards", sku: "WRD-003", batchNo: "W2026-003", manufacturer: "N/A", unitPrice: 0, sellingPrice: 1500, stock: 10, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward A", barcode: "8901234032", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-33", name: "Private Ward", category: "Wards", sku: "WRD-004", batchNo: "W2026-004", manufacturer: "N/A", unitPrice: 0, sellingPrice: 3000, stock: 8, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward A", barcode: "8901234033", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-34", name: "ICU", category: "Wards", sku: "WRD-005", batchNo: "W2026-005", manufacturer: "N/A", unitPrice: 0, sellingPrice: 8000, stock: 6, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "ICU", barcode: "8901234034", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-35", name: "NICU", category: "Wards", sku: "WRD-006", batchNo: "W2026-006", manufacturer: "N/A", unitPrice: 0, sellingPrice: 10000, stock: 4, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "ICU", barcode: "8901234035", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-36", name: "Isolation Ward", category: "Wards", sku: "WRD-007", batchNo: "W2026-007", manufacturer: "N/A", unitPrice: 0, sellingPrice: 2000, stock: 4, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward A", barcode: "8901234036", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
+  { id: "inv-37", name: "Maternity Ward", category: "Wards", sku: "WRD-008", batchNo: "W2026-008", manufacturer: "N/A", unitPrice: 0, sellingPrice: 2500, stock: 10, minStock: 0, unit: "Beds", hsnCode: "N/A", gstPercent: 0, department: "Ward B", barcode: "8901234037", lastUpdated: "2026-03-01", vendor: "N/A", purchaseDate: "2020-01-01", consumptionRate: 0 },
 ];
 
 export const mockTransfers: StockTransfer[] = [

@@ -8,9 +8,9 @@ import {
   DollarSign,
   Shield,
   Microscope,
-  FileText,
   Package,
   Pill,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,7 +33,7 @@ export const modules: ModuleItem[] = [
   { id: "accounts", title: "Accounts & Revenue", icon: DollarSign, description: "Financial management", route: "/accounts", color: "bg-success/10 text-success" },
   { id: "insurance", title: "Insurance", icon: Shield, description: "Insurance claims & processing", route: "/insurance", color: "bg-info/10 text-info" },
   { id: "diagnostics", title: "Diagnostics", icon: Microscope, description: "Lab & diagnostic services", route: "/diagnostics", color: "bg-warning/10 text-warning" },
-  { id: "discharge-summary", title: "Discharge Summary", icon: FileText, description: "Patient discharge records", route: "/discharge-summary", color: "bg-primary/10 text-primary" },
   { id: "inventory", title: "Inventory", icon: Package, description: "Stock & inventory management", route: "/inventory", color: "bg-destructive/10 text-destructive" },
   { id: "pharmacy", title: "Pharmacy", icon: Pill, description: "Pharmacy management", route: "/pharmacy", color: "bg-info/10 text-info" },
+  { id: "staff-payroll", title: "Staff & Payroll", icon: Users, description: "Staff attendance & salary", route: "/staff-payroll", color: "bg-primary/10 text-primary" },
 ];
