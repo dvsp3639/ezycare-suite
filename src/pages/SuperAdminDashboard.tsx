@@ -46,7 +46,7 @@ interface Analytics {
   recent_hospitals: any[];
 }
 
-const callApi = async (path: string, method = "GET", body?: any) => {
+const callApi = async (path: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", body?: any) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
 
