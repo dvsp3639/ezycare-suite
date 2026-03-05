@@ -18,7 +18,6 @@ import DayCare from "./pages/DayCare";
 import IPD from "./pages/IPD";
 import StaffPayroll from "./pages/StaffPayroll";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -31,18 +30,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <DashboardLayout>{children}</DashboardLayout>;
 };
 
-const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isSuperAdmin, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
-};
-
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isSuperAdmin, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (isAuthenticated && isSuperAdmin) return <Navigate to="/super-admin" replace />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
@@ -50,7 +40,6 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
-    <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
     <Route path="/patient-registration" element={<ProtectedRoute><PatientRegistration /></ProtectedRoute>} />
     <Route path="/clinic-management" element={<ProtectedRoute><ClinicManagement /></ProtectedRoute>} />
