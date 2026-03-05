@@ -7,7 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff"];
+const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff", "receptionist"];
+const HOSPITAL_ADMIN_MANAGEABLE_ROLES = ["doctor", "nurse", "lab_technician", "pharmacist", "receptionist"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -74,6 +75,158 @@ serve(async (req) => {
         JSON.stringify({ user: claimsData.user, profile, roles }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Check if hospital_admin
+    const { data: hospitalAdminRole } = await adminClient
+      .from("user_roles")
+      .select("role, hospital_id")
+      .eq("user_id", userId)
+      .eq("role", "hospital_admin")
+      .maybeSingle();
+
+    const isHospitalAdmin = !!hospitalAdminRole;
+    const adminHospitalId = hospitalAdminRole?.hospital_id;
+
+    // ========== HOSPITAL ADMIN: Users CRUD for their hospital ==========
+    if (isHospitalAdmin && !isSuperAdmin) {
+      // Hospital admin can only manage users in their hospital
+      if (path === "hospital-users" && method === "GET") {
+        if (!adminHospitalId) throw new Error("No hospital assigned");
+
+        let query = adminClient
+          .from("user_roles")
+          .select("id, user_id, role, hospital_id")
+          .eq("hospital_id", adminHospitalId)
+          .in("role", HOSPITAL_ADMIN_MANAGEABLE_ROLES);
+
+        const roleFilter = url.searchParams.get("role");
+        if (roleFilter) query = query.eq("role", roleFilter);
+
+        const { data: roles, error } = await query;
+        if (error) throw error;
+
+        const userIds = roles?.map((r: any) => r.user_id) || [];
+        let profiles: any[] = [];
+        if (userIds.length > 0) {
+          const { data: profileData } = await adminClient
+            .from("profiles")
+            .select("*")
+            .in("user_id", userIds);
+          profiles = profileData || [];
+        }
+
+        const usersWithDetails = await Promise.all(
+          (roles || []).map(async (role: any) => {
+            const { data: authUser } = await adminClient.auth.admin.getUserById(role.user_id);
+            const profile = profiles.find((p: any) => p.user_id === role.user_id);
+            return {
+              ...role,
+              email: authUser?.user?.email,
+              full_name: profile?.full_name,
+              phone: profile?.phone,
+            };
+          })
+        );
+
+        return new Response(JSON.stringify(usersWithDetails), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (path === "hospital-users" && method === "POST") {
+        const body = await req.json();
+        const { email, password, full_name, phone, role } = body;
+
+        if (!email || !password || !role) {
+          throw new Error("email, password, and role are required");
+        }
+        if (!HOSPITAL_ADMIN_MANAGEABLE_ROLES.includes(role)) {
+          throw new Error(`Invalid role. Must be one of: ${HOSPITAL_ADMIN_MANAGEABLE_ROLES.join(", ")}`);
+        }
+
+        const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: full_name || email },
+        });
+        if (authError) throw authError;
+
+        const { error: roleError } = await adminClient
+          .from("user_roles")
+          .insert({ user_id: authData.user.id, role, hospital_id: adminHospitalId });
+        if (roleError) throw roleError;
+
+        if (full_name || phone) {
+          await adminClient
+            .from("profiles")
+            .update({ full_name: full_name || email, phone })
+            .eq("user_id", authData.user.id);
+        }
+
+        return new Response(
+          JSON.stringify({ user_id: authData.user.id, email, role, hospital_id: adminHospitalId }),
+          { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const hospitalUserMatch = path.match(/^hospital-users\/([a-f0-9-]+)$/);
+      if (hospitalUserMatch && method === "PUT") {
+        const roleId = hospitalUserMatch[1];
+        const body = await req.json();
+        const { full_name, phone, role } = body;
+
+        const { data: roleRecord } = await adminClient
+          .from("user_roles")
+          .select("user_id, hospital_id")
+          .eq("id", roleId)
+          .single();
+
+        if (!roleRecord) throw new Error("User role not found");
+        if (roleRecord.hospital_id !== adminHospitalId) throw new Error("Access denied");
+
+        if (role) {
+          if (!HOSPITAL_ADMIN_MANAGEABLE_ROLES.includes(role)) throw new Error("Invalid role");
+          await adminClient.from("user_roles").update({ role }).eq("id", roleId);
+        }
+
+        if (full_name || phone) {
+          const profileUpdate: any = {};
+          if (full_name) profileUpdate.full_name = full_name;
+          if (phone) profileUpdate.phone = phone;
+          await adminClient.from("profiles").update(profileUpdate).eq("user_id", roleRecord.user_id);
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (hospitalUserMatch && method === "DELETE") {
+        const roleId = hospitalUserMatch[1];
+        const { data: roleRecord } = await adminClient
+          .from("user_roles")
+          .select("user_id, hospital_id")
+          .eq("id", roleId)
+          .single();
+
+        if (!roleRecord) throw new Error("User role not found");
+        if (roleRecord.hospital_id !== adminHospitalId) throw new Error("Access denied");
+
+        await adminClient.from("user_roles").delete().eq("id", roleId);
+        await adminClient.auth.admin.deleteUser(roleRecord.user_id);
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Hospital admin cannot access other endpoints
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ========== SUPER ADMIN ONLY ==========
