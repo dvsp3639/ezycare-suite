@@ -50,6 +50,7 @@ const AppRoutes = () => (
     <Route path="/day-care" element={<ProtectedRoute><DayCare /></ProtectedRoute>} />
     <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
     <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
+    <Route path="/users-roles" element={<ProtectedRoute><UsersRoles /></ProtectedRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />

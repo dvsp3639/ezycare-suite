@@ -36,4 +36,5 @@ export const modules: ModuleItem[] = [
   { id: "inventory", title: "Inventory", icon: Package, description: "Stock & inventory management", route: "/inventory", color: "bg-destructive/10 text-destructive" },
   { id: "pharmacy", title: "Pharmacy", icon: Pill, description: "Pharmacy management", route: "/pharmacy", color: "bg-info/10 text-info" },
   { id: "staff-payroll", title: "Staff & Payroll", icon: Users, description: "Staff attendance & salary", route: "/staff-payroll", color: "bg-primary/10 text-primary" },
+  { id: "users-roles", title: "Users & Roles", icon: Shield, description: "Manage staff credentials", route: "/users-roles", color: "bg-destructive/10 text-destructive" },
 ];
