@@ -18,6 +18,7 @@ import DayCare from "./pages/DayCare";
 import IPD from "./pages/IPD";
 import StaffPayroll from "./pages/StaffPayroll";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
+import UsersRoles from "./pages/UsersRoles";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
