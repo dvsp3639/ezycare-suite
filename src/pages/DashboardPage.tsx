@@ -10,7 +10,7 @@ const DashboardPage = () => {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-display font-bold text-foreground">
-          Good {new Date().getHours() < 12 ? "Morning" : new Date().getHours() < 17 ? "Afternoon" : "Evening"}, {user?.name}
+          Good {new Date().getHours() < 12 ? "Morning" : new Date().getHours() < 17 ? "Afternoon" : "Evening"}, {user?.user_metadata?.full_name || user?.email}
         </h1>
         <p className="text-muted-foreground mt-1">Welcome to EZY OP Dashboard</p>
       </div>

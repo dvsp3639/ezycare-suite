@@ -3,22 +3,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 import ezyopLogo from "@/assets/ezyop-logo.png";
 
 const LoginPage = () => {
   const { login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!login(username, password)) {
-      setError("Invalid username or password");
+    setIsLoading(true);
+    const result = await login(email, password);
+    if (!result.success) {
+      setError(result.error || "Invalid credentials");
     }
+    setIsLoading(false);
   };
 
   return (
@@ -48,16 +52,18 @@ const LoginPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium text-foreground">
-                Username
+              <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                Email
               </Label>
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter email"
                 className="h-11"
                 autoFocus
+                disabled={isLoading}
               />
             </div>
 
@@ -73,6 +79,7 @@ const LoginPage = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
                   className="h-11 pr-10"
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -88,19 +95,21 @@ const LoginPage = () => {
               <p className="text-sm text-destructive animate-fade-in">{error}</p>
             )}
 
-            <Button type="submit" className="w-full h-11 font-medium" size="lg">
-              <LogIn className="mr-2 h-4 w-4" />
+            <Button type="submit" className="w-full h-11 font-medium" size="lg" disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="mr-2 h-4 w-4" />
+              )}
               Sign In
             </Button>
           </form>
 
           <div className="mt-8 p-4 rounded-lg bg-secondary border border-border">
-            <p className="text-xs font-medium text-secondary-foreground mb-2">Sample Credentials</p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><span className="font-medium">Admin:</span> admin / admin123</p>
-              <p><span className="font-medium">Doctor:</span> doctor / doctor123</p>
-              <p><span className="font-medium">Nurse:</span> nurse / nurse123</p>
-            </div>
+            <p className="text-xs font-medium text-secondary-foreground mb-2">Getting Started</p>
+            <p className="text-xs text-muted-foreground">
+              Contact your Super Admin to get your login credentials.
+            </p>
           </div>
         </div>
       </div>

@@ -78,8 +78,8 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-3">
         {!collapsed && user && (
           <div className="mb-2 px-2">
-            <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
-            <p className="text-[10px] text-sidebar-muted">{user.role}</p>
+            <p className="text-xs font-medium text-sidebar-foreground truncate">{user.user_metadata?.full_name || user.email}</p>
+            <p className="text-[10px] text-sidebar-muted">{user.email}</p>
           </div>
         )}
         <SidebarMenu>

@@ -1,42 +1,117 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { User, Session } from "@supabase/supabase-js";
 
-interface User {
-  username: string;
-  name: string;
+interface UserProfile {
+  full_name: string;
+  phone?: string;
+  avatar_url?: string;
+}
+
+interface UserRole {
   role: string;
+  hospital_id?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
+  profile: UserProfile | null;
+  roles: UserRole[];
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  isSuperAdmin: boolean;
+  isHospitalAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const SAMPLE_USERS = [
-  { username: "admin", password: "admin123", name: "Dr. Admin", role: "Administrator" },
-  { username: "doctor", password: "doctor123", name: "Dr. Sharma", role: "Doctor" },
-  { username: "nurse", password: "nurse123", name: "Nurse Priya", role: "Nurse" },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((username: string, password: string) => {
-    const found = SAMPLE_USERS.find(u => u.username === username && u.password === password);
-    if (found) {
-      setUser({ username: found.username, name: found.name, role: found.role });
-      return true;
+  const fetchUserData = useCallback(async (accessToken: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-api/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!error && data) {
+        setProfile(data.profile);
+        setRoles(data.roles || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch user data:", err);
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => setUser(null), []);
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (newSession?.access_token) {
+          // Defer data fetch to avoid deadlock
+          setTimeout(() => fetchUserData(newSession.access_token), 0);
+        } else {
+          setProfile(null);
+          setRoles([]);
+        }
+        setLoading(false);
+      }
+    );
+
+    // THEN check existing session
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+      if (existingSession?.access_token) {
+        fetchUserData(existingSession.access_token);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserData]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRoles([]);
+  }, []);
+
+  const isSuperAdmin = roles.some(r => r.role === "super_admin");
+  const isHospitalAdmin = roles.some(r => r.role === "hospital_admin");
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        roles,
+        session,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        isSuperAdmin,
+        isHospitalAdmin,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
