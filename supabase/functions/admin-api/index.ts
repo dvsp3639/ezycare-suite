@@ -58,7 +58,7 @@ serve(async (req) => {
     const method = req.method;
 
     // ========== PUBLIC: Get user info ==========
-    if (path === "me" && method === "GET") {
+    if (path === "me" && (method === "GET" || method === "POST")) {
       const { data: roles } = await adminClient
         .from("user_roles")
         .select("role, hospital_id")
