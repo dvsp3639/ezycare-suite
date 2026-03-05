@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff"];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +19,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
 
-    // Verify caller is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -26,7 +27,6 @@ serve(async (req) => {
       });
     }
 
-    // Verify user and check role
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -41,11 +41,9 @@ serve(async (req) => {
     }
 
     const userId = claimsData.user.id;
-
-    // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if user is super_admin
+    // Check caller's role
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -59,7 +57,7 @@ serve(async (req) => {
     const path = url.pathname.replace(/^\/admin-api\/?/, "");
     const method = req.method;
 
-    // ========== PUBLIC: Get user role info ==========
+    // ========== PUBLIC: Get user info ==========
     if (path === "me" && method === "GET") {
       const { data: roles } = await adminClient
         .from("user_roles")
@@ -78,7 +76,7 @@ serve(async (req) => {
       );
     }
 
-    // ========== SUPER ADMIN ONLY ROUTES ==========
+    // ========== SUPER ADMIN ONLY ==========
     if (!isSuperAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden: super_admin role required" }), {
         status: 403,
@@ -92,7 +90,6 @@ serve(async (req) => {
         .from("hospitals")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error) throw error;
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -109,7 +106,6 @@ serve(async (req) => {
         .insert({ name, address, city, state, phone, email, license_number })
         .select()
         .single();
-
       if (error) throw error;
       return new Response(JSON.stringify(data), {
         status: 201,
@@ -129,7 +125,6 @@ serve(async (req) => {
         .eq("id", hospitalId)
         .select()
         .single();
-
       if (error) throw error;
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -138,34 +133,29 @@ serve(async (req) => {
 
     if (hospitalMatch && method === "DELETE") {
       const hospitalId = hospitalMatch[1];
-      const { error } = await adminClient
-        .from("hospitals")
-        .delete()
-        .eq("id", hospitalId);
-
+      const { error } = await adminClient.from("hospitals").delete().eq("id", hospitalId);
       if (error) throw error;
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ---------- HOSPITAL ADMINS ----------
-    if (path === "hospital-admins" && method === "GET") {
+    // ---------- STAFF / USERS CRUD (all roles) ----------
+    if (path === "users" && method === "GET") {
       const hospitalId = url.searchParams.get("hospital_id");
+      const role = url.searchParams.get("role");
 
       let query = adminClient
         .from("user_roles")
         .select("id, user_id, role, hospital_id")
-        .eq("role", "hospital_admin");
+        .in("role", VALID_ROLES);
 
-      if (hospitalId) {
-        query = query.eq("hospital_id", hospitalId);
-      }
+      if (hospitalId) query = query.eq("hospital_id", hospitalId);
+      if (role) query = query.eq("role", role);
 
       const { data: roles, error } = await query;
       if (error) throw error;
 
-      // Fetch profiles for these users
       const userIds = roles?.map((r: any) => r.user_id) || [];
       let profiles: any[] = [];
       if (userIds.length > 0) {
@@ -176,8 +166,7 @@ serve(async (req) => {
         profiles = profileData || [];
       }
 
-      // Fetch emails from auth
-      const adminsWithDetails = await Promise.all(
+      const usersWithDetails = await Promise.all(
         (roles || []).map(async (role: any) => {
           const { data: authUser } = await adminClient.auth.admin.getUserById(role.user_id);
           const profile = profiles.find((p: any) => p.user_id === role.user_id);
@@ -190,17 +179,20 @@ serve(async (req) => {
         })
       );
 
-      return new Response(JSON.stringify(adminsWithDetails), {
+      return new Response(JSON.stringify(usersWithDetails), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (path === "hospital-admins" && method === "POST") {
+    if (path === "users" && method === "POST") {
       const body = await req.json();
-      const { email, password, full_name, phone, hospital_id } = body;
+      const { email, password, full_name, phone, hospital_id, role } = body;
 
-      if (!email || !password || !hospital_id) {
-        throw new Error("email, password, and hospital_id are required");
+      if (!email || !password || !hospital_id || !role) {
+        throw new Error("email, password, hospital_id, and role are required");
+      }
+      if (!VALID_ROLES.includes(role)) {
+        throw new Error(`Invalid role. Must be one of: ${VALID_ROLES.join(", ")}`);
       }
 
       // Create auth user
@@ -208,23 +200,17 @@ serve(async (req) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name },
+        user_metadata: { full_name: full_name || email },
       });
-
       if (authError) throw authError;
 
-      // Assign hospital_admin role
+      // Assign role
       const { error: roleError } = await adminClient
         .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role: "hospital_admin",
-          hospital_id,
-        });
-
+        .insert({ user_id: authData.user.id, role, hospital_id });
       if (roleError) throw roleError;
 
-      // Update profile name if provided
+      // Update profile
       if (full_name || phone) {
         await adminClient
           .from("profiles")
@@ -233,16 +219,49 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ user_id: authData.user.id, email, hospital_id }),
+        JSON.stringify({ user_id: authData.user.id, email, role, hospital_id }),
         { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const adminMatch = path.match(/^hospital-admins\/([a-f0-9-]+)$/);
-    if (adminMatch && method === "DELETE") {
-      const roleId = adminMatch[1];
+    const userMatch = path.match(/^users\/([a-f0-9-]+)$/);
+    if (userMatch && method === "PUT") {
+      const roleId = userMatch[1];
+      const body = await req.json();
+      const { full_name, phone, role, hospital_id } = body;
 
-      // Get user_id from role
+      // Get current role record
+      const { data: roleRecord } = await adminClient
+        .from("user_roles")
+        .select("user_id")
+        .eq("id", roleId)
+        .single();
+
+      if (!roleRecord) throw new Error("User role not found");
+
+      // Update role/hospital if changed
+      const updateData: any = {};
+      if (role) updateData.role = role;
+      if (hospital_id) updateData.hospital_id = hospital_id;
+      if (Object.keys(updateData).length > 0) {
+        await adminClient.from("user_roles").update(updateData).eq("id", roleId);
+      }
+
+      // Update profile
+      if (full_name || phone) {
+        const profileUpdate: any = {};
+        if (full_name) profileUpdate.full_name = full_name;
+        if (phone) profileUpdate.phone = phone;
+        await adminClient.from("profiles").update(profileUpdate).eq("user_id", roleRecord.user_id);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (userMatch && method === "DELETE") {
+      const roleId = userMatch[1];
       const { data: roleRecord } = await adminClient
         .from("user_roles")
         .select("user_id")
@@ -250,9 +269,7 @@ serve(async (req) => {
         .single();
 
       if (roleRecord) {
-        // Delete role
         await adminClient.from("user_roles").delete().eq("id", roleId);
-        // Delete auth user
         await adminClient.auth.admin.deleteUser(roleRecord.user_id);
       }
 
@@ -272,10 +289,20 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("is_active", true);
 
-      const { count: adminCount } = await adminClient
+      const { count: totalUsers } = await adminClient
         .from("user_roles")
         .select("*", { count: "exact", head: true })
-        .eq("role", "hospital_admin");
+        .in("role", VALID_ROLES);
+
+      // Count by role
+      const roleCounts: Record<string, number> = {};
+      for (const role of VALID_ROLES) {
+        const { count } = await adminClient
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", role);
+        roleCounts[role] = count || 0;
+      }
 
       const { data: recentHospitals } = await adminClient
         .from("hospitals")
@@ -287,7 +314,8 @@ serve(async (req) => {
         JSON.stringify({
           total_hospitals: hospitalCount || 0,
           active_hospitals: activeHospitalCount || 0,
-          total_admins: adminCount || 0,
+          total_users: totalUsers || 0,
+          role_counts: roleCounts,
           recent_hospitals: recentHospitals || [],
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
