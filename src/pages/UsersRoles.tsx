@@ -65,9 +65,9 @@ export default function UsersRoles() {
   const apiCall = useCallback(async (path: string, method: string, body?: any) => {
     const opts: any = {
       headers: { Authorization: `Bearer ${session?.access_token}` },
+      method,
     };
     if (body) opts.body = body;
-    if (method !== "GET") opts.method = method;
 
     const { data, error } = await supabase.functions.invoke(`admin-api/${path}`, opts);
     if (error) throw new Error(error.message || "API error");
