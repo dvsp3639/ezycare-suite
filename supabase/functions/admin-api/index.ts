@@ -7,7 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff"];
+const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff", "receptionist"];
+const HOSPITAL_ADMIN_MANAGEABLE_ROLES = ["doctor", "nurse", "lab_technician", "pharmacist", "receptionist"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
