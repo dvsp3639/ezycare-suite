@@ -37,14 +37,14 @@ export const clinicService = {
   },
 
   // ─── Time Slots ───
-  async createTimeSlot(slot: { schedule_id: string; time: string; max_patients?: number; is_active?: boolean }) {
+  async createTimeSlot(slot: { scheduleId: string; time: string; maxPatients?: number; isActive?: boolean }) {
     const { data, error } = await supabase
       .from("time_slots")
-      .insert(slot as any)
+      .insert(camelToSnake(slot) as any)
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return snakeToCamel(data);
   },
 
   async incrementSlotBooked(slotId: string): Promise<void> {
