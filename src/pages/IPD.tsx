@@ -176,7 +176,7 @@ const IPD = () => {
     if (!selectedBed || !allocateForm.patientId || !allocateForm.admittingDoctor) {
       toast.error("Patient and doctor are required"); return;
     }
-    const patient = mockPatients.find((p) => p.id === allocateForm.patientId);
+    const patient = dbPatients.find((p: any) => p.id === allocateForm.patientId);
     const ward = wards.find((w) => w.id === selectedBed.wardId);
     if (!patient || !ward) return;
 
