@@ -942,7 +942,7 @@ const IPD = () => {
             <div><Label>Doctor</Label>
               <Select value={noteForm.doctor} onValueChange={(v) => setNoteForm({ ...noteForm, doctor: v })}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Notes</Label><Textarea value={noteForm.notes} onChange={(e) => setNoteForm({ ...noteForm, notes: e.target.value })} placeholder="Clinical notes..." rows={3} /></div>
