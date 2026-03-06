@@ -521,16 +521,16 @@ const ClinicManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPatients.map((p) => (
+                {filteredPatients.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-mono text-sm font-medium text-foreground">{p.registrationNumber}</TableCell>
                     <TableCell className="font-medium text-foreground">{p.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.mobile}</TableCell>
-                    <TableCell className="text-sm">{p.age} / {p.gender}</TableCell>
-                    <TableCell className="text-sm">{p.doctor}</TableCell>
-                    <TableCell className="text-sm">{p.diagnosis}</TableCell>
-                    <TableCell className="text-sm">{formatDateDisplay(p.lastVisit)}</TableCell>
-                    <TableCell><Badge variant="outline">{p.totalVisits}</Badge></TableCell>
+                    <TableCell className="text-sm">{p.dob ? `${new Date().getFullYear() - new Date(p.dob).getFullYear()}` : "-"} / {p.gender}</TableCell>
+                    <TableCell className="text-sm">{p.bloodGroup || "-"}</TableCell>
+                    <TableCell className="text-sm">{p.chronicConditions || "-"}</TableCell>
+                    <TableCell className="text-sm">{p.createdAt ? formatDateDisplay(p.createdAt.split("T")[0]) : "-"}</TableCell>
+                    <TableCell><Badge variant="outline">-</Badge></TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="outline" onClick={() => setSelectedPatient(p)}><Eye className="h-4 w-4 mr-1" /> View</Button>
                     </TableCell>
