@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
 import type { Patient, PatientInsert, PatientUpdate } from "./types";
 
 export const patientService = {
