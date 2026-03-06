@@ -15,10 +15,12 @@ import {
   Receipt, Trash2, Edit, Eye, TrendingUp, IndianRupee, Users, Activity,
   BarChart3, PieChart,
 } from "lucide-react";
+import { format } from "date-fns";
 import {
-  mockDayCarePatients, mockDayCareTreatments, dayCareCategories,
+  dayCareCategories,
   type DayCarePatient, type DayCareTreatment, type DayCareBillingItem, type DayCareBill,
 } from "@/data/mockDayCareData";
+import { useDayCareSessions, useDayCareTreatments } from "@/modules/daycare/hooks";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
 const statusColor = (s: DayCarePatient["status"]) => {
