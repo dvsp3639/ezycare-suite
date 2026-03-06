@@ -70,7 +70,7 @@ export const clinicService = {
     if (date) query = query.eq("appointment_date", date);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as unknown as Appointment[];
+    return snakeToCamel(data || []) as Appointment[];
   },
 
   async createAppointment(appointment: Partial<Appointment>): Promise<Appointment> {
