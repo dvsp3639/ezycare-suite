@@ -4,7 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isHospitalAdmin, isSuperAdmin } = useAuth();
+
+  const visibleModules = modules.filter((mod) => {
+    if (mod.id === "users-roles") return isHospitalAdmin || isSuperAdmin;
+    return true;
+  });
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -16,7 +21,7 @@ const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {modules.map((mod, i) => (
+        {visibleModules.map((mod, i) => (
           <button
             key={mod.id}
             onClick={() => navigate(mod.route)}
