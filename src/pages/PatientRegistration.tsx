@@ -7,9 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, UserPlus, Save, Printer, Calendar, Clock, X } from "lucide-react";
-import { mockPatients, generateRegistrationNumber, type Patient } from "@/data/mockPatients";
-import { useClinicData } from "@/contexts/ClinicDataContext";
+import { Search, UserPlus, Save, Printer, Calendar, Clock, X, Loader2 } from "lucide-react";
+import { useCreatePatient } from "@/modules/patients/hooks";
+import { patientService } from "@/modules/patients/services";
+import { useDoctorSchedules, useAppointments, useCreateAppointment } from "@/modules/clinic/hooks";
+import { clinicService } from "@/modules/clinic/services";
+import { snakeToCamel } from "@/lib/caseConverter";
 import { cn } from "@/lib/utils";
 import TimeSlotPicker from "@/components/TimeSlotPicker";
 
@@ -19,22 +22,35 @@ const formatDateDisplay = (dateStr: string) => {
   return `${d}/${m}/${y}`;
 };
 
-const emptyPatient: Omit<Patient, "id" | "registrationNumber"> = {
+interface UIPatient {
+  id: string;
+  registrationNumber: string;
+  name: string;
+  mobile: string;
+  dob: string;
+  gender: string;
+  emergencyContact: string;
+  bloodGroup: string;
+  address: string;
+  chronicConditions: string;
+}
+
+const emptyForm = {
   name: "", mobile: "", dob: "", gender: "Male", emergencyContact: "",
   bloodGroup: "", address: "", chronicConditions: "",
 };
 
 const PatientRegistration = () => {
-  const { schedules, addToQueue, incrementSlotBooked } = useClinicData();
-
   const [searchMobile, setSearchMobile] = useState("");
-  const [searchResults, setSearchResults] = useState<Patient[] | null>(null);
-  const [form, setForm] = useState(emptyPatient);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [searchResults, setSearchResults] = useState<UIPatient[] | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [selectedPatient, setSelectedPatient] = useState<UIPatient | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
@@ -44,28 +60,47 @@ const PatientRegistration = () => {
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  const handleSearch = () => {
+  const createPatient = useCreatePatient();
+  const createAppointment = useCreateAppointment();
+
+  // Fetch schedules for OPD date
+  const { data: rawSchedules } = useDoctorSchedules(opdDate || undefined);
+  const schedules = (rawSchedules || []).map((s: any) => snakeToCamel(s)) as any[];
+
+  // Fetch today's appointments for token calculation
+  const todayStr = new Date().toISOString().split("T")[0];
+  const { data: rawAppointments } = useAppointments(opdDate || todayStr);
+
+  const handleSearch = async () => {
     if (searchMobile.length < 10) {
       toast.error("Enter a valid 10-digit mobile number");
       return;
     }
-    const found = mockPatients.filter((p) => p.mobile === searchMobile);
-    setSearchResults(found);
-    setSelectedPatient(null);
-    setIsRegistered(false);
-    setShowOPD(false);
-    setShowAddNew(false);
-    if (found.length === 0) {
-      setForm({ ...emptyPatient, mobile: searchMobile });
+    setSearching(true);
+    try {
+      const found = await patientService.getByMobile(searchMobile);
+      const uiPatients: UIPatient[] = found.map((p) => snakeToCamel(p) as UIPatient);
+      setSearchResults(uiPatients);
+      setSelectedPatient(null);
+      setIsRegistered(false);
+      setShowOPD(false);
+      setShowAddNew(false);
+      if (uiPatients.length === 0) {
+        setForm({ ...emptyForm, mobile: searchMobile });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error searching patients");
+    } finally {
+      setSearching(false);
     }
   };
 
-  const selectPatient = (p: Patient) => {
+  const selectPatient = (p: UIPatient) => {
     setSelectedPatient(p);
     setForm({
       name: p.name, mobile: p.mobile, dob: p.dob, gender: p.gender,
-      emergencyContact: p.emergencyContact, bloodGroup: p.bloodGroup,
-      address: p.address, chronicConditions: p.chronicConditions,
+      emergencyContact: p.emergencyContact || "", bloodGroup: p.bloodGroup || "",
+      address: p.address || "", chronicConditions: p.chronicConditions || "",
     });
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
@@ -78,81 +113,113 @@ const PatientRegistration = () => {
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
-    setForm({ ...emptyPatient, mobile: searchMobile });
+    setForm({ ...emptyForm, mobile: searchMobile });
   };
 
   const updateField = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.mobile || !form.dob || !form.address) {
       toast.error("Please fill all required fields");
       return;
     }
-    const duplicate = mockPatients.find(
-      (p) => p.mobile === form.mobile && p.name.toLowerCase() === form.name.toLowerCase()
-    );
-    if (duplicate) {
-      toast.error("A patient with this name and mobile number already exists");
-      return;
+    setSaving(true);
+    try {
+      // Check for duplicates
+      const existing = await patientService.getByMobile(form.mobile);
+      const duplicate = existing.find(
+        (p) => p.mobile === form.mobile && p.name.toLowerCase() === form.name.toLowerCase()
+      );
+      if (duplicate) {
+        toast.error("A patient with this name and mobile number already exists");
+        setSaving(false);
+        return;
+      }
+
+      const regNum = await patientService.generateRegistrationNumber();
+      const newPatient = await createPatient.mutateAsync({
+        registration_number: regNum,
+        name: form.name,
+        mobile: form.mobile,
+        dob: form.dob,
+        gender: form.gender as "Male" | "Female" | "Other",
+        emergency_contact: form.emergencyContact,
+        blood_group: form.bloodGroup,
+        address: form.address,
+        chronic_conditions: form.chronicConditions,
+      });
+
+      const uiPatient = snakeToCamel(newPatient) as UIPatient;
+      setRegistrationNumber(regNum);
+      setIsRegistered(true);
+      setSelectedPatient(uiPatient);
+      setShowSaveDialog(true);
+      setShowAddNew(false);
+    } catch (err: any) {
+      toast.error(err.message || "Error saving patient");
+    } finally {
+      setSaving(false);
     }
-    const regNum = generateRegistrationNumber();
-    const newPatient: Patient = {
-      id: Date.now().toString(),
-      registrationNumber: regNum,
-      ...form,
-    };
-    mockPatients.push(newPatient);
-    setRegistrationNumber(regNum);
-    setIsRegistered(true);
-    setSelectedPatient(newPatient);
-    setShowSaveDialog(true);
-    setShowAddNew(false);
   };
 
   // Get selected doctor's schedule for time slots
-  const selectedDoctorSchedule = schedules.find((d) => d.id === opdDoctor);
+  const selectedDoctorSchedule = schedules.find((d: any) => d.id === opdDoctor);
 
-  const handleOPDSave = (print: boolean) => {
+  const handleOPDSave = async (print: boolean) => {
     if (!opdDate || !opdType || !opdDoctor || !opdTimeSlot) {
       toast.error("Please fill all OPD booking details");
       return;
     }
 
-    const doctor = schedules.find((d) => d.id === opdDoctor);
+    const doctor = schedules.find((d: any) => d.id === opdDoctor);
     if (!doctor) return;
 
-    // Add to queue
     const now = new Date();
     const checkInTime = `${now.getHours() > 12 ? now.getHours() - 12 : now.getHours()}:${now.getMinutes().toString().padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
-    addToQueue({
-      patientName: form.name,
-      registrationNumber: registrationNumber,
-      doctorName: doctor.doctorName,
-      timeSlot: opdTimeSlot,
-      opdType: opdType as "Normal" | "Emergency" | "Follow Up",
-      status: "Waiting",
-      checkInTime,
-    });
+    try {
+      const maxToken = (rawAppointments || []).reduce((max: number, a: any) => Math.max(max, a.token_no || 0), 0);
 
-    // Increment booked count on the slot
-    incrementSlotBooked(opdDoctor, opdTimeSlot);
+      await createAppointment.mutateAsync({
+        token_no: maxToken + 1,
+        patient_name: form.name,
+        registration_number: registrationNumber,
+        patient_id: selectedPatient?.id || null,
+        doctor_name: doctor.doctorName,
+        time_slot: opdTimeSlot,
+        opd_type: opdType as any,
+        status: "Waiting",
+        check_in_time: checkInTime,
+        appointment_date: opdDate,
+        diagnosis: "",
+        doctor_notes: "",
+        follow_up_date: null,
+      });
 
-    toast.success(`OPD booked successfully${print ? " — Printing..." : ""}`, {
-      description: `${form.name} | ${formatDateDisplay(opdDate)} | ${opdTimeSlot} | Token assigned`,
-    });
-    if (print) window.print();
-    setShowOPD(false);
-    setOpdDate("");
-    setOpdType("");
-    setOpdDoctor("");
-    setOpdTimeSlot("");
+      // Increment booked count on the slot
+      const slot = doctor.timeSlots?.find((s: any) => s.time === opdTimeSlot);
+      if (slot?.id) {
+        await clinicService.incrementSlotBooked(slot.id);
+      }
+
+      toast.success(`OPD booked successfully${print ? " — Printing..." : ""}`, {
+        description: `${form.name} | ${formatDateDisplay(opdDate)} | ${opdTimeSlot} | Token assigned`,
+      });
+      if (print) window.print();
+      setShowOPD(false);
+      setOpdDate("");
+      setOpdType("");
+      setOpdDoctor("");
+      setOpdTimeSlot("");
+    } catch (err: any) {
+      toast.error(err.message || "Error booking OPD");
+    }
   };
 
   const resetForm = () => {
-    setForm(emptyPatient);
+    setForm(emptyForm);
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
@@ -172,8 +239,8 @@ const PatientRegistration = () => {
         </div>
         <div className="flex gap-2">
           {((form.name && !isRegistered) || showAddNew) && (
-            <Button onClick={handleSave} size="sm">
-              <Save className="mr-2 h-4 w-4" />
+            <Button onClick={handleSave} size="sm" disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Details
             </Button>
           )}
@@ -195,9 +262,10 @@ const PatientRegistration = () => {
             onChange={(e) => setSearchMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
             placeholder="Enter 10-digit mobile number"
             className="h-11 max-w-xs font-mono"
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
-          <Button onClick={handleSearch} className="h-11">
-            <Search className="mr-2 h-4 w-4" />
+          <Button onClick={handleSearch} className="h-11" disabled={searching}>
+            {searching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
             Search
           </Button>
           {(selectedPatient || form.name) && (
@@ -321,7 +389,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); }} min={new Date().toISOString().split("T")[0]} />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
@@ -339,9 +407,14 @@ const PatientRegistration = () => {
               <Select value={opdDoctor} onValueChange={(v) => { setOpdDoctor(v); setOpdTimeSlot(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>
-                  {schedules.map((d) => (
+                  {schedules.length === 0 && (
+                    <div className="p-2 text-xs text-muted-foreground text-center">
+                      {opdDate ? "No schedules for this date" : "Select a date first"}
+                    </div>
+                  )}
+                  {schedules.map((d: any) => (
                     <SelectItem key={d.id} value={d.id}>
-                      {d.doctorName} — {d.specialization}
+                      {d.doctorName} — {d.specialization || "General"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -369,7 +442,7 @@ const PatientRegistration = () => {
                       onOpenChange={setShowTimePicker}
                       onSelect={setOpdTimeSlot}
                       selectedTime={opdTimeSlot}
-                      slots={selectedDoctorSchedule.timeSlots}
+                      slots={selectedDoctorSchedule.timeSlots || []}
                       doctorName={selectedDoctorSchedule.doctorName}
                       selectedDate={opdDate}
                     />
@@ -382,16 +455,16 @@ const PatientRegistration = () => {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
               <span>
-                {selectedDoctorSchedule.doctorName} · {opdTimeSlot} · {selectedDoctorSchedule.consultationDuration} min consultation
+                {selectedDoctorSchedule.doctorName} · {opdTimeSlot} · {selectedDoctorSchedule.consultationDuration || 30} min consultation
               </span>
             </div>
           )}
           <div className="flex gap-3 mt-4 pt-4 border-t border-border">
-            <Button onClick={() => handleOPDSave(false)}>
-              <Save className="mr-2 h-4 w-4" />
+            <Button onClick={() => handleOPDSave(false)} disabled={createAppointment.isPending}>
+              {createAppointment.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save
             </Button>
-            <Button variant="outline" onClick={() => handleOPDSave(true)}>
+            <Button variant="outline" onClick={() => handleOPDSave(true)} disabled={createAppointment.isPending}>
               <Printer className="mr-2 h-4 w-4" />
               Save & Print
             </Button>
