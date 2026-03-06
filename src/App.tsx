@@ -31,6 +31,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <DashboardLayout>{children}</DashboardLayout>;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading, isHospitalAdmin, isSuperAdmin } = useAuth();
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isHospitalAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return <DashboardLayout>{children}</DashboardLayout>;
+};
+
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -50,7 +58,7 @@ const AppRoutes = () => (
     <Route path="/day-care" element={<ProtectedRoute><DayCare /></ProtectedRoute>} />
     <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
     <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
-    <Route path="/users-roles" element={<ProtectedRoute><UsersRoles /></ProtectedRoute>} />
+    <Route path="/users-roles" element={<AdminRoute><UsersRoles /></AdminRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />
