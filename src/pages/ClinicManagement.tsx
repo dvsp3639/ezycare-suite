@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
+import { usePatients } from "@/modules/patients/hooks";
 import {
-  mockClinicPatients,
   type DoctorSchedule,
   type QueueEntry,
   type ClinicPatient,
@@ -79,7 +79,7 @@ const ClinicManagement = () => {
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
-  const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
   // Consultation dialog state
   const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
@@ -309,11 +309,12 @@ const ClinicManagement = () => {
 
   const filteredQueue = queueFilter === "all" ? queue : queue.filter((q) => q.status === queueFilter);
 
-  const filteredPatients = mockClinicPatients.filter(
-    (p) =>
-      p.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      p.registrationNumber.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      p.mobile.includes(patientSearch)
+  const { data: dbPatients = [] } = usePatients();
+  const filteredPatients = dbPatients.filter(
+    (p: any) =>
+      (p.name || "").toLowerCase().includes(patientSearch.toLowerCase()) ||
+      (p.registrationNumber || "").toLowerCase().includes(patientSearch.toLowerCase()) ||
+      (p.mobile || "").includes(patientSearch)
   );
 
   const waitingCount = queue.filter((q) => q.status === "Waiting").length;
@@ -512,24 +513,24 @@ const ClinicManagement = () => {
                   <TableHead>Patient</TableHead>
                   <TableHead>Mobile</TableHead>
                   <TableHead>Age/Gender</TableHead>
-                  <TableHead>Doctor</TableHead>
-                  <TableHead>Diagnosis</TableHead>
-                  <TableHead>Last Visit</TableHead>
-                  <TableHead>Visits</TableHead>
+                  <TableHead>Blood Group</TableHead>
+                  <TableHead>Conditions</TableHead>
+                  <TableHead>Registered</TableHead>
+                  <TableHead>-</TableHead>
                   <TableHead className="text-right">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPatients.map((p) => (
+                {filteredPatients.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-mono text-sm font-medium text-foreground">{p.registrationNumber}</TableCell>
                     <TableCell className="font-medium text-foreground">{p.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.mobile}</TableCell>
-                    <TableCell className="text-sm">{p.age} / {p.gender}</TableCell>
-                    <TableCell className="text-sm">{p.doctor}</TableCell>
-                    <TableCell className="text-sm">{p.diagnosis}</TableCell>
-                    <TableCell className="text-sm">{formatDateDisplay(p.lastVisit)}</TableCell>
-                    <TableCell><Badge variant="outline">{p.totalVisits}</Badge></TableCell>
+                    <TableCell className="text-sm">{p.dob ? `${new Date().getFullYear() - new Date(p.dob).getFullYear()}` : "-"} / {p.gender}</TableCell>
+                    <TableCell className="text-sm">{p.bloodGroup || "-"}</TableCell>
+                    <TableCell className="text-sm">{p.chronicConditions || "-"}</TableCell>
+                    <TableCell className="text-sm">{p.createdAt ? formatDateDisplay(p.createdAt.split("T")[0]) : "-"}</TableCell>
+                    <TableCell><Badge variant="outline">-</Badge></TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="outline" onClick={() => setSelectedPatient(p)}><Eye className="h-4 w-4 mr-1" /> View</Button>
                     </TableCell>
@@ -952,46 +953,23 @@ const ClinicManagement = () => {
                 <DialogTitle className="font-display">{selectedPatient.name}</DialogTitle>
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">{selectedPatient.registrationNumber}</Badge>
-                  <Badge variant="outline" className="text-xs">{selectedPatient.age} yrs · {selectedPatient.gender}</Badge>
+                  <Badge variant="outline" className="text-xs">{selectedPatient.dob ? `${new Date().getFullYear() - new Date(selectedPatient.dob).getFullYear()} yrs` : "-"} · {selectedPatient.gender}</Badge>
                   <Badge variant="outline" className="text-xs">{selectedPatient.mobile}</Badge>
                 </div>
               </DialogHeader>
               <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm">
-                <div><p className="text-xs text-muted-foreground">Current Doctor</p><p className="font-medium text-foreground">{selectedPatient.doctor}</p></div>
-                <div><p className="text-xs text-muted-foreground">Latest Diagnosis</p><p className="font-medium text-foreground">{selectedPatient.diagnosis}</p></div>
-                <div><p className="text-xs text-muted-foreground">Total Visits</p><p className="font-medium text-foreground">{selectedPatient.totalVisits}</p></div>
+                <div><p className="text-xs text-muted-foreground">Blood Group</p><p className="font-medium text-foreground">{selectedPatient.bloodGroup || "-"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Chronic Conditions</p><p className="font-medium text-foreground">{selectedPatient.chronicConditions || "-"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Address</p><p className="font-medium text-foreground">{selectedPatient.address || "-"}</p></div>
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5"><FileText className="h-4 w-4" /> Visit History</h4>
-                <div className="space-y-3">
-                  {selectedPatient.visitHistory.map((visit) => (
-                    <div key={visit.id} className="border border-border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-foreground">{formatDateDisplay(visit.date)}</span>
-                          <Badge variant="outline" className={cn("text-xs", opdTypeColor[visit.opdType])}>{visit.opdType}</Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{visit.doctor}</span>
-                      </div>
-                      <div><p className="text-xs text-muted-foreground mb-0.5">Diagnosis</p><p className="text-sm font-medium text-foreground">{visit.diagnosis}</p></div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Pill className="h-3 w-3" /> Prescription</p>
-                        <ul className="space-y-0.5">
-                          {visit.prescription.map((rx, i) => (
-                            <li key={i} className="text-sm text-foreground flex items-start gap-1.5">
-                              <span className="text-primary mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />{rx}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      {visit.notes && (
-                        <div className="bg-muted/50 rounded p-2">
-                          <p className="text-xs text-muted-foreground">Doctor's Notes</p>
-                          <p className="text-sm text-foreground">{visit.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5"><FileText className="h-4 w-4" /> Patient Information</h4>
+                <div className="border border-border rounded-lg p-4 space-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><p className="text-xs text-muted-foreground">Emergency Contact</p><p className="text-foreground">{selectedPatient.emergencyContact || "-"}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Date of Birth</p><p className="text-foreground">{selectedPatient.dob ? formatDateDisplay(selectedPatient.dob) : "-"}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Registered On</p><p className="text-foreground">{selectedPatient.createdAt ? formatDateDisplay(selectedPatient.createdAt.split("T")[0]) : "-"}</p></div>
+                  </div>
                 </div>
               </div>
             </>

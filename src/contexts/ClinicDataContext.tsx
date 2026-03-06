@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { format } from "date-fns";
+import { clinicService } from "@/modules/clinic/services";
+import type { Appointment } from "@/modules/clinic/types";
 import {
-  mockDoctorSchedules,
-  mockQueue,
-  mockClinicPatients,
   type DoctorSchedule,
   type QueueEntry,
   type ClinicPatient,
@@ -25,11 +25,12 @@ interface ClinicDataContextType {
   updateQueueLabOrders: (id: string, labOrders: LabOrder[]) => void;
   updateQueueFollowUp: (id: string, followUpDate: string) => void;
   incrementSlotBooked: (doctorId: string, slotTime: string) => void;
-  // Diagnostics workflow
   allLabOrders: LabOrder[];
   updateLabOrderStatus: (labOrderId: string, status: LabOrder["status"]) => void;
   updateLabOrderResults: (labOrderId: string, results: LabResult[], reportNotes?: string, reportFiles?: { name: string; url: string; type: string }[]) => void;
   updateLabOrderPayment: (labOrderId: string, paymentMode: "Cash" | "Credit") => void;
+  isLoading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const ClinicDataContext = createContext<ClinicDataContextType | null>(null);
@@ -40,10 +41,83 @@ export const useClinicData = () => {
   return ctx;
 };
 
+// Map DB schedule to mock DoctorSchedule shape
+function mapDbSchedule(s: any): DoctorSchedule {
+  return {
+    id: s.id,
+    doctorName: s.doctorName,
+    specialization: s.specialization || "",
+    availableFrom: s.availableFrom || "9:00 AM",
+    availableTo: s.availableTo || "5:00 PM",
+    consultationDuration: s.consultationDuration || 30,
+    timeSlots: (s.timeSlots || []).map((ts: any) => ({
+      time: ts.time,
+      maxPatients: ts.maxPatients ?? 5,
+      bookedPatients: ts.bookedPatients ?? 0,
+      isActive: ts.isActive ?? true,
+    })),
+  };
+}
+
+// Map DB appointment to QueueEntry shape
+function mapDbAppointment(a: any): QueueEntry {
+  const vitalsArr = a.vitals || [];
+  const v = vitalsArr[0];
+  const prescriptions = a.prescriptions || [];
+  return {
+    id: a.id,
+    tokenNo: a.tokenNo,
+    patientName: a.patientName,
+    registrationNumber: a.registrationNumber,
+    doctorName: a.doctorName,
+    timeSlot: a.timeSlot || "",
+    opdType: a.opdType || "Normal",
+    status: a.status || "Waiting",
+    checkInTime: a.checkInTime || "",
+    diagnosis: a.diagnosis || undefined,
+    doctorNotes: a.doctorNotes || undefined,
+    followUpDate: a.followUpDate || undefined,
+    vitals: v ? { bp: v.bp || "", temperature: v.temperature || "", weight: v.weight || "", height: v.height || "", spo2: v.spo2 || "", pulse: v.pulse || "" } : undefined,
+    structuredPrescription: prescriptions.length > 0 ? prescriptions.map((p: any) => ({
+      medicine: p.medicine || "",
+      dosage: p.dosage || "",
+      frequency: p.frequency || "",
+      duration: p.duration || "",
+      instructions: p.instructions || "",
+    })) : undefined,
+    prescription: prescriptions.length > 0 ? prescriptions.map((p: any) =>
+      `${p.medicine} ${p.dosage} – ${p.frequency}${p.duration ? ` for ${p.duration}` : ""}${p.instructions ? ` (${p.instructions})` : ""}`
+    ) : undefined,
+  };
+}
+
 export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
-  const [schedules, setSchedules] = useState<DoctorSchedule[]>(mockDoctorSchedules);
-  const [queue, setQueue] = useState<QueueEntry[]>(mockQueue);
-  const [clinicPatients] = useState<ClinicPatient[]>(mockClinicPatients);
+  const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [clinicPatients] = useState<ClinicPatient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const refreshData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [dbSchedules, dbAppointments] = await Promise.all([
+        clinicService.getSchedules(today),
+        clinicService.getAppointments(today),
+      ]);
+      setSchedules(dbSchedules.map(mapDbSchedule));
+      setQueue(dbAppointments.map(mapDbAppointment));
+    } catch (err) {
+      console.error("Failed to load clinic data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [today]);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const addToQueue = useCallback((entry: Omit<QueueEntry, "id" | "tokenNo">) => {
     setQueue((prev) => {
@@ -55,6 +129,8 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateQueueStatus = useCallback((id: string, status: QueueEntry["status"]) => {
     setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+    // Persist to DB
+    clinicService.updateAppointment(id, { status } as any).catch(console.error);
   }, []);
 
   const updateQueueConsultation = useCallback((id: string, data: { diagnosis: string; prescription: string[]; structuredPrescription: PrescriptionItem[]; notes: string }) => {
@@ -65,10 +141,16 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
           : q
       )
     );
+    // Persist
+    clinicService.updateAppointment(id, { status: "Completed", diagnosis: data.diagnosis, doctorNotes: data.notes } as any).catch(console.error);
+    if (data.structuredPrescription.length > 0) {
+      clinicService.savePrescriptions(id, data.structuredPrescription).catch(console.error);
+    }
   }, []);
 
   const updateQueueVitals = useCallback((id: string, vitals: Vitals) => {
     setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, vitals } : q)));
+    clinicService.saveVitals({ appointmentId: id, ...vitals } as any).catch(console.error);
   }, []);
 
   const updateQueueLabOrders = useCallback((id: string, labOrders: LabOrder[]) => {
@@ -77,6 +159,7 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateQueueFollowUp = useCallback((id: string, followUpDate: string) => {
     setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, followUpDate } : q)));
+    clinicService.updateAppointment(id, { followUpDate } as any).catch(console.error);
   }, []);
 
   const incrementSlotBooked = useCallback((doctorId: string, slotTime: string) => {
@@ -89,10 +172,7 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
-  // Collect all lab orders from all queue entries
-  const allLabOrders = queue.flatMap((q) =>
-    (q.labOrders || []).map((lab) => ({ ...lab }))
-  );
+  const allLabOrders = queue.flatMap((q) => (q.labOrders || []).map((lab) => ({ ...lab })));
 
   const updateLabOrderStatus = useCallback((labOrderId: string, status: LabOrder["status"]) => {
     setQueue((prev) =>
@@ -135,7 +215,7 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <ClinicDataContext.Provider
-      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked, allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment }}
+      value={{ schedules, setSchedules, queue, setQueue, clinicPatients, addToQueue, updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp, incrementSlotBooked, allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment, isLoading, refreshData }}
     >
       {children}
     </ClinicDataContext.Provider>
