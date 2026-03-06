@@ -21,9 +21,14 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isHospitalAdmin, isSuperAdmin } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const visibleModules = modules.filter((mod) => {
+    if (mod.id === "users-roles") return isHospitalAdmin || isSuperAdmin;
+    return true;
+  });
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -59,7 +64,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {modules.map((mod) => (
+              {visibleModules.map((mod) => (
                 <SidebarMenuItem key={mod.id}>
                   <SidebarMenuButton
                     onClick={() => navigate(mod.route)}
