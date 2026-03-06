@@ -18,11 +18,11 @@ export const clinicService = {
   async createSchedule(schedule: Partial<DoctorSchedule>): Promise<DoctorSchedule> {
     const { data, error } = await supabase
       .from("doctor_schedules")
-      .insert(schedule as any)
+      .insert(camelToSnake(schedule) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as DoctorSchedule;
+    return snakeToCamel(data) as DoctorSchedule;
   },
 
   async updateSchedule(id: string, updates: Partial<DoctorSchedule>): Promise<DoctorSchedule> {
