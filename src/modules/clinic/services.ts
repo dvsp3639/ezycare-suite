@@ -28,12 +28,12 @@ export const clinicService = {
   async updateSchedule(id: string, updates: Partial<DoctorSchedule>): Promise<DoctorSchedule> {
     const { data, error } = await supabase
       .from("doctor_schedules")
-      .update(updates as any)
+      .update(camelToSnake(updates) as any)
       .eq("id", id)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as DoctorSchedule;
+    return snakeToCamel(data) as DoctorSchedule;
   },
 
   // ─── Time Slots ───
