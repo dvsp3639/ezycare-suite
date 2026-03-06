@@ -12,7 +12,7 @@ export const clinicService = {
     if (date) query = query.eq("schedule_date", date);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as unknown as DoctorSchedule[];
+    return snakeToCamel(data || []) as DoctorSchedule[];
   },
 
   async createSchedule(schedule: Partial<DoctorSchedule>): Promise<DoctorSchedule> {
