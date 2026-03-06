@@ -309,11 +309,12 @@ const ClinicManagement = () => {
 
   const filteredQueue = queueFilter === "all" ? queue : queue.filter((q) => q.status === queueFilter);
 
-  const filteredPatients = mockClinicPatients.filter(
-    (p) =>
-      p.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      p.registrationNumber.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      p.mobile.includes(patientSearch)
+  const { data: dbPatients = [] } = usePatients();
+  const filteredPatients = dbPatients.filter(
+    (p: any) =>
+      (p.name || "").toLowerCase().includes(patientSearch.toLowerCase()) ||
+      (p.registrationNumber || "").toLowerCase().includes(patientSearch.toLowerCase()) ||
+      (p.mobile || "").includes(patientSearch)
   );
 
   const waitingCount = queue.filter((q) => q.status === "Waiting").length;
