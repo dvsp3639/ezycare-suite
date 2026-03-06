@@ -179,7 +179,7 @@ const StaffPayroll = () => {
       await createLeaveMut.mutateAsync({
         staff_id: leaveForm.staff_id,
         staff_name: s?.name || "",
-        leave_type: leaveForm.leave_type,
+        leave_type: leaveForm.leave_type as any,
         from_date: leaveForm.from_date,
         to_date: leaveForm.to_date,
         days,
