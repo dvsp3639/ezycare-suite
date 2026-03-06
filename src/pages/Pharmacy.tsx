@@ -32,6 +32,28 @@ type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
+  const { data: dbPatients } = usePatients();
+  const { data: dbMedicines } = useMedicines();
+
+  const allPatients: ClinicPatient[] = useMemo(() =>
+    (dbPatients || []).map((p: any) => ({
+      id: p.id, registrationNumber: p.registrationNumber, name: p.name,
+      mobile: p.mobile, gender: p.gender || "Male",
+      age: p.dob ? Math.floor((Date.now() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
+      lastVisit: "", totalVisits: 0, doctor: "", diagnosis: "", visitHistory: [],
+    })),
+  [dbPatients]);
+
+  const allMedicines: Medicine[] = useMemo(() =>
+    (dbMedicines || []).map((m: any) => ({
+      id: m.id, name: m.name, genericName: m.genericName || "",
+      category: m.category || "", manufacturer: m.manufacturer || "",
+      batchNo: m.batchNo || "", expiryDate: m.expiryDate || "",
+      mrp: m.mrp || 0, stock: m.stock || 0, unit: m.unit || "",
+      hsnCode: m.hsnCode || "", gstPercent: m.gstPercent ?? 12,
+    })),
+  [dbMedicines]);
+
   const [issueType, setIssueType] = useState<IssueType>("OP Sale");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
@@ -47,13 +69,13 @@ const Pharmacy = () => {
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
-    return mockClinicPatients.filter(
+    return allPatients.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.registrationNumber.toLowerCase().includes(q) ||
         p.mobile.includes(q)
     );
-  }, [searchQuery]);
+  }, [searchQuery, allPatients]);
 
   // Doctor prescription for selected patient
   const doctorPrescription = useMemo(() => {
