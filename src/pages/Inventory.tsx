@@ -17,14 +17,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockInventory, mockTransfers,
   inventoryCategories, departments, categoryColors,
   getExpiryStatus, getStockStatus,
   type InventoryItem, type InventoryCategory, type Department, type StockTransfer,
 } from "@/data/mockInventoryData";
-import { labTestCatalog, type LabTestDefinition } from "@/data/mockDiagnosticsData";
+import { type LabTestDefinition } from "@/data/mockDiagnosticsData";
 import type { LabCategory } from "@/data/mockClinicData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
+import { useInventoryItems, useStockTransfers } from "@/modules/inventory/hooks";
+import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
 
 // ──── Asset Types ────
 export type AssetStatus = "Active" | "Under Maintenance" | "Retired" | "Disposed";
