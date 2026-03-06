@@ -56,8 +56,11 @@ export default function UsersRoles() {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resetPwDialogOpen, setResetPwDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
+  const [resetPwUser, setResetPwUser] = useState<StaffUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [form, setForm] = useState<FormData>(emptyForm);
   const [filterRole, setFilterRole] = useState<string>("all");
   const [search, setSearch] = useState("");
