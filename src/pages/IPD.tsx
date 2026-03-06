@@ -819,7 +819,7 @@ const IPD = () => {
               <div><Label>Patient *</Label>
                 <Select value={allocateForm.patientId} onValueChange={(v) => setAllocateForm({ ...allocateForm, patientId: v })}>
                   <SelectTrigger><SelectValue placeholder="Select registered patient" /></SelectTrigger>
-                  <SelectContent>{mockPatients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
+                  <SelectContent>{dbPatients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div><Label>Admitting Doctor *</Label>
