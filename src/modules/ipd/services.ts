@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
 import type {
   Ward, Bed, IPDAdmission, DoctorVisitNote, NurseNote,
   MedicineEntry, SurgicalEntry, DiagnosticEntry, DischargeSummary, BedTransfer,
@@ -12,17 +13,17 @@ export const ipdService = {
       .select("*, beds(*)")
       .order("name");
     if (error) throw error;
-    return (data || []) as unknown as Ward[];
+    return snakeToCamel(data || []) as Ward[];
   },
 
   async createWard(ward: Partial<Ward>): Promise<Ward> {
-    const { data, error } = await supabase.from("wards").insert(ward as any).select().single();
+    const { data, error } = await supabase.from("wards").insert(camelToSnake(ward) as any).select().single();
     if (error) throw error;
-    return data as unknown as Ward;
+    return snakeToCamel(data) as Ward;
   },
 
   async updateWard(id: string, updates: Partial<Ward>): Promise<void> {
-    const { error } = await supabase.from("wards").update(updates as any).eq("id", id);
+    const { error } = await supabase.from("wards").update(camelToSnake(updates) as any).eq("id", id);
     if (error) throw error;
   },
 
@@ -31,17 +32,17 @@ export const ipdService = {
     if (wardId) query = query.eq("ward_id", wardId);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as unknown as Bed[];
+    return snakeToCamel(data || []) as Bed[];
   },
 
   async createBed(bed: Partial<Bed>): Promise<Bed> {
-    const { data, error } = await supabase.from("beds").insert(bed as any).select().single();
+    const { data, error } = await supabase.from("beds").insert(camelToSnake(bed) as any).select().single();
     if (error) throw error;
-    return data as unknown as Bed;
+    return snakeToCamel(data) as Bed;
   },
 
   async updateBed(id: string, updates: Partial<Bed>): Promise<void> {
-    const { error } = await supabase.from("beds").update(updates as any).eq("id", id);
+    const { error } = await supabase.from("beds").update(camelToSnake(updates) as any).eq("id", id);
     if (error) throw error;
   },
 
@@ -51,17 +52,17 @@ export const ipdService = {
     if (status) query = query.eq("status", status);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as unknown as IPDAdmission[];
+    return snakeToCamel(data || []) as IPDAdmission[];
   },
 
   async createAdmission(admission: Partial<IPDAdmission>): Promise<IPDAdmission> {
-    const { data, error } = await supabase.from("ipd_admissions").insert(admission as any).select().single();
+    const { data, error } = await supabase.from("ipd_admissions").insert(camelToSnake(admission) as any).select().single();
     if (error) throw error;
-    return data as unknown as IPDAdmission;
+    return snakeToCamel(data) as IPDAdmission;
   },
 
   async updateAdmission(id: string, updates: Partial<IPDAdmission>): Promise<void> {
-    const { error } = await supabase.from("ipd_admissions").update(updates as any).eq("id", id);
+    const { error } = await supabase.from("ipd_admissions").update(camelToSnake(updates) as any).eq("id", id);
     if (error) throw error;
   },
 
@@ -73,13 +74,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as DoctorVisitNote[];
+    return snakeToCamel(data || []) as DoctorVisitNote[];
   },
 
   async createDoctorNote(note: Partial<DoctorVisitNote>): Promise<DoctorVisitNote> {
-    const { data, error } = await supabase.from("doctor_visit_notes").insert(note as any).select().single();
+    const { data, error } = await supabase.from("doctor_visit_notes").insert(camelToSnake(note) as any).select().single();
     if (error) throw error;
-    return data as unknown as DoctorVisitNote;
+    return snakeToCamel(data) as DoctorVisitNote;
   },
 
   // ─── Nurse Notes ───
@@ -90,13 +91,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as NurseNote[];
+    return snakeToCamel(data || []) as NurseNote[];
   },
 
   async createNurseNote(note: Partial<NurseNote>): Promise<NurseNote> {
-    const { data, error } = await supabase.from("nurse_notes").insert(note as any).select().single();
+    const { data, error } = await supabase.from("nurse_notes").insert(camelToSnake(note) as any).select().single();
     if (error) throw error;
-    return data as unknown as NurseNote;
+    return snakeToCamel(data) as NurseNote;
   },
 
   // ─── Medicine Entries ───
@@ -107,13 +108,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as MedicineEntry[];
+    return snakeToCamel(data || []) as MedicineEntry[];
   },
 
   async createMedicineEntry(entry: Partial<MedicineEntry>): Promise<MedicineEntry> {
-    const { data, error } = await supabase.from("medicine_entries").insert(entry as any).select().single();
+    const { data, error } = await supabase.from("medicine_entries").insert(camelToSnake(entry) as any).select().single();
     if (error) throw error;
-    return data as unknown as MedicineEntry;
+    return snakeToCamel(data) as MedicineEntry;
   },
 
   // ─── Surgical Entries ───
@@ -124,13 +125,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as SurgicalEntry[];
+    return snakeToCamel(data || []) as SurgicalEntry[];
   },
 
   async createSurgicalEntry(entry: Partial<SurgicalEntry>): Promise<SurgicalEntry> {
-    const { data, error } = await supabase.from("surgical_entries").insert(entry as any).select().single();
+    const { data, error } = await supabase.from("surgical_entries").insert(camelToSnake(entry) as any).select().single();
     if (error) throw error;
-    return data as unknown as SurgicalEntry;
+    return snakeToCamel(data) as SurgicalEntry;
   },
 
   // ─── Diagnostic Entries ───
@@ -141,13 +142,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as DiagnosticEntry[];
+    return snakeToCamel(data || []) as DiagnosticEntry[];
   },
 
   async createDiagnosticEntry(entry: Partial<DiagnosticEntry>): Promise<DiagnosticEntry> {
-    const { data, error } = await supabase.from("diagnostic_entries").insert(entry as any).select().single();
+    const { data, error } = await supabase.from("diagnostic_entries").insert(camelToSnake(entry) as any).select().single();
     if (error) throw error;
-    return data as unknown as DiagnosticEntry;
+    return snakeToCamel(data) as DiagnosticEntry;
   },
 
   // ─── Discharge Summaries ───
@@ -158,13 +159,13 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .maybeSingle();
     if (error) throw error;
-    return data as unknown as DischargeSummary | null;
+    return data ? snakeToCamel(data) as DischargeSummary : null;
   },
 
   async createDischargeSummary(summary: Partial<DischargeSummary>): Promise<DischargeSummary> {
-    const { data, error } = await supabase.from("discharge_summaries").insert(summary as any).select().single();
+    const { data, error } = await supabase.from("discharge_summaries").insert(camelToSnake(summary) as any).select().single();
     if (error) throw error;
-    return data as unknown as DischargeSummary;
+    return snakeToCamel(data) as DischargeSummary;
   },
 
   // ─── Bed Transfers ───
@@ -175,12 +176,12 @@ export const ipdService = {
       .eq("admission_id", admissionId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as BedTransfer[];
+    return snakeToCamel(data || []) as BedTransfer[];
   },
 
   async createBedTransfer(transfer: Partial<BedTransfer>): Promise<BedTransfer> {
-    const { data, error } = await supabase.from("bed_transfers").insert(transfer as any).select().single();
+    const { data, error } = await supabase.from("bed_transfers").insert(camelToSnake(transfer) as any).select().single();
     if (error) throw error;
-    return data as unknown as BedTransfer;
+    return snakeToCamel(data) as BedTransfer;
   },
 };
