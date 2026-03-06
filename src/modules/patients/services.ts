@@ -34,11 +34,11 @@ export const patientService = {
   async create(patient: PatientInsert): Promise<Patient> {
     const { data, error } = await supabase
       .from("patients")
-      .insert(patient as any)
+      .insert(camelToSnake(patient) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as Patient;
+    return snakeToCamel(data) as Patient;
   },
 
   async update(id: string, updates: PatientUpdate): Promise<Patient> {
