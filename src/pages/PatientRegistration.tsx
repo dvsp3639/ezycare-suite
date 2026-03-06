@@ -140,15 +140,15 @@ const PatientRegistration = () => {
 
       const regNum = await patientService.generateRegistrationNumber();
       const newPatient = await createPatient.mutateAsync({
-        registration_number: regNum,
+        registrationNumber: regNum,
         name: form.name,
         mobile: form.mobile,
         dob: form.dob,
         gender: form.gender as "Male" | "Female" | "Other",
-        emergency_contact: form.emergencyContact,
-        blood_group: form.bloodGroup,
+        emergencyContact: form.emergencyContact,
+        bloodGroup: form.bloodGroup,
         address: form.address,
-        chronic_conditions: form.chronicConditions,
+        chronicConditions: form.chronicConditions,
       });
 
       const uiPatient = snakeToCamel(newPatient) as UIPatient;
