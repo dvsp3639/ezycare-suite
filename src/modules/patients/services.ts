@@ -18,7 +18,7 @@ export const patientService = {
       .select("*")
       .eq("mobile", mobile);
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 
   async getById(id: string): Promise<Patient | null> {
