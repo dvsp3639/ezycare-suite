@@ -106,11 +106,10 @@ export const clinicService = {
   },
 
   // ─── Prescriptions ───
-  async savePrescriptions(appointmentId: string, prescriptions: Omit<Prescription, "id" | "created_at" | "appointment_id">[]): Promise<void> {
-    // Delete existing and re-insert
+  async savePrescriptions(appointmentId: string, prescriptions: Omit<Prescription, "id" | "createdAt" | "appointmentId">[]): Promise<void> {
     await supabase.from("prescriptions").delete().eq("appointment_id", appointmentId);
     if (prescriptions.length > 0) {
-      const rows = prescriptions.map((p) => ({ ...p, appointment_id: appointmentId }));
+      const rows = prescriptions.map((p) => ({ ...camelToSnake(p), appointment_id: appointmentId }));
       const { error } = await supabase.from("prescriptions").insert(rows as any);
       if (error) throw error;
     }

@@ -75,7 +75,7 @@ export const patientService = {
       .or(`name.ilike.%${query}%,mobile.ilike.%${query}%,registration_number.ilike.%${query}%`)
       .order("name");
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 };
 
