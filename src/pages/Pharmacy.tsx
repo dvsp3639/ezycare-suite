@@ -87,15 +87,15 @@ const Pharmacy = () => {
 
   // Filtered medicines for manual add
   const filteredMedicines = useMemo(() => {
-    if (!medicineSearch.trim()) return mockMedicines;
+    if (!medicineSearch.trim()) return allMedicines;
     const q = medicineSearch.toLowerCase();
-    return mockMedicines.filter(
+    return allMedicines.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
-        m.genericName.toLowerCase().includes(q) ||
-        m.category.toLowerCase().includes(q)
+        (m.genericName || "").toLowerCase().includes(q) ||
+        (m.category || "").toLowerCase().includes(q)
     );
-  }, [medicineSearch]);
+  }, [medicineSearch, allMedicines]);
 
   // Calculations
   const isReturn = issueType.includes("Return");
