@@ -18,15 +18,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockAdmissions, mockDoctorNotes, mockNurseNotes,
-  mockMedicineEntries, mockSurgicalEntries, mockDiagnosticEntries,
-  mockBedTransfers, mockDischargeSummaries, bedStatusColors, wardTypeColors,
+  bedStatusColors, wardTypeColors,
   type Ward, type Bed, type BedStatus, type IPDAdmission, type AdmissionStatus,
   type DoctorVisitNote, type NurseNote, type MedicineEntry, type SurgicalEntry,
   type DiagnosticEntry, type BedTransfer, type DischargeSummary,
 } from "@/data/mockIPDData";
-import { mockPatients, mockDoctors } from "@/data/mockPatients";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
+import { useAdmissions } from "@/modules/ipd/hooks";
+import { usePatients } from "@/modules/patients/hooks";
+import { useStaffMembers } from "@/modules/staff/hooks";
 
 const admissionStatusColors: Record<AdmissionStatus, string> = {
   Active: "bg-success/10 text-success border-success/30",
