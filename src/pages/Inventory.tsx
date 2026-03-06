@@ -83,12 +83,55 @@ const mockAssets: HospitalAsset[] = [
 // ──── Main Component ────
 const Inventory = () => {
   const { wardInventoryItems, addWard, updateWard, deleteWard, toggleBedMaintenance } = useWardsBeds();
+  const { data: dbItems } = useInventoryItems();
+  const { data: dbTransfers } = useStockTransfers();
+  const { data: dbLabCatalog } = useLabTestCatalog();
+
   const [activeTab, setActiveTab] = useState("stock");
-  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory.filter((i) => i.category !== "Wards"));
-  const [transfers, setTransfers] = useState<StockTransfer[]>(mockTransfers);
-  const [labTests, setLabTests] = useState<LabTestDefinition[]>(labTestCatalog);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [transfers, setTransfers] = useState<StockTransfer[]>([]);
+  const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (dbItems) {
+      setInventory((dbItems as any[]).map((i: any) => ({
+        id: i.id, name: i.name, category: i.category || "Consumables",
+        sku: i.sku || "", batchNo: i.batchNo || "", manufacturer: i.manufacturer || "",
+        unitPrice: i.unitPrice || 0, sellingPrice: i.sellingPrice || 0,
+        stock: i.stock || 0, minStock: i.minStock || 0, unit: i.unit || "Piece",
+        hsnCode: i.hsnCode || "", gstPercent: i.gstPercent ?? 12,
+        expiryDate: i.expiryDate || undefined, department: i.department || "Store",
+        barcode: i.barcode || "", lastUpdated: i.updatedAt || "", vendor: i.vendor || "",
+        purchaseDate: i.purchaseDate || "", consumptionRate: i.consumptionRate || 0,
+      })).filter((i: any) => i.category !== "Wards"));
+    }
+  }, [dbItems]);
+
+  useEffect(() => {
+    if (dbTransfers) {
+      setTransfers((dbTransfers as any[]).map((t: any) => ({
+        id: t.id, itemId: t.itemId || "", itemName: t.itemName || "",
+        fromDept: t.fromDept || "Store", toDept: t.toDept || "Pharmacy",
+        quantity: t.quantity || 0, transferDate: t.transferDate || "",
+        transferredBy: t.transferredBy || "", status: t.status || "Completed",
+        notes: t.notes || "",
+      })));
+    }
+  }, [dbTransfers]);
+
+  useEffect(() => {
+    if (dbLabCatalog) {
+      setLabTests((dbLabCatalog as any[]).map((t: any) => ({
+        id: t.id, name: t.name, category: t.category || "Blood",
+        price: t.price || 0,
+        parameters: (t.parameters || []).map((p: any) => ({
+          name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
+        })),
+      })));
+    }
+  }, [dbLabCatalog]);
 
   // Stock filters
   const [searchQuery, setSearchQuery] = useState("");

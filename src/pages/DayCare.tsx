@@ -121,7 +121,7 @@ const DayCare = () => {
     });
   }, [patients, search, statusFilter]);
 
-  const todayPatients = patients.filter((p) => p.date === "2026-03-02");
+  const todayPatients = patients.filter((p) => p.date === today);
   const inProgress = todayPatients.filter((p) => p.status === "In Progress").length;
   const completed = todayPatients.filter((p) => p.status === "Completed").length;
   const totalRevenue = patients.reduce((sum, p) => sum + (p.bill?.grandTotal || 0), 0);

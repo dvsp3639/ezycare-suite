@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import type { LabOrder, LabResult } from "@/data/mockClinicData";
-import { labTestCatalog, labCategoryColors } from "@/data/mockDiagnosticsData";
+import { labCategoryColors } from "@/data/mockDiagnosticsData";
 
 const statusColors: Record<string, string> = {
   Ordered: "bg-warning/10 text-warning border-warning/20",

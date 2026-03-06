@@ -123,7 +123,7 @@ const Pharmacy = () => {
   const handleLoadDoctorOrder = () => {
     if (!doctorPrescription) return;
     const items: PharmacyOrderItem[] = doctorPrescription.items.map((pi) => {
-      const med = mockMedicines.find((m) => m.name === pi.medicineName);
+      const med = allMedicines.find((m) => m.name === pi.medicineName);
       return {
         medicineId: med?.id ?? "",
         medicineName: pi.medicineName,

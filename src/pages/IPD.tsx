@@ -204,7 +204,7 @@ const IPD = () => {
     const availableBed = beds.find((b) => b.status === "Available");
     if (!availableBed) { toast.error("No beds available. Please free up a bed first."); return; }
 
-    const patient = mockPatients.find((p) => p.id === admitForm.patientId);
+    const patient = dbPatients.find((p: any) => p.id === admitForm.patientId);
     const ward = wards.find((w) => w.id === availableBed.wardId);
     if (!patient || !ward) return;
 
