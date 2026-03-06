@@ -64,7 +64,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {modules.map((mod) => (
+              {visibleModules.map((mod) => (
                 <SidebarMenuItem key={mod.id}>
                   <SidebarMenuButton
                     onClick={() => navigate(mod.route)}
