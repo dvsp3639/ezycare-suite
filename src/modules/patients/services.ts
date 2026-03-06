@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
 import type { Patient, PatientInsert, PatientUpdate } from "./types";
 
 export const patientService = {
@@ -8,7 +9,7 @@ export const patientService = {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 
   async getByMobile(mobile: string): Promise<Patient[]> {
@@ -17,7 +18,7 @@ export const patientService = {
       .select("*")
       .eq("mobile", mobile);
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 
   async getById(id: string): Promise<Patient | null> {
@@ -27,28 +28,28 @@ export const patientService = {
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    return data as unknown as Patient | null;
+    return data ? snakeToCamel(data) as Patient : null;
   },
 
   async create(patient: PatientInsert): Promise<Patient> {
     const { data, error } = await supabase
       .from("patients")
-      .insert(patient as any)
+      .insert(camelToSnake(patient) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as Patient;
+    return snakeToCamel(data) as Patient;
   },
 
   async update(id: string, updates: PatientUpdate): Promise<Patient> {
     const { data, error } = await supabase
       .from("patients")
-      .update(updates as any)
+      .update(camelToSnake(updates) as any)
       .eq("id", id)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as Patient;
+    return snakeToCamel(data) as Patient;
   },
 
   async delete(id: string): Promise<void> {
@@ -74,7 +75,7 @@ export const patientService = {
       .or(`name.ilike.%${query}%,mobile.ilike.%${query}%,registration_number.ilike.%${query}%`)
       .order("name");
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 };
 

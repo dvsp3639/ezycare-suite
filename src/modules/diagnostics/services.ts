@@ -1,8 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
 import type { LabTestCatalogItem, LabOrder, LabResult, LabOrderInsert } from "./types";
 
 export const diagnosticsService = {
-  // ─── Lab Test Catalog ───
   async getTestCatalog(): Promise<LabTestCatalogItem[]> {
     const { data, error } = await supabase
       .from("lab_test_catalog")
@@ -10,22 +10,21 @@ export const diagnosticsService = {
       .order("name");
     if (error) throw error;
     return (data || []).map((d: any) => ({
-      ...d,
-      parameters: d.lab_test_parameters,
-    })) as unknown as LabTestCatalogItem[];
+      ...snakeToCamel(d),
+      parameters: snakeToCamel(d.lab_test_parameters),
+    })) as LabTestCatalogItem[];
   },
 
   async createTestCatalogItem(item: Partial<LabTestCatalogItem>): Promise<LabTestCatalogItem> {
     const { data, error } = await supabase
       .from("lab_test_catalog")
-      .insert(item as any)
+      .insert(camelToSnake(item) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as LabTestCatalogItem;
+    return snakeToCamel(data) as LabTestCatalogItem;
   },
 
-  // ─── Lab Orders ───
   async getLabOrders(filters?: { status?: string; category?: string }): Promise<LabOrder[]> {
     let query = supabase
       .from("lab_orders")
@@ -36,19 +35,19 @@ export const diagnosticsService = {
     const { data, error } = await query;
     if (error) throw error;
     return (data || []).map((d: any) => ({
-      ...d,
-      results: d.lab_results,
-    })) as unknown as LabOrder[];
+      ...snakeToCamel(d),
+      results: snakeToCamel(d.lab_results),
+    })) as LabOrder[];
   },
 
   async createLabOrder(order: LabOrderInsert): Promise<LabOrder> {
     const { data, error } = await supabase
       .from("lab_orders")
-      .insert(order as any)
+      .insert(camelToSnake(order) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as LabOrder;
+    return snakeToCamel(data) as LabOrder;
   },
 
   async updateLabOrderStatus(id: string, status: string, extraFields?: Record<string, any>): Promise<void> {
@@ -67,11 +66,10 @@ export const diagnosticsService = {
     if (error) throw error;
   },
 
-  // ─── Lab Results ───
-  async saveResults(labOrderId: string, results: Omit<LabResult, "id" | "lab_order_id">[], reportNotes?: string): Promise<void> {
+  async saveResults(labOrderId: string, results: Omit<LabResult, "id" | "labOrderId">[], reportNotes?: string): Promise<void> {
     await supabase.from("lab_results").delete().eq("lab_order_id", labOrderId);
     if (results.length > 0) {
-      const rows = results.map((r) => ({ ...r, lab_order_id: labOrderId }));
+      const rows = results.map((r) => ({ ...camelToSnake(r), lab_order_id: labOrderId }));
       const { error } = await supabase.from("lab_results").insert(rows as any);
       if (error) throw error;
     }

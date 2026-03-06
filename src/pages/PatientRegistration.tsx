@@ -140,15 +140,15 @@ const PatientRegistration = () => {
 
       const regNum = await patientService.generateRegistrationNumber();
       const newPatient = await createPatient.mutateAsync({
-        registration_number: regNum,
+        registrationNumber: regNum,
         name: form.name,
         mobile: form.mobile,
         dob: form.dob,
         gender: form.gender as "Male" | "Female" | "Other",
-        emergency_contact: form.emergencyContact,
-        blood_group: form.bloodGroup,
+        emergencyContact: form.emergencyContact,
+        bloodGroup: form.bloodGroup,
         address: form.address,
-        chronic_conditions: form.chronicConditions,
+        chronicConditions: form.chronicConditions,
       });
 
       const uiPatient = snakeToCamel(newPatient) as UIPatient;
@@ -180,22 +180,22 @@ const PatientRegistration = () => {
     const checkInTime = `${now.getHours() > 12 ? now.getHours() - 12 : now.getHours()}:${now.getMinutes().toString().padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
     try {
-      const maxToken = (rawAppointments || []).reduce((max: number, a: any) => Math.max(max, a.token_no || 0), 0);
+      const maxToken = (rawAppointments || []).reduce((max: number, a: any) => Math.max(max, a.tokenNo || 0), 0);
 
       await createAppointment.mutateAsync({
-        token_no: maxToken + 1,
-        patient_name: form.name,
-        registration_number: registrationNumber,
-        patient_id: selectedPatient?.id || null,
-        doctor_name: doctor.doctorName,
-        time_slot: opdTimeSlot,
-        opd_type: opdType as any,
+        tokenNo: maxToken + 1,
+        patientName: form.name,
+        registrationNumber: registrationNumber,
+        patientId: selectedPatient?.id || null,
+        doctorName: doctor.doctorName,
+        timeSlot: opdTimeSlot,
+        opdType: opdType as any,
         status: "Waiting",
-        check_in_time: checkInTime,
-        appointment_date: opdDate,
+        checkInTime: checkInTime,
+        appointmentDate: opdDate,
         diagnosis: "",
-        doctor_notes: "",
-        follow_up_date: null,
+        doctorNotes: "",
+        followUpDate: null,
       });
 
       // Increment booked count on the slot

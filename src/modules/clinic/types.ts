@@ -2,81 +2,81 @@
 
 export interface DoctorSchedule {
   id: string;
-  hospital_id: string;
-  doctor_name: string;
+  hospitalId: string;
+  doctorName: string;
   specialization: string;
-  available_from: string;
-  available_to: string;
-  consultation_duration: number;
-  schedule_date: string;
-  created_at: string;
-  updated_at: string;
-  time_slots?: TimeSlot[];
+  availableFrom: string;
+  availableTo: string;
+  consultationDuration: number;
+  scheduleDate: string;
+  createdAt: string;
+  updatedAt: string;
+  timeSlots?: TimeSlot[];
 }
 
 export interface TimeSlot {
   id: string;
-  hospital_id: string;
-  schedule_id: string;
+  hospitalId: string;
+  scheduleId: string;
   time: string;
-  max_patients: number;
-  booked_patients: number;
-  is_active: boolean;
+  maxPatients: number;
+  bookedPatients: number;
+  isActive: boolean;
 }
 
 export interface Appointment {
   id: string;
-  hospital_id: string;
-  token_no: number;
-  patient_id: string | null;
-  patient_name: string;
-  registration_number: string;
-  doctor_name: string;
-  time_slot: string;
-  opd_type: "Normal" | "Emergency" | "Follow Up";
+  hospitalId: string;
+  tokenNo: number;
+  patientId: string | null;
+  patientName: string;
+  registrationNumber: string;
+  doctorName: string;
+  timeSlot: string;
+  opdType: "Normal" | "Emergency" | "Follow Up";
   status: "Waiting" | "In Consultation" | "Completed" | "No Show";
-  check_in_time: string;
+  checkInTime: string;
   diagnosis: string;
-  doctor_notes: string;
-  follow_up_date: string | null;
-  appointment_date: string;
-  created_at: string;
-  updated_at: string;
+  doctorNotes: string;
+  followUpDate: string | null;
+  appointmentDate: string;
+  createdAt: string;
+  updatedAt: string;
   vitals?: Vitals[];
   prescriptions?: Prescription[];
-  lab_orders?: LabOrderRef[];
+  labOrders?: LabOrderRef[];
 }
 
 export interface Vitals {
   id: string;
-  appointment_id: string;
+  appointmentId: string;
   bp: string;
   temperature: string;
   weight: string;
   height: string;
   spo2: string;
   pulse: string;
-  recorded_at: string;
+  recordedAt: string;
 }
 
 export interface Prescription {
   id: string;
-  appointment_id: string;
+  appointmentId: string;
   medicine: string;
   dosage: string;
   frequency: string;
   duration: string;
   instructions: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface LabOrderRef {
   id: string;
-  test_name: string;
+  testName: string;
   category: string;
   status: string;
 }
 
-export type AppointmentInsert = Omit<Appointment, "id" | "created_at" | "updated_at" | "hospital_id" | "vitals" | "prescriptions" | "lab_orders"> & {
-  hospital_id?: string;
+export type AppointmentInsert = Omit<Appointment, "id" | "createdAt" | "updatedAt" | "hospitalId" | "vitals" | "prescriptions" | "labOrders"> & {
+  hospitalId?: string;
 };

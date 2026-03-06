@@ -43,7 +43,7 @@ export function useUpdateAppointment() {
 export function useSaveVitals() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vitals: Omit<Vitals, "id" | "recorded_at">) => clinicService.saveVitals(vitals),
+    mutationFn: (vitals: Omit<Vitals, "id" | "recordedAt">) => clinicService.saveVitals(vitals),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic"] }),
   });
 }
@@ -51,7 +51,7 @@ export function useSaveVitals() {
 export function useSavePrescriptions() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ appointmentId, prescriptions }: { appointmentId: string; prescriptions: Omit<Prescription, "id" | "created_at" | "appointment_id">[] }) =>
+    mutationFn: ({ appointmentId, prescriptions }: { appointmentId: string; prescriptions: Omit<Prescription, "id" | "createdAt" | "appointmentId">[] }) =>
       clinicService.savePrescriptions(appointmentId, prescriptions),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic"] }),
   });
