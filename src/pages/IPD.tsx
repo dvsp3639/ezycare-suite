@@ -37,15 +37,38 @@ const admissionStatusColors: Record<AdmissionStatus, string> = {
 
 const IPD = () => {
   const { wards, beds, setBeds } = useWardsBeds();
+  const { data: dbAdmissions } = useAdmissions();
+  const { data: patientsData } = usePatients();
+  const { data: staffData } = useStaffMembers();
+  const dbPatients = patientsData || [];
+  const dbDoctors = (staffData || []).filter((s: any) => s.role === "Doctor" || s.designation?.toLowerCase().includes("doctor")).map((s: any) => ({ id: s.id, name: s.name, specialization: s.specialization || "" }));
+
   const [activeTab, setActiveTab] = useState("admissions");
-  const [admissions, setAdmissions] = useState<IPDAdmission[]>(mockAdmissions);
-  const [doctorNotes, setDoctorNotes] = useState<DoctorVisitNote[]>(mockDoctorNotes);
-  const [nurseNotes, setNurseNotes] = useState<NurseNote[]>(mockNurseNotes);
-  const [medicineEntries, setMedicineEntries] = useState<MedicineEntry[]>(mockMedicineEntries);
-  const [surgicalEntries, setSurgicalEntries] = useState<SurgicalEntry[]>(mockSurgicalEntries);
-  const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(mockDiagnosticEntries);
-  const [bedTransfers, setBedTransfers] = useState<BedTransfer[]>(mockBedTransfers);
-  const [dischargeSummaries, setDischargeSummaries] = useState<DischargeSummary[]>(mockDischargeSummaries);
+  const [admissions, setAdmissions] = useState<IPDAdmission[]>([]);
+  const [doctorNotes, setDoctorNotes] = useState<DoctorVisitNote[]>([]);
+  const [nurseNotes, setNurseNotes] = useState<NurseNote[]>([]);
+  const [medicineEntries, setMedicineEntries] = useState<MedicineEntry[]>([]);
+  const [surgicalEntries, setSurgicalEntries] = useState<SurgicalEntry[]>([]);
+  const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>([]);
+  const [bedTransfers, setBedTransfers] = useState<BedTransfer[]>([]);
+  const [dischargeSummaries, setDischargeSummaries] = useState<DischargeSummary[]>([]);
+
+  useEffect(() => {
+    if (dbAdmissions) {
+      setAdmissions(dbAdmissions.map((a: any) => ({
+        id: a.id, patientId: a.patientId || a.id, patientName: a.patientName,
+        registrationNumber: a.registrationNumber, age: a.age || 0,
+        gender: a.gender || "", contactNumber: a.contactNumber || "",
+        referredBy: a.referredBy || "", admittingDoctor: a.admittingDoctor,
+        department: a.department || "", diagnosis: a.diagnosis || "",
+        wardId: a.wardId || "", wardName: a.wardName || "",
+        bedId: a.bedId || "", bedNumber: a.bedNumber || "",
+        admissionDate: a.admissionDate, dischargeDate: a.dischargeDate,
+        status: a.status, emergencyContact: a.emergencyContact || "",
+        insuranceInfo: a.insuranceInfo || "",
+      })));
+    }
+  }, [dbAdmissions]);
 
   // Filters
   const [admSearch, setAdmSearch] = useState("");
