@@ -292,6 +292,9 @@ export default function UsersRoles() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setResetPwUser(user); setNewPassword(""); setResetPwDialogOpen(true); }}>
+                            <KeyRound className="h-4 w-4 text-warning" />
+                          </Button>
                           <Button variant="ghost" size="icon"
                             onClick={() => { setDeletingUser(user); setDeleteDialogOpen(true); }}>
                             <Trash2 className="h-4 w-4 text-destructive" />
