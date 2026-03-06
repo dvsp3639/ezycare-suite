@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Loader2, Users, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Users, Search, KeyRound } from "lucide-react";
 
 const ROLES = [
   { value: "doctor", label: "Doctor" },
