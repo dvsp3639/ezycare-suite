@@ -377,6 +377,29 @@ export default function UsersRoles() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPwDialogOpen} onOpenChange={setResetPwDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Set a new password for <strong>{resetPwUser?.full_name || resetPwUser?.email}</strong>.
+          </p>
+          <div className="space-y-2 py-2">
+            <Label>New Password</Label>
+            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPwDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={saving || newPassword.length < 6}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
