@@ -157,6 +157,26 @@ export default function UsersRoles() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetPwUser || !newPassword) return;
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiCall(`hospital-users/${resetPwUser.id}`, "PATCH", { password: newPassword });
+      toast({ title: "Success", description: "Password reset successfully" });
+      setResetPwDialogOpen(false);
+      setResetPwUser(null);
+      setNewPassword("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
     if (!search) return true;
     const q = search.toLowerCase();
