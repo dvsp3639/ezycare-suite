@@ -1002,7 +1002,7 @@ const IPD = () => {
             <div><Label>Surgeon</Label>
               <Select value={surgForm.surgeon} onValueChange={(v) => setSurgForm({ ...surgForm, surgeon: v })}>
                 <SelectTrigger><SelectValue placeholder="Select surgeon" /></SelectTrigger>
-                <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Notes</Label><Textarea value={surgForm.notes} onChange={(e) => setSurgForm({ ...surgForm, notes: e.target.value })} rows={2} /></div>
