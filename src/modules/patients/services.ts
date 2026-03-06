@@ -9,7 +9,7 @@ export const patientService = {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data || []) as unknown as Patient[];
+    return snakeToCamel(data || []) as Patient[];
   },
 
   async getByMobile(mobile: string): Promise<Patient[]> {
