@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
+import { usePatients } from "@/modules/patients/hooks";
 import {
-  mockClinicPatients,
   type DoctorSchedule,
   type QueueEntry,
   type ClinicPatient,
