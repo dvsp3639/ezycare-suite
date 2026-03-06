@@ -95,14 +95,14 @@ export const clinicService = {
   },
 
   // ─── Vitals ───
-  async saveVitals(vitals: Omit<Vitals, "id" | "recorded_at">): Promise<Vitals> {
+  async saveVitals(vitals: Omit<Vitals, "id" | "recordedAt">): Promise<Vitals> {
     const { data, error } = await supabase
       .from("vitals")
-      .insert(vitals as any)
+      .insert(camelToSnake(vitals) as any)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as Vitals;
+    return snakeToCamel(data) as Vitals;
   },
 
   // ─── Prescriptions ───
