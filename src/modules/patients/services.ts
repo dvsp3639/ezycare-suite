@@ -44,12 +44,12 @@ export const patientService = {
   async update(id: string, updates: PatientUpdate): Promise<Patient> {
     const { data, error } = await supabase
       .from("patients")
-      .update(updates as any)
+      .update(camelToSnake(updates) as any)
       .eq("id", id)
       .select()
       .single();
     if (error) throw error;
-    return data as unknown as Patient;
+    return snakeToCamel(data) as Patient;
   },
 
   async delete(id: string): Promise<void> {
