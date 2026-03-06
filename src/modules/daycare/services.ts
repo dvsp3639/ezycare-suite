@@ -56,7 +56,7 @@ export const daycareService = {
     if (error) throw error;
   },
 
-  async createBill(bill: Partial<DayCareBill>, items: Omit<DayCareBillItem, "id" | "billId" | "hospitalId">[]): Promise<DayCareBill> {
+  async createBill(bill: Partial<DayCareBill>, items: Omit<DayCareBillItem, "id" | "bill_id" | "hospital_id">[]): Promise<DayCareBill> {
     const { data: billData, error: billError } = await supabase
       .from("daycare_bills")
       .insert(camelToSnake(bill) as any)

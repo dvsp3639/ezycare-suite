@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Loader2, Users, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Users, Search, KeyRound } from "lucide-react";
 
 const ROLES = [
   { value: "doctor", label: "Doctor" },
@@ -56,8 +56,11 @@ export default function UsersRoles() {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resetPwDialogOpen, setResetPwDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
+  const [resetPwUser, setResetPwUser] = useState<StaffUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [form, setForm] = useState<FormData>(emptyForm);
   const [filterRole, setFilterRole] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -147,6 +150,26 @@ export default function UsersRoles() {
       setDeleteDialogOpen(false);
       setDeletingUser(null);
       fetchUsers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPwUser || !newPassword) return;
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiCall(`hospital-users/${resetPwUser.id}`, "PATCH", { password: newPassword });
+      toast({ title: "Success", description: "Password reset successfully" });
+      setResetPwDialogOpen(false);
+      setResetPwUser(null);
+      setNewPassword("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -269,6 +292,9 @@ export default function UsersRoles() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setResetPwUser(user); setNewPassword(""); setResetPwDialogOpen(true); }}>
+                            <KeyRound className="h-4 w-4 text-warning" />
+                          </Button>
                           <Button variant="ghost" size="icon"
                             onClick={() => { setDeletingUser(user); setDeleteDialogOpen(true); }}>
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -347,6 +373,29 @@ export default function UsersRoles() {
             <Button variant="destructive" onClick={handleDelete} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPwDialogOpen} onOpenChange={setResetPwDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Set a new password for <strong>{resetPwUser?.full_name || resetPwUser?.email}</strong>.
+          </p>
+          <div className="space-y-2 py-2">
+            <Label>New Password</Label>
+            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPwDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={saving || newPassword.length < 6}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Reset Password
             </Button>
           </DialogFooter>
         </DialogContent>

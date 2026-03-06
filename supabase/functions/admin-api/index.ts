@@ -203,6 +203,36 @@ serve(async (req) => {
         });
       }
 
+      // Password reset for hospital users
+      if (hospitalUserMatch && method === "PATCH") {
+        const roleId = hospitalUserMatch[1];
+        const body = await req.json();
+        const { password } = body;
+
+        if (!password || password.length < 6) {
+          throw new Error("Password must be at least 6 characters");
+        }
+
+        const { data: roleRecord } = await adminClient
+          .from("user_roles")
+          .select("user_id, hospital_id")
+          .eq("id", roleId)
+          .single();
+
+        if (!roleRecord) throw new Error("User role not found");
+        if (roleRecord.hospital_id !== adminHospitalId) throw new Error("Access denied");
+
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(
+          roleRecord.user_id,
+          { password }
+        );
+        if (updateError) throw updateError;
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       if (hospitalUserMatch && method === "DELETE") {
         const roleId = hospitalUserMatch[1];
         const { data: roleRecord } = await adminClient
