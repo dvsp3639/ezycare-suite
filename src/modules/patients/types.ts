@@ -2,22 +2,22 @@
 
 export interface Patient {
   id: string;
-  hospital_id: string;
-  registration_number: string;
+  hospitalId: string;
+  registrationNumber: string;
   name: string;
   mobile: string;
   dob: string | null;
   gender: "Male" | "Female" | "Other";
-  emergency_contact: string;
-  blood_group: string;
+  emergencyContact: string;
+  bloodGroup: string;
   address: string;
-  chronic_conditions: string;
-  created_at: string;
-  updated_at: string;
+  chronicConditions: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export type PatientInsert = Omit<Patient, "id" | "created_at" | "updated_at" | "hospital_id"> & {
-  hospital_id?: string;
+export type PatientInsert = Omit<Patient, "id" | "createdAt" | "updatedAt" | "hospitalId"> & {
+  hospitalId?: string;
 };
 
-export type PatientUpdate = Partial<Omit<Patient, "id" | "created_at" | "updated_at" | "hospital_id">>;
+export type PatientUpdate = Partial<Omit<Patient, "id" | "createdAt" | "updatedAt" | "hospitalId">>;
