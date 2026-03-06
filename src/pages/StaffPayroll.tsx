@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,19 +11,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
-  Users, Search, Plus, User, Phone, Edit, Eye, Trash2, CheckCircle, XCircle,
+  Users, Search, Plus, User, Eye, CheckCircle, XCircle,
   Clock, IndianRupee, Calendar, FileText, ClipboardList, BadgeCheck,
-  AlertTriangle,
+  AlertTriangle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockStaff, mockSalaryRecords, mockAdvances, mockAttendance, mockLeaveRequests,
-  staffRoles, leaveTypes, roleColors,
-  type StaffMember, type StaffRole, type SalaryRecord, type SalaryAdvance,
-  type AttendanceRecord, type AttendanceStatus, type LeaveRequest, type LeaveStatus,
-} from "@/data/mockStaffData";
+  useStaffMembers, useSalaryRecords, useSalaryAdvances, useAttendance, useLeaveRequests,
+  useCreateStaff, useUpdateStaff, useCreateSalaryRecord, useUpdateSalaryRecord,
+  useCreateAttendance, useUpdateAttendance, useCreateLeaveRequest, useUpdateLeaveRequest,
+  useCreateAdvance, useUpdateAdvance,
+} from "@/modules/staff/hooks";
+import type { StaffMember, SalaryRecord, AttendanceRecord, LeaveRequest, SalaryAdvance } from "@/modules/staff/types";
 
-const attendanceColors: Record<AttendanceStatus, string> = {
+const staffRoles = ["Doctor", "Nurse", "Technician", "Pharmacist", "Admin", "Receptionist", "Housekeeping", "Security", "Driver"];
+const leaveTypes = ["Casual", "Sick", "Earned", "Maternity", "Paternity", "Unpaid"];
+
+const roleColors: Record<string, string> = {
+  Doctor: "bg-primary/10 text-primary border-primary/20",
+  Nurse: "bg-info/10 text-info border-info/20",
+  Technician: "bg-warning/10 text-warning border-warning/20",
+  Pharmacist: "bg-success/10 text-success border-success/30",
+  Admin: "bg-accent text-accent-foreground border-accent",
+  Receptionist: "bg-muted text-muted-foreground border-border",
+  Housekeeping: "bg-muted text-muted-foreground border-border",
+  Security: "bg-muted text-muted-foreground border-border",
+  Driver: "bg-muted text-muted-foreground border-border",
+};
+
+const attendanceColors: Record<string, string> = {
   Present: "bg-success/10 text-success border-success/30",
   Absent: "bg-destructive/10 text-destructive border-destructive/30",
   "Half Day": "bg-warning/10 text-warning border-warning/30",
@@ -31,7 +47,7 @@ const attendanceColors: Record<AttendanceStatus, string> = {
   Holiday: "bg-muted text-muted-foreground border-border",
 };
 
-const leaveStatusColors: Record<LeaveStatus, string> = {
+const leaveStatusColors: Record<string, string> = {
   Pending: "bg-warning/10 text-warning border-warning/30",
   Approved: "bg-success/10 text-success border-success/30",
   Rejected: "bg-destructive/10 text-destructive border-destructive/30",
@@ -39,13 +55,6 @@ const leaveStatusColors: Record<LeaveStatus, string> = {
 
 const StaffPayroll = () => {
   const [activeTab, setActiveTab] = useState("staff");
-  const [staff, setStaff] = useState<StaffMember[]>(mockStaff);
-  const [salaries, setSalaries] = useState<SalaryRecord[]>(mockSalaryRecords);
-  const [advances, setAdvances] = useState<SalaryAdvance[]>(mockAdvances);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(mockAttendance);
-  const [leaves, setLeaves] = useState<LeaveRequest[]>(mockLeaveRequests);
-
-  // Filters
   const [staffSearch, setStaffSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
@@ -60,103 +69,190 @@ const StaffPayroll = () => {
 
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
-  const [advanceForm, setAdvanceForm] = useState({ staffId: "", amount: 0, reason: "", repaymentMonths: 3 });
-  const [leaveForm, setLeaveForm] = useState({ staffId: "", leaveType: "Casual" as string, fromDate: "", toDate: "", reason: "" });
+  const [advanceForm, setAdvanceForm] = useState({ staff_id: "", amount: 0, reason: "", repayment_months: 3 });
+  const [leaveForm, setLeaveForm] = useState({ staff_id: "", leave_type: "Casual", from_date: "", to_date: "", reason: "" });
+
+  // Queries
+  const { data: staff = [], isLoading: loadingStaff } = useStaffMembers(
+    roleFilter !== "all" ? { role: roleFilter } : undefined
+  );
+  const { data: salaries = [] } = useSalaryRecords();
+  const { data: advances = [] } = useSalaryAdvances();
+  const { data: attendance = [] } = useAttendance(attendanceDate);
+  const { data: leaves = [] } = useLeaveRequests();
+
+  // Mutations
+  const createStaff = useCreateStaff();
+  const createAttendanceMut = useCreateAttendance();
+  const updateAttendanceMut = useUpdateAttendance();
+  const createLeaveMut = useCreateLeaveRequest();
+  const updateLeaveMut = useUpdateLeaveRequest();
+  const updateSalaryMut = useUpdateSalaryRecord();
+  const createAdvanceMut = useCreateAdvance();
+  const updateAdvanceMut = useUpdateAdvance();
 
   // Computed
   const filteredStaff = useMemo(() => staff.filter((s) => {
-    const matchSearch = !staffSearch || s.name.toLowerCase().includes(staffSearch.toLowerCase()) || s.employeeId.toLowerCase().includes(staffSearch.toLowerCase());
-    const matchRole = roleFilter === "all" || s.role === roleFilter;
-    return matchSearch && matchRole;
-  }), [staff, staffSearch, roleFilter]);
+    if (!staffSearch) return true;
+    const q = staffSearch.toLowerCase();
+    return s.name.toLowerCase().includes(q) || s.employee_id.toLowerCase().includes(q);
+  }), [staff, staffSearch]);
 
   const totalStaff = staff.length;
   const activeStaff = staff.filter((s) => s.status === "Active").length;
-  const totalSalaryBill = salaries.filter((s) => s.month === "2026-03").reduce((sum, s) => sum + s.netSalary, 0);
+  const totalSalaryBill = salaries.reduce((sum, s) => sum + (s.net_salary || 0), 0);
   const pendingLeaves = leaves.filter((l) => l.status === "Pending").length;
 
   // Handlers
-  const handleAddStaff = () => {
-    if (!staffForm.name || !staffForm.employeeId) { toast.error("Name and Employee ID required"); return; }
-    const newStaff: StaffMember = {
-      id: `s-${Date.now()}`, employeeId: staffForm.employeeId || "", name: staffForm.name || "",
-      role: (staffForm.role as StaffRole) || "Admin", department: staffForm.department || "",
-      designation: staffForm.designation || "", employmentType: staffForm.employmentType || "Full-Time",
-      joiningDate: staffForm.joiningDate || new Date().toISOString().split("T")[0],
-      phone: staffForm.phone || "", email: staffForm.email || "", address: staffForm.address || "",
-      emergencyContact: staffForm.emergencyContact || "", bloodGroup: staffForm.bloodGroup || "",
-      qualification: staffForm.qualification || "", specialization: staffForm.specialization,
-      aadharNo: staffForm.aadharNo || "", panNo: staffForm.panNo || "",
-      bankAccount: staffForm.bankAccount || "", bankName: staffForm.bankName || "", ifscCode: staffForm.ifscCode || "",
-      baseSalary: staffForm.baseSalary || 0, status: "Active",
-    };
-    setStaff((prev) => [...prev, newStaff]);
-    toast.success(`${newStaff.name} added`);
-    setShowAddStaff(false);
-    setStaffForm({});
+  const handleAddStaff = async () => {
+    if (!staffForm.name || !staffForm.employee_id) { toast.error("Name and Employee ID required"); return; }
+    try {
+      await createStaff.mutateAsync({
+        employee_id: staffForm.employee_id,
+        name: staffForm.name,
+        role: staffForm.role || "Admin",
+        department: staffForm.department || "",
+        designation: staffForm.designation || "",
+        employment_type: staffForm.employment_type || "Full-Time",
+        joining_date: staffForm.joining_date || null,
+        phone: staffForm.phone || "",
+        email: staffForm.email || "",
+        address: staffForm.address || "",
+        emergency_contact: staffForm.emergency_contact || "",
+        blood_group: staffForm.blood_group || "",
+        qualification: staffForm.qualification || "",
+        specialization: staffForm.specialization || "",
+        aadhar_no: staffForm.aadhar_no || "",
+        pan_no: staffForm.pan_no || "",
+        bank_account: staffForm.bank_account || "",
+        bank_name: staffForm.bank_name || "",
+        ifsc_code: staffForm.ifsc_code || "",
+        base_salary: staffForm.base_salary || 0,
+        status: "Active",
+      });
+      toast.success(`${staffForm.name} added`);
+      setShowAddStaff(false);
+      setStaffForm({});
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add staff");
+    }
   };
 
-  const handleRequestAdvance = () => {
-    if (!advanceForm.staffId || advanceForm.amount <= 0) { toast.error("Select staff and enter amount"); return; }
-    const s = staff.find((x) => x.id === advanceForm.staffId);
-    const adv: SalaryAdvance = {
-      id: `adv-${Date.now()}`, staffId: advanceForm.staffId, staffName: s?.name || "",
-      amount: advanceForm.amount, requestDate: new Date().toISOString().split("T")[0],
-      reason: advanceForm.reason, status: "Pending", repaymentMonths: advanceForm.repaymentMonths,
-      monthlyDeduction: Math.ceil(advanceForm.amount / advanceForm.repaymentMonths),
-    };
-    setAdvances((prev) => [adv, ...prev]);
-    toast.success("Advance request submitted");
-    setShowAdvanceDialog(false);
-    setAdvanceForm({ staffId: "", amount: 0, reason: "", repaymentMonths: 3 });
+  const handleRequestAdvance = async () => {
+    if (!advanceForm.staff_id || advanceForm.amount <= 0) { toast.error("Select staff and enter amount"); return; }
+    const s = staff.find((x) => x.id === advanceForm.staff_id);
+    try {
+      await createAdvanceMut.mutateAsync({
+        staff_id: advanceForm.staff_id,
+        staff_name: s?.name || "",
+        amount: advanceForm.amount,
+        reason: advanceForm.reason,
+        repayment_months: advanceForm.repayment_months,
+        monthly_deduction: Math.ceil(advanceForm.amount / advanceForm.repayment_months),
+        status: "Pending",
+      });
+      toast.success("Advance request submitted");
+      setShowAdvanceDialog(false);
+      setAdvanceForm({ staff_id: "", amount: 0, reason: "", repayment_months: 3 });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
-  const handleApproveAdvance = (id: string) => {
-    setAdvances((prev) => prev.map((a) => a.id === id ? { ...a, status: "Approved" as const, approvedBy: "Admin" } : a));
+  const handleApproveAdvance = async (id: string) => {
+    await updateAdvanceMut.mutateAsync({ id, updates: { status: "Approved", approved_by: "Admin" } });
     toast.success("Advance approved");
   };
 
-  const handleRejectAdvance = (id: string) => {
-    setAdvances((prev) => prev.map((a) => a.id === id ? { ...a, status: "Rejected" as const } : a));
+  const handleRejectAdvance = async (id: string) => {
+    await updateAdvanceMut.mutateAsync({ id, updates: { status: "Rejected" } });
     toast.info("Advance rejected");
   };
 
-  const handleApplyLeave = () => {
-    if (!leaveForm.staffId || !leaveForm.fromDate || !leaveForm.toDate) { toast.error("Fill all fields"); return; }
-    const s = staff.find((x) => x.id === leaveForm.staffId);
-    const from = new Date(leaveForm.fromDate);
-    const to = new Date(leaveForm.toDate);
+  const handleApplyLeave = async () => {
+    if (!leaveForm.staff_id || !leaveForm.from_date || !leaveForm.to_date) { toast.error("Fill all fields"); return; }
+    const s = staff.find((x) => x.id === leaveForm.staff_id);
+    const from = new Date(leaveForm.from_date);
+    const to = new Date(leaveForm.to_date);
     const days = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    const lv: LeaveRequest = {
-      id: `lv-${Date.now()}`, staffId: leaveForm.staffId, staffName: s?.name || "",
-      leaveType: leaveForm.leaveType as any, fromDate: leaveForm.fromDate, toDate: leaveForm.toDate,
-      days, reason: leaveForm.reason, status: "Pending", appliedDate: new Date().toISOString().split("T")[0],
-    };
-    setLeaves((prev) => [lv, ...prev]);
-    toast.success("Leave request submitted");
-    setShowLeaveDialog(false);
-    setLeaveForm({ staffId: "", leaveType: "Casual", fromDate: "", toDate: "", reason: "" });
+    try {
+      await createLeaveMut.mutateAsync({
+        staff_id: leaveForm.staff_id,
+        staff_name: s?.name || "",
+        leave_type: leaveForm.leave_type,
+        from_date: leaveForm.from_date,
+        to_date: leaveForm.to_date,
+        days,
+        reason: leaveForm.reason,
+        status: "Pending",
+      });
+      toast.success("Leave request submitted");
+      setShowLeaveDialog(false);
+      setLeaveForm({ staff_id: "", leave_type: "Casual", from_date: "", to_date: "", reason: "" });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
-  const handleApproveLeave = (id: string) => {
-    setLeaves((prev) => prev.map((l) => l.id === id ? { ...l, status: "Approved" as const, approvedBy: "Admin" } : l));
+  const handleApproveLeave = async (id: string) => {
+    await updateLeaveMut.mutateAsync({ id, updates: { status: "Approved", approved_by: "Admin" } });
     toast.success("Leave approved");
   };
 
-  const handleRejectLeave = (id: string) => {
-    setLeaves((prev) => prev.map((l) => l.id === id ? { ...l, status: "Rejected" as const } : l));
+  const handleRejectLeave = async (id: string) => {
+    await updateLeaveMut.mutateAsync({ id, updates: { status: "Rejected" } });
     toast.info("Leave rejected");
   };
 
-  const handleProcessSalary = (id: string) => {
-    setSalaries((prev) => prev.map((s) => s.id === id ? { ...s, status: "Processed" as const } : s));
+  const handleProcessSalary = async (id: string) => {
+    await updateSalaryMut.mutateAsync({ id, updates: { status: "Processed" } });
     toast.success("Salary processed");
   };
 
-  const handlePaySalary = (id: string) => {
-    setSalaries((prev) => prev.map((s) => s.id === id ? { ...s, status: "Paid" as const, paidDate: new Date().toISOString().split("T")[0] } : s));
+  const handlePaySalary = async (id: string) => {
+    await updateSalaryMut.mutateAsync({ id, updates: { status: "Paid", paid_date: new Date().toISOString().split("T")[0] } });
     toast.success("Salary marked as paid");
   };
+
+  const handleMarkPresent = async (s: StaffMember) => {
+    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    await createAttendanceMut.mutateAsync({
+      staff_id: s.id, staff_name: s.name, attendance_date: attendanceDate, check_in: now, status: "Present",
+    });
+    toast.success(`${s.name} checked in at ${now}`);
+  };
+
+  const handleMarkHalfDay = async (s: StaffMember) => {
+    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    await createAttendanceMut.mutateAsync({
+      staff_id: s.id, staff_name: s.name, attendance_date: attendanceDate, check_in: now, status: "Half Day", hours_worked: 4,
+    });
+    toast.success(`${s.name} marked as half day`);
+  };
+
+  const handleMarkAbsent = async (s: StaffMember) => {
+    await createAttendanceMut.mutateAsync({
+      staff_id: s.id, staff_name: s.name, attendance_date: attendanceDate, status: "Absent",
+    });
+    toast.info(`${s.name} marked absent`);
+  };
+
+  const handleClockOut = async (a: AttendanceRecord) => {
+    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const hoursWorked = a.check_in
+      ? Math.round((Date.now() - new Date(`${a.attendance_date} ${a.check_in}`).getTime()) / (1000 * 60 * 60) * 10) / 10
+      : null;
+    await updateAttendanceMut.mutateAsync({ id: a.id, updates: { check_out: now, hours_worked: hoursWorked } });
+    toast.success(`${a.staff_name} checked out at ${now}`);
+  };
+
+  if (loadingStaff) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
@@ -167,7 +263,7 @@ const StaffPayroll = () => {
           </h1>
           <p className="text-sm text-muted-foreground">Staff profiles, attendance, leaves & salary management</p>
         </div>
-        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employmentType: "Full-Time" }); }}>
+        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employment_type: "Full-Time" }); }}>
           <Plus className="h-4 w-4 mr-1" /> Add Staff
         </Button>
       </div>
@@ -176,7 +272,7 @@ const StaffPayroll = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <SCard label="Total Staff" value={totalStaff} icon={<Users className="h-4 w-4" />} accent="text-primary" />
         <SCard label="Active" value={activeStaff} icon={<BadgeCheck className="h-4 w-4" />} accent="text-success" />
-        <SCard label="Salary Bill (Mar)" value={`₹${(totalSalaryBill / 1000).toFixed(0)}K`} icon={<IndianRupee className="h-4 w-4" />} accent="text-info" />
+        <SCard label="Salary Bill" value={`₹${(totalSalaryBill / 1000).toFixed(0)}K`} icon={<IndianRupee className="h-4 w-4" />} accent="text-info" />
         <SCard label="Pending Leaves" value={pendingLeaves} icon={<AlertTriangle className="h-4 w-4" />} accent="text-warning" />
       </div>
 
@@ -223,12 +319,12 @@ const StaffPayroll = () => {
                 {filteredStaff.map((s) => (
                   <TableRow key={s.id} className="hover:bg-muted/30">
                     <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{s.employeeId}</TableCell>
-                    <TableCell><Badge variant="outline" className={cn("text-xs", roleColors[s.role])}>{s.role}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.employee_id}</TableCell>
+                    <TableCell><Badge variant="outline" className={cn("text-xs", roleColors[s.role] || "")}>{s.role}</Badge></TableCell>
                     <TableCell className="text-sm">{s.department}</TableCell>
                     <TableCell className="text-xs">{s.phone}</TableCell>
-                    <TableCell className="text-xs">{s.employmentType}</TableCell>
-                    <TableCell className="text-sm font-medium">₹{s.baseSalary.toLocaleString()}</TableCell>
+                    <TableCell className="text-xs">{s.employment_type}</TableCell>
+                    <TableCell className="text-sm font-medium">₹{(s.base_salary || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedStaff(s); setShowStaffProfile(true); }}>
                         <Eye className="h-3.5 w-3.5" />
@@ -236,6 +332,9 @@ const StaffPayroll = () => {
                     </TableCell>
                   </TableRow>
                 ))}
+                {filteredStaff.length === 0 && (
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff members found. Click "Add Staff" to create one.</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -249,21 +348,10 @@ const StaffPayroll = () => {
               <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="w-[170px] h-9" />
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground ml-2">
-              {(() => {
-                const dayAttendance = attendance.filter((a) => a.date === attendanceDate);
-                const present = dayAttendance.filter((a) => a.status === "Present").length;
-                const absent = dayAttendance.filter((a) => a.status === "Absent").length;
-                const onLeave = dayAttendance.filter((a) => a.status === "On Leave").length;
-                const halfDay = dayAttendance.filter((a) => a.status === "Half Day").length;
-                return (
-                  <>
-                    <span className="text-success font-semibold">{present} Present</span>
-                    <span className="text-destructive font-semibold">{absent} Absent</span>
-                    <span className="text-info font-semibold">{onLeave} On Leave</span>
-                    <span className="text-warning font-semibold">{halfDay} Half Day</span>
-                  </>
-                );
-              })()}
+              <span className="text-success font-semibold">{attendance.filter((a) => a.status === "Present").length} Present</span>
+              <span className="text-destructive font-semibold">{attendance.filter((a) => a.status === "Absent").length} Absent</span>
+              <span className="text-info font-semibold">{attendance.filter((a) => a.status === "On Leave").length} On Leave</span>
+              <span className="text-warning font-semibold">{attendance.filter((a) => a.status === "Half Day").length} Half Day</span>
             </div>
             <Button size="sm" className="ml-auto" onClick={() => setShowMarkAttendance(true)}>
               <Plus className="h-4 w-4 mr-1" /> Mark Attendance
@@ -271,15 +359,13 @@ const StaffPayroll = () => {
           </div>
 
           <p className="text-xs text-muted-foreground mb-3">
-            💡 <strong>How attendance works:</strong> Click "Mark Attendance" to record check-in for staff. When they leave, click the clock-out button next to their entry. The system auto-calculates hours worked and overtime.
+            💡 <strong>How attendance works:</strong> Click "Mark Attendance" to record check-in. When staff leave, click clock-out. Hours are auto-calculated.
           </p>
 
           {(() => {
-            const dayRecords = attendance.filter((a) => a.date === attendanceDate);
-            const unmarkedStaff = staff.filter((s) => s.status === "Active" && !dayRecords.find((r) => r.staffId === s.id));
+            const unmarkedStaff = staff.filter((s) => s.status === "Active" && !attendance.find((r) => r.staff_id === s.id));
             return (
               <div className="space-y-4">
-                {/* Unmarked Staff Warning */}
                 {unmarkedStaff.length > 0 && (
                   <div className="rounded-lg bg-warning/5 border border-warning/20 p-3">
                     <p className="text-xs font-semibold text-warning mb-2 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {unmarkedStaff.length} staff not yet marked for {attendanceDate}</p>
@@ -291,7 +377,6 @@ const StaffPayroll = () => {
                   </div>
                 )}
 
-                {/* Attendance Records */}
                 <div className="rounded-lg border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -307,27 +392,20 @@ const StaffPayroll = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {dayRecords.map((a) => {
-                        const staffMember = staff.find((s) => s.id === a.staffId);
+                      {attendance.map((a) => {
+                        const staffMember = staff.find((s) => s.id === a.staff_id);
                         return (
                           <TableRow key={a.id}>
-                            <TableCell className="font-medium">{a.staffName}</TableCell>
-                            <TableCell><Badge variant="outline" className={cn("text-[10px]", staffMember ? roleColors[staffMember.role] : "")}>{staffMember?.role}</Badge></TableCell>
-                            <TableCell className="text-sm font-medium text-success">{a.checkIn || "—"}</TableCell>
-                            <TableCell className="text-sm font-medium text-destructive">{a.checkOut || "—"}</TableCell>
-                            <TableCell className="text-sm">{a.hoursWorked ? <span className="font-semibold">{a.hoursWorked}h</span> : "—"}</TableCell>
-                            <TableCell><Badge variant="outline" className={cn("text-xs", attendanceColors[a.status])}>{a.status}</Badge></TableCell>
+                            <TableCell className="font-medium">{a.staff_name}</TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-[10px]", staffMember ? roleColors[staffMember.role] || "" : "")}>{staffMember?.role}</Badge></TableCell>
+                            <TableCell className="text-sm font-medium text-success">{a.check_in || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-destructive">{a.check_out || "—"}</TableCell>
+                            <TableCell className="text-sm">{a.hours_worked ? <span className="font-semibold">{a.hours_worked}h</span> : "—"}</TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-xs", attendanceColors[a.status] || "")}>{a.status}</Badge></TableCell>
                             <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{a.notes || "—"}</TableCell>
                             <TableCell className="text-right">
-                              {a.checkIn && !a.checkOut && a.status === "Present" && (
-                                <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => {
-                                  const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-                                  setAttendance((prev) => prev.map((r) => r.id === a.id ? {
-                                    ...r, checkOut: now,
-                                    hoursWorked: Math.round((Date.now() - new Date(`${a.date} ${a.checkIn}`).getTime()) / (1000 * 60 * 60) * 10) / 10,
-                                  } : r));
-                                  toast.success(`${a.staffName} checked out at ${now}`);
-                                }}>
+                              {a.check_in && !a.check_out && a.status === "Present" && (
+                                <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => handleClockOut(a)}>
                                   <Clock className="h-3 w-3 mr-1" /> Clock Out
                                 </Button>
                               )}
@@ -335,8 +413,8 @@ const StaffPayroll = () => {
                           </TableRow>
                         );
                       })}
-                      {dayRecords.length === 0 && (
-                        <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No attendance records for this date. Click "Mark Attendance" to start.</TableCell></TableRow>
+                      {attendance.length === 0 && (
+                        <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No attendance records for this date.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -369,13 +447,13 @@ const StaffPayroll = () => {
               <TableBody>
                 {leaves.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.staffName}</TableCell>
-                    <TableCell className="text-sm">{l.leaveType}</TableCell>
-                    <TableCell className="text-xs">{l.fromDate}</TableCell>
-                    <TableCell className="text-xs">{l.toDate}</TableCell>
+                    <TableCell className="font-medium">{l.staff_name}</TableCell>
+                    <TableCell className="text-sm">{l.leave_type}</TableCell>
+                    <TableCell className="text-xs">{l.from_date}</TableCell>
+                    <TableCell className="text-xs">{l.to_date}</TableCell>
                     <TableCell className="text-sm">{l.days}</TableCell>
                     <TableCell className="text-xs max-w-[150px] truncate">{l.reason}</TableCell>
-                    <TableCell><Badge variant="outline" className={cn("text-xs", leaveStatusColors[l.status])}>{l.status}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={cn("text-xs", leaveStatusColors[l.status || ""] || "")}>{l.status}</Badge></TableCell>
                     <TableCell className="text-right">
                       {l.status === "Pending" && (
                         <div className="flex gap-1 justify-end">
@@ -409,16 +487,16 @@ const StaffPayroll = () => {
               </TableHeader>
               <TableBody>
                 {salaries.map((s) => {
-                  const allowances = s.hra + s.da + s.specialAllowance + s.overtime;
-                  const deductions = s.deductions + s.pf + s.esi + s.tax + s.advance;
+                  const allowances = (s.hra || 0) + (s.da || 0) + (s.special_allowance || 0) + (s.overtime || 0);
+                  const deductions = (s.deductions || 0) + (s.pf || 0) + (s.esi || 0) + (s.tax || 0) + (s.advance || 0);
                   return (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.staffName}</TableCell>
+                      <TableCell className="font-medium">{s.staff_name}</TableCell>
                       <TableCell className="text-sm">{s.month}</TableCell>
-                      <TableCell className="text-sm">₹{s.baseSalary.toLocaleString()}</TableCell>
+                      <TableCell className="text-sm">₹{(s.base_salary || 0).toLocaleString()}</TableCell>
                       <TableCell className="text-sm text-success">+₹{allowances.toLocaleString()}</TableCell>
                       <TableCell className="text-sm text-destructive">-₹{deductions.toLocaleString()}</TableCell>
-                      <TableCell className="text-sm font-bold">₹{s.netSalary.toLocaleString()}</TableCell>
+                      <TableCell className="text-sm font-bold">₹{(s.net_salary || 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn("text-xs",
                           s.status === "Paid" ? "bg-success/10 text-success" : s.status === "Processed" ? "bg-info/10 text-info" : "bg-warning/10 text-warning"
@@ -458,11 +536,11 @@ const StaffPayroll = () => {
               <TableBody>
                 {advances.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.staffName}</TableCell>
+                    <TableCell className="font-medium">{a.staff_name}</TableCell>
                     <TableCell className="text-sm font-bold">₹{a.amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-xs">{a.requestDate}</TableCell>
+                    <TableCell className="text-xs">{a.request_date}</TableCell>
                     <TableCell className="text-xs max-w-[150px] truncate">{a.reason}</TableCell>
-                    <TableCell className="text-xs">{a.repaymentMonths ? `${a.repaymentMonths} months (₹${a.monthlyDeduction}/mo)` : "—"}</TableCell>
+                    <TableCell className="text-xs">{a.repayment_months ? `${a.repayment_months} months (₹${a.monthly_deduction}/mo)` : "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn("text-xs",
                         a.status === "Approved" ? "bg-success/10 text-success" : a.status === "Pending" ? "bg-warning/10 text-warning" : a.status === "Repaid" ? "bg-info/10 text-info" : "bg-destructive/10 text-destructive"
@@ -493,11 +571,11 @@ const StaffPayroll = () => {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Name</Label><Input value={staffForm.name || ""} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} /></div>
-              <div><Label>Employee ID</Label><Input value={staffForm.employeeId || ""} onChange={(e) => setStaffForm({ ...staffForm, employeeId: e.target.value })} /></div>
+              <div><Label>Employee ID</Label><Input value={staffForm.employee_id || ""} onChange={(e) => setStaffForm({ ...staffForm, employee_id: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Role</Label>
-                <Select value={staffForm.role || "Nurse"} onValueChange={(v) => setStaffForm({ ...staffForm, role: v as StaffRole })}>
+                <Select value={staffForm.role || "Nurse"} onValueChange={(v) => setStaffForm({ ...staffForm, role: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{staffRoles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                 </Select>
@@ -507,7 +585,7 @@ const StaffPayroll = () => {
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Designation</Label><Input value={staffForm.designation || ""} onChange={(e) => setStaffForm({ ...staffForm, designation: e.target.value })} /></div>
               <div><Label>Employment Type</Label>
-                <Select value={staffForm.employmentType || "Full-Time"} onValueChange={(v) => setStaffForm({ ...staffForm, employmentType: v as any })}>
+                <Select value={staffForm.employment_type || "Full-Time"} onValueChange={(v) => setStaffForm({ ...staffForm, employment_type: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="Full-Time">Full-Time</SelectItem><SelectItem value="Part-Time">Part-Time</SelectItem><SelectItem value="Contract">Contract</SelectItem><SelectItem value="Visiting">Visiting</SelectItem></SelectContent>
                 </Select>
@@ -523,22 +601,24 @@ const StaffPayroll = () => {
               <div><Label>Specialization</Label><Input value={staffForm.specialization || ""} onChange={(e) => setStaffForm({ ...staffForm, specialization: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><Label>Blood Group</Label><Input value={staffForm.bloodGroup || ""} onChange={(e) => setStaffForm({ ...staffForm, bloodGroup: e.target.value })} /></div>
-              <div><Label>Aadhar No</Label><Input value={staffForm.aadharNo || ""} onChange={(e) => setStaffForm({ ...staffForm, aadharNo: e.target.value })} /></div>
-              <div><Label>PAN No</Label><Input value={staffForm.panNo || ""} onChange={(e) => setStaffForm({ ...staffForm, panNo: e.target.value })} /></div>
+              <div><Label>Blood Group</Label><Input value={staffForm.blood_group || ""} onChange={(e) => setStaffForm({ ...staffForm, blood_group: e.target.value })} /></div>
+              <div><Label>Aadhar No</Label><Input value={staffForm.aadhar_no || ""} onChange={(e) => setStaffForm({ ...staffForm, aadhar_no: e.target.value })} /></div>
+              <div><Label>PAN No</Label><Input value={staffForm.pan_no || ""} onChange={(e) => setStaffForm({ ...staffForm, pan_no: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><Label>Bank Account</Label><Input value={staffForm.bankAccount || ""} onChange={(e) => setStaffForm({ ...staffForm, bankAccount: e.target.value })} /></div>
-              <div><Label>Bank Name</Label><Input value={staffForm.bankName || ""} onChange={(e) => setStaffForm({ ...staffForm, bankName: e.target.value })} /></div>
-              <div><Label>IFSC Code</Label><Input value={staffForm.ifscCode || ""} onChange={(e) => setStaffForm({ ...staffForm, ifscCode: e.target.value })} /></div>
+              <div><Label>Bank Account</Label><Input value={staffForm.bank_account || ""} onChange={(e) => setStaffForm({ ...staffForm, bank_account: e.target.value })} /></div>
+              <div><Label>Bank Name</Label><Input value={staffForm.bank_name || ""} onChange={(e) => setStaffForm({ ...staffForm, bank_name: e.target.value })} /></div>
+              <div><Label>IFSC Code</Label><Input value={staffForm.ifsc_code || ""} onChange={(e) => setStaffForm({ ...staffForm, ifsc_code: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Emergency Contact</Label><Input value={staffForm.emergencyContact || ""} onChange={(e) => setStaffForm({ ...staffForm, emergencyContact: e.target.value })} /></div>
-              <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.baseSalary || 0} onChange={(e) => setStaffForm({ ...staffForm, baseSalary: +e.target.value })} /></div>
+              <div><Label>Emergency Contact</Label><Input value={staffForm.emergency_contact || ""} onChange={(e) => setStaffForm({ ...staffForm, emergency_contact: e.target.value })} /></div>
+              <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.base_salary || 0} onChange={(e) => setStaffForm({ ...staffForm, base_salary: +e.target.value })} /></div>
             </div>
-            <div><Label>Joining Date</Label><Input type="date" value={staffForm.joiningDate || ""} onChange={(e) => setStaffForm({ ...staffForm, joiningDate: e.target.value })} /></div>
+            <div><Label>Joining Date</Label><Input type="date" value={staffForm.joining_date || ""} onChange={(e) => setStaffForm({ ...staffForm, joining_date: e.target.value })} /></div>
           </div>
-          <DialogFooter><Button onClick={handleAddStaff}>Add Staff</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending}>
+            {createStaff.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
+          </Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -555,26 +635,26 @@ const StaffPayroll = () => {
                 <div>
                   <h3 className="text-lg font-bold text-foreground">{selectedStaff.name}</h3>
                   <p className="text-sm text-muted-foreground">{selectedStaff.designation} • {selectedStaff.department}</p>
-                  <Badge variant="outline" className={cn("text-xs", roleColors[selectedStaff.role])}>{selectedStaff.role}</Badge>
+                  <Badge variant="outline" className={cn("text-xs", roleColors[selectedStaff.role] || "")}>{selectedStaff.role}</Badge>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <Detail label="Employee ID" value={selectedStaff.employeeId} />
-                <Detail label="Employment" value={selectedStaff.employmentType} />
-                <Detail label="Phone" value={selectedStaff.phone} />
-                <Detail label="Email" value={selectedStaff.email} />
-                <Detail label="Joining Date" value={selectedStaff.joiningDate} />
-                <Detail label="Blood Group" value={selectedStaff.bloodGroup} />
-                <Detail label="Qualification" value={selectedStaff.qualification} />
+                <Detail label="Employee ID" value={selectedStaff.employee_id} />
+                <Detail label="Employment" value={selectedStaff.employment_type || ""} />
+                <Detail label="Phone" value={selectedStaff.phone || ""} />
+                <Detail label="Email" value={selectedStaff.email || ""} />
+                <Detail label="Joining Date" value={selectedStaff.joining_date || "—"} />
+                <Detail label="Blood Group" value={selectedStaff.blood_group || "—"} />
+                <Detail label="Qualification" value={selectedStaff.qualification || "—"} />
                 <Detail label="Specialization" value={selectedStaff.specialization || "—"} />
-                <Detail label="Aadhar" value={selectedStaff.aadharNo} />
-                <Detail label="PAN" value={selectedStaff.panNo} />
-                <Detail label="Bank" value={`${selectedStaff.bankName} (${selectedStaff.ifscCode})`} />
-                <Detail label="Account" value={selectedStaff.bankAccount} />
-                <Detail label="Base Salary" value={`₹${selectedStaff.baseSalary.toLocaleString()}`} />
-                <Detail label="Emergency Contact" value={selectedStaff.emergencyContact} />
+                <Detail label="Aadhar" value={selectedStaff.aadhar_no || "—"} />
+                <Detail label="PAN" value={selectedStaff.pan_no || "—"} />
+                <Detail label="Bank" value={`${selectedStaff.bank_name || ""} (${selectedStaff.ifsc_code || ""})`} />
+                <Detail label="Account" value={selectedStaff.bank_account || "—"} />
+                <Detail label="Base Salary" value={`₹${(selectedStaff.base_salary || 0).toLocaleString()}`} />
+                <Detail label="Emergency Contact" value={selectedStaff.emergency_contact || "—"} />
               </div>
-              <div><Detail label="Address" value={selectedStaff.address} /></div>
+              <div><Detail label="Address" value={selectedStaff.address || "—"} /></div>
             </div>
           )}
           <DialogFooter><Button variant="outline" onClick={() => setShowStaffProfile(false)}>Close</Button></DialogFooter>
@@ -587,19 +667,19 @@ const StaffPayroll = () => {
           <DialogHeader><DialogTitle>Request Salary Advance</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Staff</Label>
-              <Select value={advanceForm.staffId} onValueChange={(v) => setAdvanceForm({ ...advanceForm, staffId: v })}>
+              <Select value={advanceForm.staff_id} onValueChange={(v) => setAdvanceForm({ ...advanceForm, staff_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.employeeId})</SelectItem>)}</SelectContent>
+                <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.employee_id})</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Amount (₹)</Label><Input type="number" value={advanceForm.amount} onChange={(e) => setAdvanceForm({ ...advanceForm, amount: +e.target.value })} /></div>
-            <div><Label>Repayment Months</Label><Input type="number" value={advanceForm.repaymentMonths} onChange={(e) => setAdvanceForm({ ...advanceForm, repaymentMonths: +e.target.value })} /></div>
+            <div><Label>Repayment Months</Label><Input type="number" value={advanceForm.repayment_months} onChange={(e) => setAdvanceForm({ ...advanceForm, repayment_months: +e.target.value })} /></div>
             <div><Label>Reason</Label><Textarea value={advanceForm.reason} onChange={(e) => setAdvanceForm({ ...advanceForm, reason: e.target.value })} rows={2} /></div>
-            {advanceForm.amount > 0 && advanceForm.repaymentMonths > 0 && (
-              <p className="text-sm text-muted-foreground">Monthly deduction: ₹{Math.ceil(advanceForm.amount / advanceForm.repaymentMonths)}</p>
+            {advanceForm.amount > 0 && advanceForm.repayment_months > 0 && (
+              <p className="text-sm text-muted-foreground">Monthly deduction: ₹{Math.ceil(advanceForm.amount / advanceForm.repayment_months)}</p>
             )}
           </div>
-          <DialogFooter><Button onClick={handleRequestAdvance}>Submit Request</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleRequestAdvance} disabled={createAdvanceMut.isPending}>Submit Request</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -609,24 +689,24 @@ const StaffPayroll = () => {
           <DialogHeader><DialogTitle>Apply Leave</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Staff</Label>
-              <Select value={leaveForm.staffId} onValueChange={(v) => setLeaveForm({ ...leaveForm, staffId: v })}>
+              <Select value={leaveForm.staff_id} onValueChange={(v) => setLeaveForm({ ...leaveForm, staff_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.employeeId})</SelectItem>)}</SelectContent>
+                <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.employee_id})</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Leave Type</Label>
-              <Select value={leaveForm.leaveType} onValueChange={(v) => setLeaveForm({ ...leaveForm, leaveType: v })}>
+              <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{leaveTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>From</Label><Input type="date" value={leaveForm.fromDate} onChange={(e) => setLeaveForm({ ...leaveForm, fromDate: e.target.value })} /></div>
-              <div><Label>To</Label><Input type="date" value={leaveForm.toDate} onChange={(e) => setLeaveForm({ ...leaveForm, toDate: e.target.value })} /></div>
+              <div><Label>From</Label><Input type="date" value={leaveForm.from_date} onChange={(e) => setLeaveForm({ ...leaveForm, from_date: e.target.value })} /></div>
+              <div><Label>To</Label><Input type="date" value={leaveForm.to_date} onChange={(e) => setLeaveForm({ ...leaveForm, to_date: e.target.value })} /></div>
             </div>
             <div><Label>Reason</Label><Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} rows={2} /></div>
           </div>
-          <DialogFooter><Button onClick={handleApplyLeave}>Submit</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleApplyLeave} disabled={createLeaveMut.isPending}>Submit</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -634,9 +714,9 @@ const StaffPayroll = () => {
       <Dialog open={showMarkAttendance} onOpenChange={setShowMarkAttendance}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary" /> Mark Daily Attendance — {attendanceDate}</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground -mt-2">Select staff members and mark their attendance. Check-in time is recorded automatically.</p>
+          <p className="text-xs text-muted-foreground -mt-2">Select staff members and mark their attendance.</p>
           <div className="space-y-2 mt-2">
-            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staffId === s.id && a.date === attendanceDate)).map((s) => (
+            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staff_id === s.id)).map((s) => (
               <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
@@ -648,33 +728,19 @@ const StaffPayroll = () => {
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <Button size="sm" variant="outline" className="text-xs h-7 text-success border-success/30 hover:bg-success/10" onClick={() => {
-                    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, checkIn: now, status: "Present" };
-                    setAttendance((prev) => [...prev, rec]);
-                    toast.success(`${s.name} checked in at ${now}`);
-                  }}>
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-success border-success/30 hover:bg-success/10" onClick={() => handleMarkPresent(s)}>
                     <CheckCircle className="h-3 w-3 mr-1" /> Present
                   </Button>
-                  <Button size="sm" variant="outline" className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10" onClick={() => {
-                    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, checkIn: now, status: "Half Day", hoursWorked: 4 };
-                    setAttendance((prev) => [...prev, rec]);
-                    toast.success(`${s.name} marked as half day`);
-                  }}>
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10" onClick={() => handleMarkHalfDay(s)}>
                     Half Day
                   </Button>
-                  <Button size="sm" variant="outline" className="text-xs h-7 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
-                    const rec: AttendanceRecord = { id: `att-${Date.now()}-${s.id}`, staffId: s.id, staffName: s.name, date: attendanceDate, status: "Absent" };
-                    setAttendance((prev) => [...prev, rec]);
-                    toast.info(`${s.name} marked absent`);
-                  }}>
+                  <Button size="sm" variant="outline" className="text-xs h-7 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => handleMarkAbsent(s)}>
                     <XCircle className="h-3 w-3 mr-1" /> Absent
                   </Button>
                 </div>
               </div>
             ))}
-            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staffId === s.id && a.date === attendanceDate)).length === 0 && (
+            {staff.filter((s) => s.status === "Active" && !attendance.find((a) => a.staff_id === s.id)).length === 0 && (
               <div className="text-center py-6 text-muted-foreground text-sm">
                 <CheckCircle className="h-8 w-8 mx-auto mb-2 text-success" />
                 <p>All staff attendance has been marked for {attendanceDate}!</p>

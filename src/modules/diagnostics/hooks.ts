@@ -50,7 +50,7 @@ export function useUpdateLabOrderPayment() {
 export function useSaveLabResults() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ labOrderId, results, reportNotes }: { labOrderId: string; results: Omit<LabResult, "id" | "lab_order_id">[]; reportNotes?: string }) =>
+    mutationFn: ({ labOrderId, results, reportNotes }: { labOrderId: string; results: Omit<LabResult, "id" | "lab_order_id" | "hospital_id">[]; reportNotes?: string }) =>
       diagnosticsService.saveResults(labOrderId, results, reportNotes),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["diagnostics"] }),
   });

@@ -54,7 +54,7 @@ const PatientRegistration = () => {
 
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
-  const [opdDate, setOpdDate] = useState("");
+  const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
   const [opdType, setOpdType] = useState("");
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
