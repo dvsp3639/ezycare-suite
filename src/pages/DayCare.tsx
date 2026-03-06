@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,10 +15,12 @@ import {
   Receipt, Trash2, Edit, Eye, TrendingUp, IndianRupee, Users, Activity,
   BarChart3, PieChart,
 } from "lucide-react";
+import { format } from "date-fns";
 import {
-  mockDayCarePatients, mockDayCareTreatments, dayCareCategories,
+  dayCareCategories,
   type DayCarePatient, type DayCareTreatment, type DayCareBillingItem, type DayCareBill,
 } from "@/data/mockDayCareData";
+import { useDayCareSessions, useDayCareTreatments } from "@/modules/daycare/hooks";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
 const statusColor = (s: DayCarePatient["status"]) => {
@@ -47,8 +49,47 @@ const CHART_COLORS = [
 
 const DayCare = () => {
   const { toast } = useToast();
-  const [patients, setPatients] = useState<DayCarePatient[]>(mockDayCarePatients);
-  const [treatments] = useState<DayCareTreatment[]>(mockDayCareTreatments);
+  const today = format(new Date(), "yyyy-MM-dd");
+  const { data: dbSessions } = useDayCareSessions(today);
+  const { data: dbTreatments } = useDayCareTreatments();
+
+  const [patients, setPatients] = useState<DayCarePatient[]>([]);
+  const [treatments, setTreatments] = useState<DayCareTreatment[]>([]);
+
+  useEffect(() => {
+    if (dbSessions) {
+      setPatients(dbSessions.map((s: any) => ({
+        id: s.id, patientName: s.patientName, registrationNumber: s.registrationNumber,
+        age: s.age || 0, gender: s.gender || "Male", mobile: s.mobile || "",
+        doctorName: s.doctorName, admissionTime: s.admissionTime || "", status: s.status,
+        diagnosis: s.diagnosis || "", date: s.sessionDate,
+        treatments: (s.treatments || []).map((t: any) => ({
+          treatmentId: t.treatmentId || t.id, treatmentName: t.treatmentName,
+          status: t.status, startTime: t.startTime, endTime: t.endTime, notes: t.notes,
+        })),
+        bill: s.bill ? {
+          id: s.bill.id, patientId: s.id,
+          items: (s.bill.items || []).map((i: any) => ({
+            id: i.id, description: i.description, category: i.category || "Other",
+            qty: i.qty || 1, unitPrice: i.unitPrice || 0, total: i.total || 0,
+          })),
+          subtotal: s.bill.subtotal || 0, discount: s.bill.discount || 0,
+          tax: s.bill.tax || 0, grandTotal: s.bill.grandTotal || 0,
+          paymentStatus: s.bill.paymentStatus || "Pending",
+          paymentMode: s.bill.paymentMode, createdAt: s.bill.createdAt || "",
+        } : undefined,
+      })));
+    }
+  }, [dbSessions]);
+
+  useEffect(() => {
+    if (dbTreatments) {
+      setTreatments(dbTreatments.map((t: any) => ({
+        id: t.id, name: t.name, category: t.category,
+        duration: t.duration || "", price: t.price || 0, description: t.description || "",
+      })));
+    }
+  }, [dbTreatments]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("patients");
@@ -80,7 +121,7 @@ const DayCare = () => {
     });
   }, [patients, search, statusFilter]);
 
-  const todayPatients = patients.filter((p) => p.date === "2026-03-02");
+  const todayPatients = patients.filter((p) => p.date === today);
   const inProgress = todayPatients.filter((p) => p.status === "In Progress").length;
   const completed = todayPatients.filter((p) => p.status === "Completed").length;
   const totalRevenue = patients.reduce((sum, p) => sum + (p.bill?.grandTotal || 0), 0);

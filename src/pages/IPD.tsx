@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,15 +18,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  mockAdmissions, mockDoctorNotes, mockNurseNotes,
-  mockMedicineEntries, mockSurgicalEntries, mockDiagnosticEntries,
-  mockBedTransfers, mockDischargeSummaries, bedStatusColors, wardTypeColors,
+  bedStatusColors, wardTypeColors,
   type Ward, type Bed, type BedStatus, type IPDAdmission, type AdmissionStatus,
   type DoctorVisitNote, type NurseNote, type MedicineEntry, type SurgicalEntry,
   type DiagnosticEntry, type BedTransfer, type DischargeSummary,
 } from "@/data/mockIPDData";
-import { mockPatients, mockDoctors } from "@/data/mockPatients";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
+import { useAdmissions } from "@/modules/ipd/hooks";
+import { usePatients } from "@/modules/patients/hooks";
+import { useStaffMembers } from "@/modules/staff/hooks";
 
 const admissionStatusColors: Record<AdmissionStatus, string> = {
   Active: "bg-success/10 text-success border-success/30",
@@ -37,15 +37,38 @@ const admissionStatusColors: Record<AdmissionStatus, string> = {
 
 const IPD = () => {
   const { wards, beds, setBeds } = useWardsBeds();
+  const { data: dbAdmissions } = useAdmissions();
+  const { data: patientsData } = usePatients();
+  const { data: staffData } = useStaffMembers();
+  const dbPatients = patientsData || [];
+  const dbDoctors = (staffData || []).filter((s: any) => s.role === "Doctor" || s.designation?.toLowerCase().includes("doctor")).map((s: any) => ({ id: s.id, name: s.name, specialization: s.specialization || "" }));
+
   const [activeTab, setActiveTab] = useState("admissions");
-  const [admissions, setAdmissions] = useState<IPDAdmission[]>(mockAdmissions);
-  const [doctorNotes, setDoctorNotes] = useState<DoctorVisitNote[]>(mockDoctorNotes);
-  const [nurseNotes, setNurseNotes] = useState<NurseNote[]>(mockNurseNotes);
-  const [medicineEntries, setMedicineEntries] = useState<MedicineEntry[]>(mockMedicineEntries);
-  const [surgicalEntries, setSurgicalEntries] = useState<SurgicalEntry[]>(mockSurgicalEntries);
-  const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(mockDiagnosticEntries);
-  const [bedTransfers, setBedTransfers] = useState<BedTransfer[]>(mockBedTransfers);
-  const [dischargeSummaries, setDischargeSummaries] = useState<DischargeSummary[]>(mockDischargeSummaries);
+  const [admissions, setAdmissions] = useState<IPDAdmission[]>([]);
+  const [doctorNotes, setDoctorNotes] = useState<DoctorVisitNote[]>([]);
+  const [nurseNotes, setNurseNotes] = useState<NurseNote[]>([]);
+  const [medicineEntries, setMedicineEntries] = useState<MedicineEntry[]>([]);
+  const [surgicalEntries, setSurgicalEntries] = useState<SurgicalEntry[]>([]);
+  const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>([]);
+  const [bedTransfers, setBedTransfers] = useState<BedTransfer[]>([]);
+  const [dischargeSummaries, setDischargeSummaries] = useState<DischargeSummary[]>([]);
+
+  useEffect(() => {
+    if (dbAdmissions) {
+      setAdmissions(dbAdmissions.map((a: any) => ({
+        id: a.id, patientId: a.patientId || a.id, patientName: a.patientName,
+        registrationNumber: a.registrationNumber, age: a.age || 0,
+        gender: a.gender || "", contactNumber: a.contactNumber || "",
+        referredBy: a.referredBy || "", admittingDoctor: a.admittingDoctor,
+        department: a.department || "", diagnosis: a.diagnosis || "",
+        wardId: a.wardId || "", wardName: a.wardName || "",
+        bedId: a.bedId || "", bedNumber: a.bedNumber || "",
+        admissionDate: a.admissionDate, dischargeDate: a.dischargeDate,
+        status: a.status, emergencyContact: a.emergencyContact || "",
+        insuranceInfo: a.insuranceInfo || "",
+      })));
+    }
+  }, [dbAdmissions]);
 
   // Filters
   const [admSearch, setAdmSearch] = useState("");
@@ -153,7 +176,7 @@ const IPD = () => {
     if (!selectedBed || !allocateForm.patientId || !allocateForm.admittingDoctor) {
       toast.error("Patient and doctor are required"); return;
     }
-    const patient = mockPatients.find((p) => p.id === allocateForm.patientId);
+    const patient = dbPatients.find((p: any) => p.id === allocateForm.patientId);
     const ward = wards.find((w) => w.id === selectedBed.wardId);
     if (!patient || !ward) return;
 
@@ -181,7 +204,7 @@ const IPD = () => {
     const availableBed = beds.find((b) => b.status === "Available");
     if (!availableBed) { toast.error("No beds available. Please free up a bed first."); return; }
 
-    const patient = mockPatients.find((p) => p.id === admitForm.patientId);
+    const patient = dbPatients.find((p: any) => p.id === admitForm.patientId);
     const ward = wards.find((w) => w.id === availableBed.wardId);
     if (!patient || !ward) return;
 
@@ -796,13 +819,13 @@ const IPD = () => {
               <div><Label>Patient *</Label>
                 <Select value={allocateForm.patientId} onValueChange={(v) => setAllocateForm({ ...allocateForm, patientId: v })}>
                   <SelectTrigger><SelectValue placeholder="Select registered patient" /></SelectTrigger>
-                  <SelectContent>{mockPatients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
+                  <SelectContent>{dbPatients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div><Label>Admitting Doctor *</Label>
                 <Select value={allocateForm.admittingDoctor} onValueChange={(v) => setAllocateForm({ ...allocateForm, admittingDoctor: v })}>
                   <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                  <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div><Label>Department</Label><Input value={allocateForm.department} onChange={(e) => setAllocateForm({ ...allocateForm, department: e.target.value })} placeholder="e.g. General Medicine" /></div>
@@ -824,13 +847,13 @@ const IPD = () => {
             <div><Label>Patient *</Label>
               <Select value={admitForm.patientId || ""} onValueChange={(v) => setAdmitForm({ ...admitForm, patientId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
-                <SelectContent>{mockPatients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
+                <SelectContent>{dbPatients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} ({p.registrationNumber})</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Admitting Doctor *</Label>
               <Select value={admitForm.admittingDoctor || ""} onValueChange={(v) => setAdmitForm({ ...admitForm, admittingDoctor: v })}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Department</Label><Input value={admitForm.department || ""} onChange={(e) => setAdmitForm({ ...admitForm, department: e.target.value })} placeholder="e.g. General Medicine" /></div>
@@ -919,7 +942,7 @@ const IPD = () => {
             <div><Label>Doctor</Label>
               <Select value={noteForm.doctor} onValueChange={(v) => setNoteForm({ ...noteForm, doctor: v })}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Notes</Label><Textarea value={noteForm.notes} onChange={(e) => setNoteForm({ ...noteForm, notes: e.target.value })} placeholder="Clinical notes..." rows={3} /></div>
@@ -979,7 +1002,7 @@ const IPD = () => {
             <div><Label>Surgeon</Label>
               <Select value={surgForm.surgeon} onValueChange={(v) => setSurgForm({ ...surgForm, surgeon: v })}>
                 <SelectTrigger><SelectValue placeholder="Select surgeon" /></SelectTrigger>
-                <SelectContent>{mockDoctors.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{dbDoctors.map((d: any) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Notes</Label><Textarea value={surgForm.notes} onChange={(e) => setSurgForm({ ...surgForm, notes: e.target.value })} rows={2} /></div>
