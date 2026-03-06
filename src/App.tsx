@@ -31,6 +31,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <DashboardLayout>{children}</DashboardLayout>;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading, isHospitalAdmin, isSuperAdmin } = useAuth();
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isHospitalAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return <DashboardLayout>{children}</DashboardLayout>;
+};
+
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
