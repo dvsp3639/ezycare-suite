@@ -513,10 +513,10 @@ const ClinicManagement = () => {
                   <TableHead>Patient</TableHead>
                   <TableHead>Mobile</TableHead>
                   <TableHead>Age/Gender</TableHead>
-                  <TableHead>Doctor</TableHead>
-                  <TableHead>Diagnosis</TableHead>
-                  <TableHead>Last Visit</TableHead>
-                  <TableHead>Visits</TableHead>
+                  <TableHead>Blood Group</TableHead>
+                  <TableHead>Conditions</TableHead>
+                  <TableHead>Registered</TableHead>
+                  <TableHead>-</TableHead>
                   <TableHead className="text-right">Details</TableHead>
                 </TableRow>
               </TableHeader>
