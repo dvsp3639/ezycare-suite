@@ -28,7 +28,7 @@ export const patientService = {
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    return data as unknown as Patient | null;
+    return data ? snakeToCamel(data) as Patient : null;
   },
 
   async create(patient: PatientInsert): Promise<Patient> {
