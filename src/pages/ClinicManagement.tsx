@@ -79,7 +79,7 @@ const ClinicManagement = () => {
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
-  const [selectedPatient, setSelectedPatient] = useState<ClinicPatient | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
   // Consultation dialog state
   const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
