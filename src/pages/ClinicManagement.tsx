@@ -91,7 +91,6 @@ const ClinicManagement = () => {
   // Staff doctors for adding schedules
   const { data: staffDoctors = [] } = useStaffMembers({ role: "Doctor" });
   const createSchedule = useCreateSchedule();
-  const { refreshData } = useClinicData();
 
   // Consultation dialog state
   const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
