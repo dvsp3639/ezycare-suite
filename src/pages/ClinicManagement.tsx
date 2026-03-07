@@ -377,6 +377,11 @@ const ClinicManagement = () => {
                 {schedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
               </SelectContent>
             </Select>
+            {!isPastDate && (
+              <Button size="sm" onClick={() => setShowAddDoctor(true)}>
+                <Plus className="h-4 w-4 mr-1.5" /> Add Doctor
+              </Button>
+            )}
           </div>
 
           <div className="space-y-4">
