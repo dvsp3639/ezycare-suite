@@ -510,7 +510,7 @@ const ClinicManagement = () => {
           </div>
 
           <div className="space-y-4">
-            {schedules.filter((d) => selectedDoctor === "all" || d.id === selectedDoctor).map((doc) => (
+            {dateSchedules.filter((d) => selectedDoctor === "all" || d.id === selectedDoctor).map((doc) => (
               <div key={doc.id} className="bg-card rounded-xl border border-border p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div>
