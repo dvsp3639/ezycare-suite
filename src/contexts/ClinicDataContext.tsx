@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { format } from "date-fns";
 import { clinicService } from "@/modules/clinic/services";
+import { staffService } from "@/modules/staff/services";
 import type { Appointment } from "@/modules/clinic/types";
 import {
   type DoctorSchedule,
@@ -102,11 +103,34 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [dbSchedules, dbAppointments] = await Promise.all([
+      const [dbSchedules, dbAppointments, staffDoctors] = await Promise.all([
         clinicService.getSchedules(today),
         clinicService.getAppointments(today),
+        staffService.getStaff({ role: "Doctor", status: "Active" }),
       ]);
-      setSchedules(dbSchedules.map(mapDbSchedule));
+
+      // Auto-create schedules for staff doctors that don't have one for today
+      const scheduledNames = new Set(dbSchedules.map((s: any) => (s.doctorName || "").toLowerCase()));
+      const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
+
+      if (missingDoctors.length > 0) {
+        const newSchedules = await Promise.all(
+          missingDoctors.map((doc) =>
+            clinicService.createSchedule({
+              doctorName: doc.name,
+              specialization: doc.specialization || doc.designation || "",
+              scheduleDate: today,
+              availableFrom: "9:00 AM",
+              availableTo: "5:00 PM",
+              consultationDuration: 30,
+            } as any)
+          )
+        );
+        setSchedules([...dbSchedules.map(mapDbSchedule), ...newSchedules.map(mapDbSchedule)]);
+      } else {
+        setSchedules(dbSchedules.map(mapDbSchedule));
+      }
+
       setQueue(dbAppointments.map(mapDbAppointment));
     } catch (err) {
       console.error("Failed to load clinic data:", err);
