@@ -96,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setAllowedModules([]);
   }, []);
 
   const isSuperAdmin = roles.some(r => r.role === "super_admin");
