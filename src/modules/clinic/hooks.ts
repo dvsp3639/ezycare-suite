@@ -21,7 +21,23 @@ export function useAppointments(date?: string) {
   });
 }
 
+export function useCreateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (schedule: Partial<DoctorSchedule>) => clinicService.createSchedule(schedule),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic"] }),
+  });
+}
+
 export function useCreateAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (appointment: Partial<Appointment>) => clinicService.createAppointment(appointment),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clinic"] });
+    },
+  });
+}
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (appointment: Partial<Appointment>) => clinicService.createAppointment(appointment),
