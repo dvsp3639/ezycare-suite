@@ -222,7 +222,7 @@ const ClinicManagement = () => {
 
   // Open manage slots dialog
   const openManageSlots = (docId: string) => {
-    const doc = schedules.find(d => d.id === docId);
+    const doc = dateSchedules.find(d => d.id === docId);
     if (doc) {
       setSlotRanges(extractRangesFromSlots(doc));
     } else {
