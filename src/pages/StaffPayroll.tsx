@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Users, Search, Plus, User, Eye, CheckCircle, XCircle,
@@ -23,6 +24,9 @@ import {
   useCreateAdvance, useUpdateAdvance,
 } from "@/modules/staff/hooks";
 import type { StaffMember, SalaryRecord, AttendanceRecord, LeaveRequest, SalaryAdvance } from "@/modules/staff/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { modules } from "@/data/modules";
 
 const staffRoles = ["Doctor", "Nurse", "Technician", "Pharmacist", "Admin", "Receptionist", "Housekeeping", "Security", "Driver"];
 const leaveTypes = ["Casual", "Sick", "Earned", "Maternity", "Paternity", "Unpaid"];
