@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import type { LabOrder, LabResult } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
+import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
 
 const statusColors: Record<string, string> = {
   Ordered: "bg-warning/10 text-warning border-warning/20",
@@ -30,6 +31,7 @@ const statusColors: Record<string, string> = {
 
 const Diagnostics = () => {
   const { allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment } = useClinicData();
+  const { data: labTestCatalog = [] } = useLabTestCatalog();
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -113,7 +115,7 @@ const Diagnostics = () => {
           parameter: p.name,
           value: "",
           unit: p.unit,
-          normalRange: p.normalRange,
+          normalRange: p.normal_range || "",
           isAbnormal: false,
         }))
       );
