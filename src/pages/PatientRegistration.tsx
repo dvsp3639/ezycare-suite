@@ -65,7 +65,7 @@ const PatientRegistration = () => {
 
   // Fetch schedules for OPD date
   const { data: rawSchedules } = useDoctorSchedules(opdDate || undefined);
-  const schedules = (rawSchedules || []).map((s: any) => snakeToCamel(s)) as any[];
+  const schedules = (rawSchedules || []) as any[];
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
@@ -389,7 +389,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>

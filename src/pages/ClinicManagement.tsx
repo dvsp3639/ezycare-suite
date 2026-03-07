@@ -85,6 +85,11 @@ const ClinicManagement = () => {
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
+  // Multi-range slot management
+  interface SlotRange { from: string; to: string; tokensPerSlot: number; }
+  const [slotRanges, setSlotRanges] = useState<SlotRange[]>([]);
+  const [savingSlots, setSavingSlots] = useState(false);
+
   // Removed: Add Doctor button and dialog - doctors auto-pull from staff
 
   // Consultation dialog state
@@ -126,29 +131,145 @@ const ClinicManagement = () => {
 
   const editSlotDoctor = editSlotDoctorId ? schedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
 
-  // Slot management
-  const updateMaxPatients = (doctorId: string, slotTime: string, delta: number) => {
-    setSchedules((prev) =>
-      prev.map((doc) =>
-        doc.id === doctorId
-          ? { ...doc, timeSlots: doc.timeSlots.map((s) => s.time === slotTime ? { ...s, maxPatients: Math.max(1, s.maxPatients + delta) } : s) }
-          : doc
-      )
-    );
+  // Helper: parse 12h time to minutes
+  const parseTime12 = (t: string): number => {
+    const [timePart, meridiem] = t.split(" ");
+    let [h, m] = timePart.split(":").map(Number);
+    if (meridiem === "PM" && h !== 12) h += 12;
+    if (meridiem === "AM" && h === 12) h = 0;
+    return h * 60 + m;
   };
 
-  const toggleSlotActive = (doctorId: string, slotTime: string) => {
-    setSchedules((prev) =>
-      prev.map((doc) =>
-        doc.id === doctorId
-          ? { ...doc, timeSlots: doc.timeSlots.map((s) => s.time === slotTime ? { ...s, isActive: !s.isActive } : s) }
-          : doc
-      )
-    );
+  // Generate 30-min time slots from ranges
+  const generateSlotsFromRanges = (ranges: SlotRange[]): { time: string; maxPatients: number; bookedPatients: number; isActive: boolean }[] => {
+    const allSlots: { time: string; maxPatients: number; bookedPatients: number; isActive: boolean }[] = [];
+    const seen = new Set<string>();
+    for (const range of ranges) {
+      const fromMin = parseTime12(range.from);
+      const toMin = parseTime12(range.to);
+      if (toMin <= fromMin) continue;
+      for (let t = fromMin; t < toMin; t += 30) {
+        const h24 = Math.floor(t / 60);
+        const min = t % 60;
+        const period = h24 < 12 ? "AM" : "PM";
+        const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+        const timeStr = `${h12}:${min.toString().padStart(2, "0")} ${period}`;
+        if (!seen.has(timeStr)) {
+          seen.add(timeStr);
+          allSlots.push({ time: timeStr, maxPatients: range.tokensPerSlot, bookedPatients: 0, isActive: true });
+        }
+      }
+    }
+    return allSlots.sort((a, b) => parseTime12(a.time) - parseTime12(b.time));
   };
 
-  const updateDoctorAvailability = (doctorId: string, field: "availableFrom" | "availableTo", value: string) => {
-    setSchedules((prev) => prev.map((doc) => (doc.id === doctorId ? { ...doc, [field]: value } : doc)));
+  // Extract ranges from existing time slots for editing
+  const extractRangesFromSlots = (doc: DoctorSchedule): SlotRange[] => {
+    const activeSlots = doc.timeSlots.filter(s => s.isActive).sort((a, b) => parseTime12(a.time) - parseTime12(b.time));
+    if (activeSlots.length === 0) return [{ from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }];
+    const ranges: SlotRange[] = [];
+    let rangeStart = activeSlots[0];
+    let prevMin = parseTime12(rangeStart.time);
+    let prevTokens = rangeStart.maxPatients;
+    for (let i = 1; i < activeSlots.length; i++) {
+      const currMin = parseTime12(activeSlots[i].time);
+      const currTokens = activeSlots[i].maxPatients;
+      // Break range if gap > 30min or token count changes
+      if (currMin - prevMin > 30 || currTokens !== prevTokens) {
+        // Close previous range
+        const endMin = prevMin + 30;
+        const endH24 = Math.floor(endMin / 60);
+        const endM = endMin % 60;
+        const endPeriod = endH24 < 12 ? "AM" : "PM";
+        const endH12 = endH24 === 0 ? 12 : endH24 > 12 ? endH24 - 12 : endH24;
+        ranges.push({ from: rangeStart.time, to: `${endH12}:${endM.toString().padStart(2, "0")} ${endPeriod}`, tokensPerSlot: prevTokens });
+        rangeStart = activeSlots[i];
+      }
+      prevMin = currMin;
+      prevTokens = currTokens;
+    }
+    // Close last range
+    const endMin2 = prevMin + 30;
+    const endH242 = Math.floor(endMin2 / 60);
+    const endM2 = endMin2 % 60;
+    const endPeriod2 = endH242 < 12 ? "AM" : "PM";
+    const endH122 = endH242 === 0 ? 12 : endH242 > 12 ? endH242 - 12 : endH242;
+    ranges.push({ from: rangeStart.time, to: `${endH122}:${endM2.toString().padStart(2, "0")} ${endPeriod2}`, tokensPerSlot: prevTokens });
+    return ranges;
+  };
+
+  // Open manage slots dialog
+  const openManageSlots = (docId: string) => {
+    const doc = schedules.find(d => d.id === docId);
+    if (doc) {
+      setSlotRanges(extractRangesFromSlots(doc));
+    } else {
+      setSlotRanges([{ from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
+    }
+    setEditSlotDoctorId(docId);
+  };
+
+  const addSlotRange = () => setSlotRanges(prev => [...prev, { from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
+  const removeSlotRange = (idx: number) => setSlotRanges(prev => prev.filter((_, i) => i !== idx));
+  const updateSlotRange = (idx: number, field: keyof SlotRange, value: string | number) => {
+    setSlotRanges(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  };
+
+  // Save slot configuration to DB
+  const handleSaveSlotConfig = async () => {
+    if (!editSlotDoctor) return;
+    // Validate ranges
+    for (const range of slotRanges) {
+      if (parseTime12(range.to) <= parseTime12(range.from)) {
+        toast.error("'To' time must be after 'From' time in each range");
+        return;
+      }
+    }
+    setSavingSlots(true);
+    try {
+      const newSlots = generateSlotsFromRanges(slotRanges);
+      // Merge with existing booked counts
+      const existingSlots = editSlotDoctor.timeSlots;
+      const mergedSlots = newSlots.map(ns => {
+        const existing = existingSlots.find(es => es.time === ns.time);
+        return existing ? { ...ns, bookedPatients: existing.bookedPatients } : ns;
+      });
+
+      // Update local state
+      setSchedules(prev => prev.map(doc =>
+        doc.id === editSlotDoctor.id
+          ? { ...doc, timeSlots: mergedSlots, availableFrom: slotRanges[0]?.from || "9:00 AM", availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM" }
+          : doc
+      ));
+
+      // Persist: update schedule availability
+      await clinicService.updateSchedule(editSlotDoctor.id, {
+        availableFrom: slotRanges[0]?.from || "9:00 AM",
+        availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM",
+      } as any);
+
+      // Persist time slots: delete old and create new
+      // We'll create slots via the service for each new slot
+      for (const slot of mergedSlots) {
+        const existing = existingSlots.find(es => es.time === slot.time);
+        if (!existing) {
+          await clinicService.createTimeSlot({
+            scheduleId: editSlotDoctor.id,
+            time: slot.time,
+            maxPatients: slot.maxPatients,
+            isActive: true,
+          });
+        }
+      }
+
+      toast.success("Slot configuration saved");
+      setEditSlotDoctorId(null);
+      refreshData();
+    } catch (err: any) {
+      toast.error(err.message || "Error saving slot configuration");
+    } finally {
+      setSavingSlots(false);
+    }
   };
 
   // Queue actions
@@ -384,7 +505,7 @@ const ClinicManagement = () => {
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
                   {!isPastDate && (
-                    <Button variant="outline" size="sm" onClick={() => setEditSlotDoctorId(doc.id)}>
+                    <Button variant="outline" size="sm" onClick={() => openManageSlots(doc.id)}>
                       <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
                     </Button>
                   )}
@@ -566,54 +687,77 @@ const ClinicManagement = () => {
           </DialogHeader>
           {editSlotDoctor && (
             <>
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><ClockIcon className="h-4 w-4" /> Availability Hours</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">From</label>
-                    <Select value={editSlotDoctor.availableFrom} onValueChange={(v) => updateDoctorAvailability(editSlotDoctor.id, "availableFrom", v)}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">To</label>
-                    <Select value={editSlotDoctor.availableTo} onValueChange={(v) => updateDoctorAvailability(editSlotDoctor.id, "availableTo", v)}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><ClockIcon className="h-4 w-4" /> Availability Ranges</h4>
+                  <Button size="sm" variant="outline" onClick={addSlotRange}><Plus className="h-3.5 w-3.5 mr-1" /> Add Range</Button>
                 </div>
-              </div>
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {editSlotDoctor.timeSlots.map((slot) => {
-                  const past = isSlotPast(slot.time);
-                  return (
-                    <div key={slot.time} className={cn("flex items-center justify-between p-3 rounded-lg border transition-all", past ? "border-border/50 bg-muted/30 opacity-50" : slot.isActive ? "border-border bg-card" : "border-border/50 bg-muted/30 opacity-60")}>
-                      <div className="flex items-center gap-3">
-                        <Switch checked={slot.isActive} onCheckedChange={() => toggleSlotActive(editSlotDoctor.id, slot.time)} disabled={past || (slot.bookedPatients > 0 && slot.isActive)} />
-                        <div className="flex items-center gap-2">
-                          <span className={cn("text-sm font-medium", slot.isActive && !past ? "text-foreground" : "text-muted-foreground")}>{slot.time}</span>
-                          {past && <Badge variant="outline" className="text-[10px] text-muted-foreground">Past</Badge>}
-                        </div>
+                <div className="space-y-3 max-h-[260px] overflow-y-auto">
+                  {slotRanges.map((range, idx) => (
+                    <div key={idx} className="bg-muted/50 rounded-lg p-3 space-y-2 border border-border">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Range {idx + 1}</span>
+                        {slotRanges.length > 1 && (
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeSlotRange(idx)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{slot.bookedPatients} booked</span>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, -1)} disabled={past || !slot.isActive || slot.maxPatients <= slot.bookedPatients || slot.maxPatients <= 1}>
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center font-semibold text-foreground text-sm">{slot.maxPatients}</span>
-                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateMaxPatients(editSlotDoctor.id, slot.time, 1)} disabled={past || !slot.isActive}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">From</label>
+                          <Select value={range.from} onValueChange={(v) => updateSlotRange(idx, "from", v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">To</label>
+                          <Select value={range.to} onValueChange={(v) => updateSlotRange(idx, "to", v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">Tokens / 30 min</label>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", Math.max(1, range.tokensPerSlot - 1))}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center font-semibold text-foreground text-sm">{range.tokensPerSlot}</span>
+                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", range.tokensPerSlot + 1)}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-              <Button onClick={() => { setEditSlotDoctorId(null); toast.success("Slot configuration saved"); }} className="w-full mt-2">Save Configuration</Button>
+
+              {/* Preview generated slots */}
+              {slotRanges.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground">Preview — {generateSlotsFromRanges(slotRanges).length} slots</h4>
+                  <div className="grid grid-cols-4 gap-1.5 max-h-[160px] overflow-y-auto">
+                    {generateSlotsFromRanges(slotRanges).map((slot) => {
+                      const past = isSlotPast(slot.time);
+                      const existing = editSlotDoctor.timeSlots.find(es => es.time === slot.time);
+                      return (
+                        <div key={slot.time} className={cn("rounded-md border p-2 text-center text-xs", past ? "border-border/50 bg-muted/40 opacity-50" : "border-border bg-card")}>
+                          <p className="font-medium text-foreground">{slot.time}</p>
+                          <p className="text-muted-foreground">{existing ? `${existing.bookedPatients}/` : "0/"}{slot.maxPatients}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleSaveSlotConfig} disabled={savingSlots} className="w-full mt-2">
+                {savingSlots ? <><Clock className="h-4 w-4 mr-1.5 animate-spin" /> Saving...</> : <><Save className="h-4 w-4 mr-1.5" /> Save Configuration</>}
+              </Button>
             </>
           )}
         </DialogContent>
