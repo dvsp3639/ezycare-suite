@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -65,7 +65,43 @@ const PatientRegistration = () => {
   const createAppointment = useCreateAppointment();
 
   // Fetch schedules for OPD date
-  const { data: rawSchedules, isLoading: schedulesLoading } = useDoctorSchedules(opdDate || undefined);
+  const { data: rawSchedules, isLoading: schedulesLoading, refetch: refetchSchedules } = useDoctorSchedules(opdDate || undefined);
+  const [autoCreatingSchedules, setAutoCreatingSchedules] = useState(false);
+
+  // Auto-create schedules for selected OPD date if doctors don't have entries yet
+  useEffect(() => {
+    if (rawSchedules === undefined || autoCreatingSchedules || !opdDate) return;
+    const autoCreate = async () => {
+      try {
+        const { staffService } = await import("@/modules/staff/services");
+        const staffDoctors = await staffService.getStaff({ role: "Doctor", status: "Active" });
+        const scheduledNames = new Set((rawSchedules || []).map((s: any) => (s.doctorName || "").toLowerCase()));
+        const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
+        if (missingDoctors.length > 0) {
+          setAutoCreatingSchedules(true);
+          await Promise.all(
+            missingDoctors.map((doc) =>
+              clinicService.createSchedule({
+                doctorName: doc.name,
+                specialization: doc.specialization || doc.designation || "",
+                scheduleDate: opdDate,
+                availableFrom: "9:00 AM",
+                availableTo: "5:00 PM",
+                consultationDuration: 30,
+              } as any)
+            )
+          );
+          refetchSchedules();
+          setAutoCreatingSchedules(false);
+        }
+      } catch (err) {
+        console.warn("Could not auto-sync doctors for OPD date:", err);
+        setAutoCreatingSchedules(false);
+      }
+    };
+    autoCreate();
+  }, [rawSchedules, opdDate]);
+
   // Only show doctors who have time slots configured
   const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
 
@@ -409,7 +445,7 @@ const PatientRegistration = () => {
               <Select value={opdDoctor} onValueChange={(v) => { setOpdDoctor(v); setOpdTimeSlot(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>
-                  {schedulesLoading && (
+                  {(schedulesLoading || autoCreatingSchedules) && (
                     <div className="p-2 text-xs text-muted-foreground text-center flex items-center gap-2 justify-center">
                       <Loader2 className="h-3 w-3 animate-spin" /> Loading doctors...
                     </div>
