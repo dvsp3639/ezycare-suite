@@ -85,6 +85,11 @@ const ClinicManagement = () => {
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
+  // Multi-range slot management
+  interface SlotRange { from: string; to: string; tokensPerSlot: number; }
+  const [slotRanges, setSlotRanges] = useState<SlotRange[]>([]);
+  const [savingSlots, setSavingSlots] = useState(false);
+
   // Removed: Add Doctor button and dialog - doctors auto-pull from staff
 
   // Consultation dialog state
