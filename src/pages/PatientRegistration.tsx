@@ -12,11 +12,10 @@ import { useCreatePatient } from "@/modules/patients/hooks";
 import { patientService } from "@/modules/patients/services";
 import { useDoctorSchedules, useAppointments, useCreateAppointment } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
-import { staffService } from "@/modules/staff/services";
 import { snakeToCamel } from "@/lib/caseConverter";
 import { cn } from "@/lib/utils";
 import TimeSlotPicker from "@/components/TimeSlotPicker";
-import { useQueryClient } from "@tanstack/react-query";
+
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -64,44 +63,11 @@ const PatientRegistration = () => {
 
   const createPatient = useCreatePatient();
   const createAppointment = useCreateAppointment();
-  const queryClient = useQueryClient();
-  const [autoCreatingSchedules, setAutoCreatingSchedules] = useState(false);
 
   // Fetch schedules for OPD date
   const { data: rawSchedules, isLoading: schedulesLoading } = useDoctorSchedules(opdDate || undefined);
-  const schedules = (rawSchedules || []) as any[];
-
-  // Auto-create schedules for selected OPD date if none exist
-  const autoCreateSchedulesForDate = async (date: string) => {
-    if (!date || autoCreatingSchedules) return;
-    setAutoCreatingSchedules(true);
-    try {
-      const existing = await clinicService.getSchedules(date);
-      if (existing.length === 0) {
-        const staffDoctors = await staffService.getStaff({ role: "Doctor", status: "Active" });
-        if (staffDoctors.length > 0) {
-          await Promise.all(
-            staffDoctors.map((doc) =>
-              clinicService.createSchedule({
-                doctorName: doc.name,
-                specialization: doc.specialization || doc.designation || "",
-                scheduleDate: date,
-                availableFrom: "9:00 AM",
-                availableTo: "5:00 PM",
-                consultationDuration: 30,
-              } as any)
-            )
-          );
-          // Invalidate query so useDoctorSchedules refetches
-          queryClient.invalidateQueries({ queryKey: ["clinic", "schedules", date] });
-        }
-      }
-    } catch (err) {
-      console.warn("Could not auto-create schedules:", err);
-    } finally {
-      setAutoCreatingSchedules(false);
-    }
-  };
+  // Only show doctors who have time slots configured
+  const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
@@ -416,7 +382,7 @@ const PatientRegistration = () => {
       )}
 
       {/* OPD Booking Modal */}
-      <Dialog open={showOPD} onOpenChange={(open) => { setShowOPD(open); if (open && opdDate) autoCreateSchedulesForDate(opdDate); }}>
+      <Dialog open={showOPD} onOpenChange={setShowOPD}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">Book OPD Appointment</DialogTitle>
@@ -425,7 +391,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); autoCreateSchedulesForDate(e.target.value); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
@@ -443,14 +409,14 @@ const PatientRegistration = () => {
               <Select value={opdDoctor} onValueChange={(v) => { setOpdDoctor(v); setOpdTimeSlot(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>
-                  {(schedulesLoading || autoCreatingSchedules) && (
+                  {schedulesLoading && (
                     <div className="p-2 text-xs text-muted-foreground text-center flex items-center gap-2 justify-center">
                       <Loader2 className="h-3 w-3 animate-spin" /> Loading doctors...
                     </div>
                   )}
-                  {!schedulesLoading && !autoCreatingSchedules && schedules.length === 0 && (
+                  {!schedulesLoading && schedules.length === 0 && (
                     <div className="p-2 text-xs text-muted-foreground text-center">
-                      {opdDate ? "No schedules for this date" : "Select a date first"}
+                      {opdDate ? "No doctor slots configured for this date. Please set up slots in Clinic Management first." : "Select a date first"}
                     </div>
                   )}
                   {schedules.map((d: any) => (

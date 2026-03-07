@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { format, startOfDay, isBefore, isToday } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
+import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
 import {
   type DoctorSchedule,
@@ -85,6 +86,27 @@ const ClinicManagement = () => {
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
+  // Fetch schedules for selected slotDate (independent of context which is today-only)
+  const slotDateStr = format(slotDate, "yyyy-MM-dd");
+  const { data: dateSchedulesRaw, refetch: refetchDateSchedules } = useDoctorSchedules(slotDateStr);
+  const dateSchedules: DoctorSchedule[] = useMemo(() => {
+    return (dateSchedulesRaw || []).map((s: any) => ({
+      id: s.id,
+      doctorName: s.doctorName,
+      specialization: s.specialization || "",
+      availableFrom: s.availableFrom || "9:00 AM",
+      availableTo: s.availableTo || "5:00 PM",
+      consultationDuration: s.consultationDuration || 30,
+      timeSlots: (s.timeSlots || []).map((ts: any) => ({
+        id: ts.id,
+        time: ts.time,
+        maxPatients: ts.maxPatients ?? 5,
+        bookedPatients: ts.bookedPatients ?? 0,
+        isActive: ts.isActive ?? true,
+      })),
+    }));
+  }, [dateSchedulesRaw]);
+
   // Multi-range slot management
   interface SlotRange { from: string; to: string; tokensPerSlot: number; }
   const [slotRanges, setSlotRanges] = useState<SlotRange[]>([]);
@@ -129,7 +151,7 @@ const ClinicManagement = () => {
     return isBefore(slotDate_, now);
   };
 
-  const editSlotDoctor = editSlotDoctorId ? schedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
+  const editSlotDoctor = editSlotDoctorId ? dateSchedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
 
   // Helper: parse 12h time to minutes
   const parseTime12 = (t: string): number => {
@@ -200,7 +222,7 @@ const ClinicManagement = () => {
 
   // Open manage slots dialog
   const openManageSlots = (docId: string) => {
-    const doc = schedules.find(d => d.id === docId);
+    const doc = dateSchedules.find(d => d.id === docId);
     if (doc) {
       setSlotRanges(extractRangesFromSlots(doc));
     } else {
@@ -235,13 +257,6 @@ const ClinicManagement = () => {
         return existing ? { ...ns, bookedPatients: existing.bookedPatients } : ns;
       });
 
-      // Update local state
-      setSchedules(prev => prev.map(doc =>
-        doc.id === editSlotDoctor.id
-          ? { ...doc, timeSlots: mergedSlots, availableFrom: slotRanges[0]?.from || "9:00 AM", availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM" }
-          : doc
-      ));
-
       // Persist: update schedule availability
       await clinicService.updateSchedule(editSlotDoctor.id, {
         availableFrom: slotRanges[0]?.from || "9:00 AM",
@@ -261,6 +276,7 @@ const ClinicManagement = () => {
 
       toast.success("Slot configuration saved");
       setEditSlotDoctorId(null);
+      refetchDateSchedules();
       refreshData();
     } catch (err: any) {
       toast.error(err.message || "Error saving slot configuration");
@@ -456,7 +472,7 @@ const ClinicManagement = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Total Doctors" value={schedules.length} icon={<Users className="h-4 w-4" />} accent="text-primary" />
+        <SummaryCard label="Total Doctors" value={dateSchedules.length} icon={<Users className="h-4 w-4" />} accent="text-primary" />
         <SummaryCard label="Waiting" value={waitingCount} icon={<Clock className="h-4 w-4" />} accent="text-warning" />
         <SummaryCard label="In Consultation" value={inConsultCount} icon={<CalendarIcon className="h-4 w-4" />} accent="text-info" />
         <SummaryCard label="Completed" value={completedCount} icon={<Users className="h-4 w-4" />} accent="text-success" />
@@ -487,14 +503,14 @@ const ClinicManagement = () => {
               <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filter by doctor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Doctors</SelectItem>
-                {schedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
+                {dateSchedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
               </SelectContent>
             </Select>
             {/* Doctors are auto-pulled from Staff & Payroll */}
           </div>
 
           <div className="space-y-4">
-            {schedules.filter((d) => selectedDoctor === "all" || d.id === selectedDoctor).map((doc) => (
+            {dateSchedules.filter((d) => selectedDoctor === "all" || d.id === selectedDoctor).map((doc) => (
               <div key={doc.id} className="bg-card rounded-xl border border-border p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div>
