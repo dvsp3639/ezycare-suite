@@ -86,6 +86,27 @@ const ClinicManagement = () => {
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
+  // Fetch schedules for selected slotDate (independent of context which is today-only)
+  const slotDateStr = format(slotDate, "yyyy-MM-dd");
+  const { data: dateSchedulesRaw, refetch: refetchDateSchedules } = useDoctorSchedules(slotDateStr);
+  const dateSchedules: DoctorSchedule[] = useMemo(() => {
+    return (dateSchedulesRaw || []).map((s: any) => ({
+      id: s.id,
+      doctorName: s.doctorName,
+      specialization: s.specialization || "",
+      availableFrom: s.availableFrom || "9:00 AM",
+      availableTo: s.availableTo || "5:00 PM",
+      consultationDuration: s.consultationDuration || 30,
+      timeSlots: (s.timeSlots || []).map((ts: any) => ({
+        id: ts.id,
+        time: ts.time,
+        maxPatients: ts.maxPatients ?? 5,
+        bookedPatients: ts.bookedPatients ?? 0,
+        isActive: ts.isActive ?? true,
+      })),
+    }));
+  }, [dateSchedulesRaw]);
+
   // Multi-range slot management
   interface SlotRange { from: string; to: string; tokensPerSlot: number; }
   const [slotRanges, setSlotRanges] = useState<SlotRange[]>([]);
