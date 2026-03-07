@@ -45,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!error && data) {
         setProfile(data.profile);
         setRoles(data.roles || []);
+        setAllowedModules(data.allowed_modules || []);
       }
     } catch (err) {
       console.error("Failed to fetch user data:", err);
