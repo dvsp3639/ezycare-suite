@@ -63,8 +63,6 @@ const PatientRegistration = () => {
 
   const createPatient = useCreatePatient();
   const createAppointment = useCreateAppointment();
-  const queryClient = useQueryClient();
-  const [autoCreatingSchedules, setAutoCreatingSchedules] = useState(false);
 
   // Fetch schedules for OPD date
   const { data: rawSchedules, isLoading: schedulesLoading } = useDoctorSchedules(opdDate || undefined);
