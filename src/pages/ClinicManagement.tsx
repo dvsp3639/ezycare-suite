@@ -503,7 +503,7 @@ const ClinicManagement = () => {
               <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filter by doctor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Doctors</SelectItem>
-                {schedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
+                {dateSchedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
               </SelectContent>
             </Select>
             {/* Doctors are auto-pulled from Staff & Payroll */}
