@@ -75,6 +75,7 @@ const ClinicManagement = () => {
   const {
     schedules, setSchedules, queue, setQueue,
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
+    refreshData,
   } = useClinicData();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
