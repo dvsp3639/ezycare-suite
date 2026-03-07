@@ -83,7 +83,7 @@ serve(async (req) => {
         JSON.stringify({ user: claimsData.user, profile, roles, allowed_modules }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-      );
+    }
     }
 
     // Check if hospital_admin
