@@ -425,7 +425,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); autoCreateSchedulesForDate(e.target.value); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>

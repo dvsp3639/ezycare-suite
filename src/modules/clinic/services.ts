@@ -47,6 +47,22 @@ export const clinicService = {
     return snakeToCamel(data);
   },
 
+  async deleteTimeSlotsBySchedule(scheduleId: string): Promise<void> {
+    const { error } = await supabase
+      .from("time_slots")
+      .delete()
+      .eq("schedule_id", scheduleId);
+    if (error) throw error;
+  },
+
+  async updateTimeSlot(slotId: string, updates: { maxPatients?: number; isActive?: boolean }): Promise<void> {
+    const { error } = await supabase
+      .from("time_slots")
+      .update(camelToSnake(updates) as any)
+      .eq("id", slotId);
+    if (error) throw error;
+  },
+
   async incrementSlotBooked(slotId: string): Promise<void> {
     const { data: slot } = await supabase
       .from("time_slots")
