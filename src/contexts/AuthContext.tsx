@@ -63,9 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Defer data fetch to avoid deadlock
           setTimeout(() => fetchUserData(newSession.access_token), 0);
         } else {
-          setProfile(null);
-          setRoles([]);
-        }
+        setProfile(null);
+        setRoles([]);
+        setAllowedModules([]);
+      }
         setLoading(false);
       }
     );
