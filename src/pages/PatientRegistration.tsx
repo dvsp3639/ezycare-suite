@@ -416,7 +416,7 @@ const PatientRegistration = () => {
                   )}
                   {!schedulesLoading && schedules.length === 0 && (
                     <div className="p-2 text-xs text-muted-foreground text-center">
-                      {opdDate ? "No schedules for this date" : "Select a date first"}
+                      {opdDate ? "No doctor slots configured for this date. Please set up slots in Clinic Management first." : "Select a date first"}
                     </div>
                   )}
                   {schedules.map((d: any) => (
