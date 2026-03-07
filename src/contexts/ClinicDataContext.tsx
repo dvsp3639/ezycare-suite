@@ -103,34 +103,38 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [dbSchedules, dbAppointments, staffDoctors] = await Promise.all([
+      const [dbSchedules, dbAppointments] = await Promise.all([
         clinicService.getSchedules(today),
         clinicService.getAppointments(today),
-        staffService.getStaff({ role: "Doctor", status: "Active" }),
       ]);
 
-      // Auto-create schedules for staff doctors that don't have one for today
-      const scheduledNames = new Set(dbSchedules.map((s: any) => (s.doctorName || "").toLowerCase()));
-      const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
+      // Try to auto-create schedules for staff doctors without one for today
+      let allSchedules = dbSchedules;
+      try {
+        const staffDoctors = await staffService.getStaff({ role: "Doctor", status: "Active" });
+        const scheduledNames = new Set(dbSchedules.map((s: any) => (s.doctorName || "").toLowerCase()));
+        const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
 
-      if (missingDoctors.length > 0) {
-        const newSchedules = await Promise.all(
-          missingDoctors.map((doc) =>
-            clinicService.createSchedule({
-              doctorName: doc.name,
-              specialization: doc.specialization || doc.designation || "",
-              scheduleDate: today,
-              availableFrom: "9:00 AM",
-              availableTo: "5:00 PM",
-              consultationDuration: 30,
-            } as any)
-          )
-        );
-        setSchedules([...dbSchedules.map(mapDbSchedule), ...newSchedules.map(mapDbSchedule)]);
-      } else {
-        setSchedules(dbSchedules.map(mapDbSchedule));
+        if (missingDoctors.length > 0) {
+          const newSchedules = await Promise.all(
+            missingDoctors.map((doc) =>
+              clinicService.createSchedule({
+                doctorName: doc.name,
+                specialization: doc.specialization || doc.designation || "",
+                scheduleDate: today,
+                availableFrom: "9:00 AM",
+                availableTo: "5:00 PM",
+                consultationDuration: 30,
+              } as any)
+            )
+          );
+          allSchedules = [...dbSchedules, ...newSchedules];
+        }
+      } catch (staffErr) {
+        console.warn("Could not auto-sync staff doctors:", staffErr);
       }
 
+      setSchedules(allSchedules.map(mapDbSchedule));
       setQueue(dbAppointments.map(mapDbAppointment));
     } catch (err) {
       console.error("Failed to load clinic data:", err);
