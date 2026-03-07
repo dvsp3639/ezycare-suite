@@ -124,6 +124,11 @@ const StaffPayroll = () => {
   // Handlers
   const handleAddStaff = async () => {
     if (!staffForm.name || !staffForm.employee_id) { toast.error("Name and Employee ID required"); return; }
+    if (createLogin && (!loginEmail || !loginPassword)) { toast.error("Email and password required for login"); return; }
+    if (createLogin && loginPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (createLogin && selectedModules.length === 0) { toast.error("Select at least one module for access"); return; }
+
+    setCreatingUser(true);
     try {
       await createStaff.mutateAsync({
         employee_id: staffForm.employee_id,
@@ -148,11 +153,38 @@ const StaffPayroll = () => {
         base_salary: staffForm.base_salary || 0,
         status: "Active",
       });
-      toast.success(`${staffForm.name} added`);
+
+      // Create login if checked
+      if (createLogin) {
+        const authRole = STAFF_ROLE_TO_AUTH_ROLE[staffForm.role || "Admin"] || "staff";
+        const { data, error } = await supabase.functions.invoke("admin-api/hospital-users", {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: {
+            email: loginEmail,
+            password: loginPassword,
+            full_name: staffForm.name,
+            phone: staffForm.phone || "",
+            role: authRole,
+            module_permissions: selectedModules,
+          },
+        });
+        if (error) throw new Error(error.message || "Failed to create login");
+        if (data?.error) throw new Error(data.error);
+        toast.success(`${staffForm.name} added with login access`);
+      } else {
+        toast.success(`${staffForm.name} added`);
+      }
+
       setShowAddStaff(false);
       setStaffForm({});
+      setCreateLogin(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      setSelectedModules([]);
     } catch (err: any) {
       toast.error(err.message || "Failed to add staff");
+    } finally {
+      setCreatingUser(false);
     }
   };
 
