@@ -12,9 +12,11 @@ import { useCreatePatient } from "@/modules/patients/hooks";
 import { patientService } from "@/modules/patients/services";
 import { useDoctorSchedules, useAppointments, useCreateAppointment } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
+import { staffService } from "@/modules/staff/services";
 import { snakeToCamel } from "@/lib/caseConverter";
 import { cn } from "@/lib/utils";
 import TimeSlotPicker from "@/components/TimeSlotPicker";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
