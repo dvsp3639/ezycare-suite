@@ -33,15 +33,15 @@ serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getUser(token);
-    if (claimsError || !claimsData?.user) {
+    const { data: claimsResult, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsResult?.claims) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.user.id;
+    const userId = claimsResult.claims.sub as string;
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check caller's role
@@ -80,7 +80,7 @@ serve(async (req) => {
       const allowed_modules = (modulePerms || []).map((m: any) => m.module_id);
 
       return new Response(
-        JSON.stringify({ user: claimsData.user, profile, roles, allowed_modules }),
+        JSON.stringify({ user: { id: userId, email: claimsResult.claims.email }, profile, roles, allowed_modules }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
