@@ -66,6 +66,7 @@ const leaveStatusColors: Record<string, string> = {
 };
 
 const StaffPayroll = () => {
+  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState("staff");
   const [staffSearch, setStaffSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
