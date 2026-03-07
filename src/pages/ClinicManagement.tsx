@@ -248,18 +248,15 @@ const ClinicManagement = () => {
         availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM",
       } as any);
 
-      // Persist time slots: delete old and create new
-      // We'll create slots via the service for each new slot
+      // Persist time slots: delete all old slots and recreate
+      await clinicService.deleteTimeSlotsBySchedule(editSlotDoctor.id);
       for (const slot of mergedSlots) {
-        const existing = existingSlots.find(es => es.time === slot.time);
-        if (!existing) {
-          await clinicService.createTimeSlot({
-            scheduleId: editSlotDoctor.id,
-            time: slot.time,
-            maxPatients: slot.maxPatients,
-            isActive: true,
-          });
-        }
+        await clinicService.createTimeSlot({
+          scheduleId: editSlotDoctor.id,
+          time: slot.time,
+          maxPatients: slot.maxPatients,
+          isActive: true,
+        });
       }
 
       toast.success("Slot configuration saved");
