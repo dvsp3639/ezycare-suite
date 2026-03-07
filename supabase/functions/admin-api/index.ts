@@ -80,7 +80,7 @@ serve(async (req) => {
       const allowed_modules = (modulePerms || []).map((m: any) => m.module_id);
 
       return new Response(
-        JSON.stringify({ user: claimsData.user, profile, roles, allowed_modules }),
+        JSON.stringify({ user: { id: userId, email: claimsResult.claims.email }, profile, roles, allowed_modules }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
