@@ -28,6 +28,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { modules } from "@/data/modules";
 
+const STAFF_ROLE_TO_AUTH_ROLE: Record<string, string> = {
+  Doctor: "doctor", Nurse: "nurse", Technician: "lab_technician",
+  Pharmacist: "pharmacist", Receptionist: "receptionist", Admin: "staff",
+  Housekeeping: "staff", Security: "staff", Driver: "staff",
+};
+
+const accessibleModules = modules.filter((m) => m.id !== "users-roles");
+
 const staffRoles = ["Doctor", "Nurse", "Technician", "Pharmacist", "Admin", "Receptionist", "Housekeeping", "Security", "Driver"];
 const leaveTypes = ["Casual", "Sick", "Earned", "Maternity", "Paternity", "Unpaid"];
 
