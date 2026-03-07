@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clinicService } from "./services";
-import type { Appointment, Vitals, Prescription } from "./types";
+import type { DoctorSchedule, Appointment, Vitals, Prescription } from "./types";
 
 const KEYS = {
   schedules: (date?: string) => ["clinic", "schedules", date] as const,
@@ -21,13 +21,19 @@ export function useAppointments(date?: string) {
   });
 }
 
+export function useCreateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (schedule: Partial<DoctorSchedule>) => clinicService.createSchedule(schedule),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic"] }),
+  });
+}
+
 export function useCreateAppointment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (appointment: Partial<Appointment>) => clinicService.createAppointment(appointment),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clinic"] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic"] }),
   });
 }
 

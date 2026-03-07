@@ -21,6 +21,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
+import { useStaffMembers } from "@/modules/staff/hooks";
+import { useCreateSchedule } from "@/modules/clinic/hooks";
+import { clinicService } from "@/modules/clinic/services";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -72,6 +75,7 @@ const ClinicManagement = () => {
   const {
     schedules, setSchedules, queue, setQueue,
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
+    refreshData,
   } = useClinicData();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
@@ -82,6 +86,11 @@ const ClinicManagement = () => {
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+
+  // Staff doctors for adding schedules
+  const { data: staffDoctors = [] } = useStaffMembers({ role: "Doctor" });
+  const createSchedule = useCreateSchedule();
 
   // Consultation dialog state
   const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
@@ -368,6 +377,11 @@ const ClinicManagement = () => {
                 {schedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
               </SelectContent>
             </Select>
+            {!isPastDate && (
+              <Button size="sm" onClick={() => setShowAddDoctor(true)}>
+                <Plus className="h-4 w-4 mr-1.5" /> Add Doctor
+              </Button>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -976,6 +990,57 @@ const ClinicManagement = () => {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add Doctor Schedule Dialog ─── */}
+      <Dialog open={showAddDoctor} onOpenChange={setShowAddDoctor}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Add Doctor Schedule</DialogTitle>
+            <p className="text-sm text-muted-foreground">Select a doctor from staff to create a schedule for {format(slotDate, "dd/MM/yyyy")}</p>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {(() => {
+              const scheduledNames = schedules.map((s) => s.doctorName.toLowerCase());
+              const available = (staffDoctors as any[]).filter(
+                (s: any) => !scheduledNames.includes((s.name || "").toLowerCase()) && (s.status === "Active" || !s.status)
+              );
+              if (available.length === 0) {
+                return <p className="text-sm text-muted-foreground py-4 text-center">All staff doctors already have schedules for this date.</p>;
+              }
+              return available.map((doc: any) => (
+                <Button
+                  key={doc.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={async () => {
+                    try {
+                      await clinicService.createSchedule({
+                        doctorName: doc.name,
+                        specialization: doc.specialization || doc.designation || "",
+                        scheduleDate: format(slotDate, "yyyy-MM-dd"),
+                        availableFrom: "9:00 AM",
+                        availableTo: "5:00 PM",
+                        consultationDuration: 30,
+                      } as any);
+                      await refreshData();
+                      toast.success(`Schedule created for Dr. ${doc.name}`);
+                      setShowAddDoctor(false);
+                    } catch (err: any) {
+                      toast.error(err.message || "Failed to create schedule");
+                    }
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-primary" />
+                  <div className="text-left">
+                    <p className="font-medium">{doc.name}</p>
+                    <p className="text-xs text-muted-foreground">{doc.specialization || doc.designation || "General"}</p>
+                  </div>
+                </Button>
+              ));
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
