@@ -71,9 +71,18 @@ serve(async (req) => {
         .eq("user_id", userId)
         .maybeSingle();
 
+      // Fetch allowed modules for this user
+      const { data: modulePerms } = await adminClient
+        .from("user_module_permissions")
+        .select("module_id")
+        .eq("user_id", userId);
+
+      const allowed_modules = (modulePerms || []).map((m: any) => m.module_id);
+
       return new Response(
-        JSON.stringify({ user: claimsData.user, profile, roles }),
+        JSON.stringify({ user: claimsData.user, profile, roles, allowed_modules }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
       );
     }
 
