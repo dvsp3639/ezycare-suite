@@ -262,6 +262,8 @@ serve(async (req) => {
         if (!roleRecord) throw new Error("User role not found");
         if (roleRecord.hospital_id !== adminHospitalId) throw new Error("Access denied");
 
+        // Clean up module permissions first
+        await adminClient.from("user_module_permissions").delete().eq("user_id", roleRecord.user_id);
         await adminClient.from("user_roles").delete().eq("id", roleId);
         await adminClient.auth.admin.deleteUser(roleRecord.user_id);
 
