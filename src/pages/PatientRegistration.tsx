@@ -65,7 +65,7 @@ const PatientRegistration = () => {
 
   // Fetch schedules for OPD date
   const { data: rawSchedules } = useDoctorSchedules(opdDate || undefined);
-  const schedules = (rawSchedules || []).map((s: any) => snakeToCamel(s)) as any[];
+  const schedules = (rawSchedules || []) as any[];
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
