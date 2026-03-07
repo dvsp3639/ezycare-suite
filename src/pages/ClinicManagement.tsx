@@ -151,7 +151,7 @@ const ClinicManagement = () => {
     return isBefore(slotDate_, now);
   };
 
-  const editSlotDoctor = editSlotDoctorId ? schedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
+  const editSlotDoctor = editSlotDoctorId ? dateSchedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
 
   // Helper: parse 12h time to minutes
   const parseTime12 = (t: string): number => {
