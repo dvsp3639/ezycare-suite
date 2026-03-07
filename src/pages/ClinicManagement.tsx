@@ -1061,7 +1061,6 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
           </div>
         ))}
       </div>
-    </div>
 
       {/* ─── Add Doctor Schedule Dialog ─── */}
       <Dialog open={showAddDoctor} onOpenChange={setShowAddDoctor}>
