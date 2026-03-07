@@ -82,6 +82,11 @@ const StaffPayroll = () => {
 
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
+  const [createLogin, setCreateLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [advanceForm, setAdvanceForm] = useState({ staff_id: "", amount: 0, reason: "", repayment_months: 3 });
   const [leaveForm, setLeaveForm] = useState({ staff_id: "", leave_type: "Casual", from_date: "", to_date: "", reason: "" });
 
