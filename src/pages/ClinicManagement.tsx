@@ -89,6 +89,41 @@ const ClinicManagement = () => {
   // Fetch schedules for selected slotDate (independent of context which is today-only)
   const slotDateStr = format(slotDate, "yyyy-MM-dd");
   const { data: dateSchedulesRaw, refetch: refetchDateSchedules } = useDoctorSchedules(slotDateStr);
+  const [autoCreating, setAutoCreating] = useState(false);
+
+  // Auto-create schedules for selected date if doctors don't have entries yet
+  useEffect(() => {
+    if (dateSchedulesRaw === undefined || autoCreating) return; // still loading or already creating
+    const autoCreate = async () => {
+      try {
+        const staffDoctors = await (await import("@/modules/staff/services")).staffService.getStaff({ role: "Doctor", status: "Active" });
+        const scheduledNames = new Set((dateSchedulesRaw || []).map((s: any) => (s.doctorName || "").toLowerCase()));
+        const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
+        if (missingDoctors.length > 0) {
+          setAutoCreating(true);
+          await Promise.all(
+            missingDoctors.map((doc) =>
+              clinicService.createSchedule({
+                doctorName: doc.name,
+                specialization: doc.specialization || doc.designation || "",
+                scheduleDate: slotDateStr,
+                availableFrom: "9:00 AM",
+                availableTo: "5:00 PM",
+                consultationDuration: 30,
+              } as any)
+            )
+          );
+          refetchDateSchedules();
+          setAutoCreating(false);
+        }
+      } catch (err) {
+        console.warn("Could not auto-sync staff doctors for date:", err);
+        setAutoCreating(false);
+      }
+    };
+    autoCreate();
+  }, [dateSchedulesRaw, slotDateStr]);
+
   const dateSchedules: DoctorSchedule[] = useMemo(() => {
     return (dateSchedulesRaw || []).map((s: any) => ({
       id: s.id,
