@@ -409,12 +409,12 @@ const PatientRegistration = () => {
               <Select value={opdDoctor} onValueChange={(v) => { setOpdDoctor(v); setOpdTimeSlot(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent>
-                  {(schedulesLoading || autoCreatingSchedules) && (
+                  {schedulesLoading && (
                     <div className="p-2 text-xs text-muted-foreground text-center flex items-center gap-2 justify-center">
                       <Loader2 className="h-3 w-3 animate-spin" /> Loading doctors...
                     </div>
                   )}
-                  {!schedulesLoading && !autoCreatingSchedules && schedules.length === 0 && (
+                  {!schedulesLoading && schedules.length === 0 && (
                     <div className="p-2 text-xs text-muted-foreground text-center">
                       {opdDate ? "No schedules for this date" : "Select a date first"}
                     </div>
