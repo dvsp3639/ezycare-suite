@@ -91,6 +91,18 @@ const ClinicManagement = () => {
   const { data: dateSchedulesRaw, refetch: refetchDateSchedules } = useDoctorSchedules(slotDateStr);
   const [autoCreating, setAutoCreating] = useState(false);
 
+  // Refresh OP Queue data when component mounts or tab switches to queue
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  // Also refresh when switching to the OP Queue tab
+  useEffect(() => {
+    if (activeTab === "queue") {
+      refreshData();
+    }
+  }, [activeTab]);
+
   // Auto-create schedules for selected date if doctors don't have entries yet
   useEffect(() => {
     if (dateSchedulesRaw === undefined || autoCreating) return; // still loading or already creating
