@@ -2114,6 +2114,38 @@ export type Database = {
           },
         ]
       }
+      user_module_permissions: {
+        Row: {
+          created_at: string
+          hospital_id: string
+          id: string
+          module_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hospital_id: string
+          id?: string
+          module_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          module_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_module_permissions_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           hospital_id: string | null
