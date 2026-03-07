@@ -65,7 +65,43 @@ const PatientRegistration = () => {
   const createAppointment = useCreateAppointment();
 
   // Fetch schedules for OPD date
-  const { data: rawSchedules, isLoading: schedulesLoading } = useDoctorSchedules(opdDate || undefined);
+  const { data: rawSchedules, isLoading: schedulesLoading, refetch: refetchSchedules } = useDoctorSchedules(opdDate || undefined);
+  const [autoCreatingSchedules, setAutoCreatingSchedules] = useState(false);
+
+  // Auto-create schedules for selected OPD date if doctors don't have entries yet
+  useEffect(() => {
+    if (rawSchedules === undefined || autoCreatingSchedules || !opdDate) return;
+    const autoCreate = async () => {
+      try {
+        const { staffService } = await import("@/modules/staff/services");
+        const staffDoctors = await staffService.getStaff({ role: "Doctor", status: "Active" });
+        const scheduledNames = new Set((rawSchedules || []).map((s: any) => (s.doctorName || "").toLowerCase()));
+        const missingDoctors = staffDoctors.filter((d) => !scheduledNames.has((d.name || "").toLowerCase()));
+        if (missingDoctors.length > 0) {
+          setAutoCreatingSchedules(true);
+          await Promise.all(
+            missingDoctors.map((doc) =>
+              clinicService.createSchedule({
+                doctorName: doc.name,
+                specialization: doc.specialization || doc.designation || "",
+                scheduleDate: opdDate,
+                availableFrom: "9:00 AM",
+                availableTo: "5:00 PM",
+                consultationDuration: 30,
+              } as any)
+            )
+          );
+          refetchSchedules();
+          setAutoCreatingSchedules(false);
+        }
+      } catch (err) {
+        console.warn("Could not auto-sync doctors for OPD date:", err);
+        setAutoCreatingSchedules(false);
+      }
+    };
+    autoCreate();
+  }, [rawSchedules, opdDate]);
+
   // Only show doctors who have time slots configured
   const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
 
