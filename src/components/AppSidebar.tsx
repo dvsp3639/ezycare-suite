@@ -21,12 +21,17 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isHospitalAdmin, isSuperAdmin } = useAuth();
+  const { user, logout, isHospitalAdmin, isSuperAdmin, allowedModules } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
   const visibleModules = modules.filter((mod) => {
     if (mod.id === "users-roles") return isHospitalAdmin || isSuperAdmin;
+    // Super admins and hospital admins see all modules
+    if (isSuperAdmin || isHospitalAdmin) return true;
+    // If user has module permissions set, only show allowed ones
+    if (allowedModules.length > 0) return allowedModules.includes(mod.id);
+    // If no permissions set (legacy), show all
     return true;
   });
 

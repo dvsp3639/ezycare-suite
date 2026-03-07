@@ -17,6 +17,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   roles: UserRole[];
+  allowedModules: string[];
   session: Session | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -33,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = useCallback(async (accessToken: string) => {
@@ -43,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!error && data) {
         setProfile(data.profile);
         setRoles(data.roles || []);
+        setAllowedModules(data.allowed_modules || []);
       }
     } catch (err) {
       console.error("Failed to fetch user data:", err);
@@ -60,9 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Defer data fetch to avoid deadlock
           setTimeout(() => fetchUserData(newSession.access_token), 0);
         } else {
-          setProfile(null);
-          setRoles([]);
-        }
+        setProfile(null);
+        setRoles([]);
+        setAllowedModules([]);
+      }
         setLoading(false);
       }
     );
@@ -92,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setAllowedModules([]);
   }, []);
 
   const isSuperAdmin = roles.some(r => r.role === "super_admin");
@@ -103,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         roles,
+        allowedModules,
         session,
         login,
         logout,

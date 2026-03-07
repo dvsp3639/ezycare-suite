@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Users, Search, Plus, User, Eye, CheckCircle, XCircle,
@@ -23,6 +24,17 @@ import {
   useCreateAdvance, useUpdateAdvance,
 } from "@/modules/staff/hooks";
 import type { StaffMember, SalaryRecord, AttendanceRecord, LeaveRequest, SalaryAdvance } from "@/modules/staff/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { modules } from "@/data/modules";
+
+const STAFF_ROLE_TO_AUTH_ROLE: Record<string, string> = {
+  Doctor: "doctor", Nurse: "nurse", Technician: "lab_technician",
+  Pharmacist: "pharmacist", Receptionist: "receptionist", Admin: "staff",
+  Housekeeping: "staff", Security: "staff", Driver: "staff",
+};
+
+const accessibleModules = modules.filter((m) => m.id !== "users-roles");
 
 const staffRoles = ["Doctor", "Nurse", "Technician", "Pharmacist", "Admin", "Receptionist", "Housekeeping", "Security", "Driver"];
 const leaveTypes = ["Casual", "Sick", "Earned", "Maternity", "Paternity", "Unpaid"];
@@ -54,6 +66,7 @@ const leaveStatusColors: Record<string, string> = {
 };
 
 const StaffPayroll = () => {
+  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState("staff");
   const [staffSearch, setStaffSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -69,6 +82,11 @@ const StaffPayroll = () => {
 
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
+  const [createLogin, setCreateLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [advanceForm, setAdvanceForm] = useState({ staff_id: "", amount: 0, reason: "", repayment_months: 3 });
   const [leaveForm, setLeaveForm] = useState({ staff_id: "", leave_type: "Casual", from_date: "", to_date: "", reason: "" });
 
@@ -106,6 +124,11 @@ const StaffPayroll = () => {
   // Handlers
   const handleAddStaff = async () => {
     if (!staffForm.name || !staffForm.employee_id) { toast.error("Name and Employee ID required"); return; }
+    if (createLogin && (!loginEmail || !loginPassword)) { toast.error("Email and password required for login"); return; }
+    if (createLogin && loginPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (createLogin && selectedModules.length === 0) { toast.error("Select at least one module for access"); return; }
+
+    setCreatingUser(true);
     try {
       await createStaff.mutateAsync({
         employee_id: staffForm.employee_id,
@@ -130,11 +153,38 @@ const StaffPayroll = () => {
         base_salary: staffForm.base_salary || 0,
         status: "Active",
       });
-      toast.success(`${staffForm.name} added`);
+
+      // Create login if checked
+      if (createLogin) {
+        const authRole = STAFF_ROLE_TO_AUTH_ROLE[staffForm.role || "Admin"] || "staff";
+        const { data, error } = await supabase.functions.invoke("admin-api/hospital-users", {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: {
+            email: loginEmail,
+            password: loginPassword,
+            full_name: staffForm.name,
+            phone: staffForm.phone || "",
+            role: authRole,
+            module_permissions: selectedModules,
+          },
+        });
+        if (error) throw new Error(error.message || "Failed to create login");
+        if (data?.error) throw new Error(data.error);
+        toast.success(`${staffForm.name} added with login access`);
+      } else {
+        toast.success(`${staffForm.name} added`);
+      }
+
       setShowAddStaff(false);
       setStaffForm({});
+      setCreateLogin(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      setSelectedModules([]);
     } catch (err: any) {
       toast.error(err.message || "Failed to add staff");
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -263,7 +313,7 @@ const StaffPayroll = () => {
           </h1>
           <p className="text-sm text-muted-foreground">Staff profiles, attendance, leaves & salary management</p>
         </div>
-        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employment_type: "Full-Time" }); }}>
+        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employment_type: "Full-Time" }); setCreateLogin(false); setLoginEmail(""); setLoginPassword(""); setSelectedModules([]); }}>
           <Plus className="h-4 w-4 mr-1" /> Add Staff
         </Button>
       </div>
@@ -615,9 +665,61 @@ const StaffPayroll = () => {
               <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.base_salary || 0} onChange={(e) => setStaffForm({ ...staffForm, base_salary: +e.target.value })} /></div>
             </div>
             <div><Label>Joining Date</Label><Input type="date" value={staffForm.joining_date || ""} onChange={(e) => setStaffForm({ ...staffForm, joining_date: e.target.value })} /></div>
+
+            {/* Login Creation Section */}
+            <div className="border-t border-border pt-4 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Checkbox
+                  id="createLogin"
+                  checked={createLogin}
+                  onCheckedChange={(checked) => {
+                    setCreateLogin(!!checked);
+                    if (!checked) { setLoginEmail(""); setLoginPassword(""); setSelectedModules([]); }
+                  }}
+                />
+                <Label htmlFor="createLogin" className="text-sm font-semibold cursor-pointer">Create Login Access</Label>
+              </div>
+
+              {createLogin && (
+                <div className="space-y-3 pl-6 border-l-2 border-primary/20">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label>Login Email</Label><Input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="user@hospital.com" /></div>
+                    <div><Label>Password</Label><Input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Min 6 characters" /></div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Module Access</Label>
+                    <p className="text-xs text-muted-foreground mb-2">Select which modules this user can access</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {accessibleModules.map((mod) => (
+                        <div key={mod.id} className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/30 transition-colors">
+                          <Checkbox
+                            id={`mod-${mod.id}`}
+                            checked={selectedModules.includes(mod.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedModules((prev) =>
+                                checked ? [...prev, mod.id] : prev.filter((m) => m !== mod.id)
+                              );
+                            }}
+                          />
+                          <Label htmlFor={`mod-${mod.id}`} className="text-xs cursor-pointer flex items-center gap-1.5">
+                            <mod.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                            {mod.title}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => setSelectedModules(accessibleModules.map((m) => m.id))}>Select All</Button>
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => setSelectedModules([])}>Clear All</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending}>
-            {createStaff.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
+          <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending || creatingUser}>
+            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
           </Button></DialogFooter>
         </DialogContent>
       </Dialog>

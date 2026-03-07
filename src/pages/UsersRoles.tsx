@@ -196,9 +196,7 @@ export default function UsersRoles() {
           <h1 className="text-2xl font-bold text-foreground">Users & Roles</h1>
           <p className="text-sm text-muted-foreground">Manage your hospital staff credentials</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Add User
-        </Button>
+        {/* Users are now created from Staff & Payroll module */}
       </div>
 
       {/* Filters */}
@@ -262,7 +260,7 @@ export default function UsersRoles() {
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>No staff members found</p>
-              <Button variant="outline" className="mt-3" onClick={openCreate}>Add your first user</Button>
+              <p className="text-xs mt-1">Create staff with login access from the Staff & Payroll module</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
