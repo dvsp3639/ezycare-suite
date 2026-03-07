@@ -260,7 +260,7 @@ export default function UsersRoles() {
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>No staff members found</p>
-              <Button variant="outline" className="mt-3" onClick={openCreate}>Add your first user</Button>
+              <p className="text-xs mt-1">Create staff with login access from the Staff & Payroll module</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
