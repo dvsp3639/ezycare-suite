@@ -665,9 +665,61 @@ const StaffPayroll = () => {
               <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.base_salary || 0} onChange={(e) => setStaffForm({ ...staffForm, base_salary: +e.target.value })} /></div>
             </div>
             <div><Label>Joining Date</Label><Input type="date" value={staffForm.joining_date || ""} onChange={(e) => setStaffForm({ ...staffForm, joining_date: e.target.value })} /></div>
+
+            {/* Login Creation Section */}
+            <div className="border-t border-border pt-4 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Checkbox
+                  id="createLogin"
+                  checked={createLogin}
+                  onCheckedChange={(checked) => {
+                    setCreateLogin(!!checked);
+                    if (!checked) { setLoginEmail(""); setLoginPassword(""); setSelectedModules([]); }
+                  }}
+                />
+                <Label htmlFor="createLogin" className="text-sm font-semibold cursor-pointer">Create Login Access</Label>
+              </div>
+
+              {createLogin && (
+                <div className="space-y-3 pl-6 border-l-2 border-primary/20">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label>Login Email</Label><Input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="user@hospital.com" /></div>
+                    <div><Label>Password</Label><Input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Min 6 characters" /></div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Module Access</Label>
+                    <p className="text-xs text-muted-foreground mb-2">Select which modules this user can access</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {accessibleModules.map((mod) => (
+                        <div key={mod.id} className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/30 transition-colors">
+                          <Checkbox
+                            id={`mod-${mod.id}`}
+                            checked={selectedModules.includes(mod.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedModules((prev) =>
+                                checked ? [...prev, mod.id] : prev.filter((m) => m !== mod.id)
+                              );
+                            }}
+                          />
+                          <Label htmlFor={`mod-${mod.id}`} className="text-xs cursor-pointer flex items-center gap-1.5">
+                            <mod.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                            {mod.title}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => setSelectedModules(accessibleModules.map((m) => m.id))}>Select All</Button>
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => setSelectedModules([])}>Clear All</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending}>
-            {createStaff.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
+          <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending || creatingUser}>
+            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
           </Button></DialogFooter>
         </DialogContent>
       </Dialog>
