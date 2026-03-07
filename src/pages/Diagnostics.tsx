@@ -115,7 +115,7 @@ const Diagnostics = () => {
           parameter: p.name,
           value: "",
           unit: p.unit,
-          normalRange: p.normalRange,
+          normalRange: p.normal_range || "",
           isAbnormal: false,
         }))
       );
