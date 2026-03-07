@@ -84,7 +84,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    }
 
     // Check if hospital_admin
     const { data: hospitalAdminRole } = await adminClient

@@ -30,9 +30,7 @@ export function AppSidebar() {
     // Super admins and hospital admins see all modules
     if (isSuperAdmin || isHospitalAdmin) return true;
     // If user has module permissions set, only show allowed ones
-    if (allowedModules.length > 0) return allowedModules.includes(mod.id);
-    // If no permissions set (legacy), show all
-    return true;
+    return allowedModules.includes(mod.id);
   });
 
   return (
