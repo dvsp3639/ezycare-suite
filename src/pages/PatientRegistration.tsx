@@ -69,39 +69,8 @@ const PatientRegistration = () => {
 
   // Fetch schedules for OPD date
   const { data: rawSchedules, isLoading: schedulesLoading } = useDoctorSchedules(opdDate || undefined);
-  const schedules = (rawSchedules || []) as any[];
-
-  // Auto-create schedules for selected OPD date if none exist
-  const autoCreateSchedulesForDate = async (date: string) => {
-    if (!date || autoCreatingSchedules) return;
-    setAutoCreatingSchedules(true);
-    try {
-      const existing = await clinicService.getSchedules(date);
-      if (existing.length === 0) {
-        const staffDoctors = await staffService.getStaff({ role: "Doctor", status: "Active" });
-        if (staffDoctors.length > 0) {
-          await Promise.all(
-            staffDoctors.map((doc) =>
-              clinicService.createSchedule({
-                doctorName: doc.name,
-                specialization: doc.specialization || doc.designation || "",
-                scheduleDate: date,
-                availableFrom: "9:00 AM",
-                availableTo: "5:00 PM",
-                consultationDuration: 30,
-              } as any)
-            )
-          );
-          // Invalidate query so useDoctorSchedules refetches
-          queryClient.invalidateQueries({ queryKey: ["clinic", "schedules", date] });
-        }
-      }
-    } catch (err) {
-      console.warn("Could not auto-create schedules:", err);
-    } finally {
-      setAutoCreatingSchedules(false);
-    }
-  };
+  // Only show doctors who have time slots configured
+  const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
