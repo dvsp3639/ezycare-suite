@@ -15,7 +15,7 @@ import { clinicService } from "@/modules/clinic/services";
 import { snakeToCamel } from "@/lib/caseConverter";
 import { cn } from "@/lib/utils";
 import TimeSlotPicker from "@/components/TimeSlotPicker";
-import { useQueryClient } from "@tanstack/react-query";
+
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
