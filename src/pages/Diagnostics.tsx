@@ -31,6 +31,7 @@ const statusColors: Record<string, string> = {
 
 const Diagnostics = () => {
   const { allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment } = useClinicData();
+  const { data: labTestCatalog = [] } = useLabTestCatalog();
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
