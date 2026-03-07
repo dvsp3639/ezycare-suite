@@ -74,6 +74,7 @@ const ClinicManagement = () => {
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
   } = useClinicData();
 
+  const { data: labTestCatalog = [] } = useLabTestCatalog();
   const [activeTab, setActiveTab] = useState("slots");
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
