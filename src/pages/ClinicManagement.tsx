@@ -21,6 +21,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
+import { useStaffMembers } from "@/modules/staff/hooks";
+import { useCreateSchedule } from "@/modules/clinic/hooks";
+import { clinicService } from "@/modules/clinic/services";
 import {
   type DoctorSchedule,
   type QueueEntry,
