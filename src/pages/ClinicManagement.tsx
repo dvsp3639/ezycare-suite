@@ -257,13 +257,6 @@ const ClinicManagement = () => {
         return existing ? { ...ns, bookedPatients: existing.bookedPatients } : ns;
       });
 
-      // Update local state
-      setSchedules(prev => prev.map(doc =>
-        doc.id === editSlotDoctor.id
-          ? { ...doc, timeSlots: mergedSlots, availableFrom: slotRanges[0]?.from || "9:00 AM", availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM" }
-          : doc
-      ));
-
       // Persist: update schedule availability
       await clinicService.updateSchedule(editSlotDoctor.id, {
         availableFrom: slotRanges[0]?.from || "9:00 AM",
@@ -283,6 +276,7 @@ const ClinicManagement = () => {
 
       toast.success("Slot configuration saved");
       setEditSlotDoctorId(null);
+      refetchDateSchedules();
       refreshData();
     } catch (err: any) {
       toast.error(err.message || "Error saving slot configuration");
