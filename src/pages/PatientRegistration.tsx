@@ -385,7 +385,7 @@ const PatientRegistration = () => {
       )}
 
       {/* OPD Booking Modal */}
-      <Dialog open={showOPD} onOpenChange={(open) => { setShowOPD(open); if (open && opdDate) autoCreateSchedulesForDate(opdDate); }}>
+      <Dialog open={showOPD} onOpenChange={setShowOPD}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">Book OPD Appointment</DialogTitle>
