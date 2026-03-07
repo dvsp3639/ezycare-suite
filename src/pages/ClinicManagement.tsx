@@ -472,7 +472,7 @@ const ClinicManagement = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Total Doctors" value={schedules.length} icon={<Users className="h-4 w-4" />} accent="text-primary" />
+        <SummaryCard label="Total Doctors" value={dateSchedules.length} icon={<Users className="h-4 w-4" />} accent="text-primary" />
         <SummaryCard label="Waiting" value={waitingCount} icon={<Clock className="h-4 w-4" />} accent="text-warning" />
         <SummaryCard label="In Consultation" value={inConsultCount} icon={<CalendarIcon className="h-4 w-4" />} accent="text-info" />
         <SummaryCard label="Completed" value={completedCount} icon={<Users className="h-4 w-4" />} accent="text-success" />
