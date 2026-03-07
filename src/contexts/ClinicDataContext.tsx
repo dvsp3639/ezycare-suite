@@ -52,6 +52,7 @@ function mapDbSchedule(s: any): DoctorSchedule {
     availableTo: s.availableTo || "5:00 PM",
     consultationDuration: s.consultationDuration || 30,
     timeSlots: (s.timeSlots || []).map((ts: any) => ({
+      id: ts.id,
       time: ts.time,
       maxPatients: ts.maxPatients ?? 5,
       bookedPatients: ts.bookedPatients ?? 0,
