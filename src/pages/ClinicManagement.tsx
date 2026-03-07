@@ -85,6 +85,12 @@ const ClinicManagement = () => {
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+
+  // Staff doctors for adding schedules
+  const { data: staffDoctors = [] } = useStaffMembers({ role: "Doctor" });
+  const createSchedule = useCreateSchedule();
+  const { refreshData } = useClinicData();
 
   // Consultation dialog state
   const [consultPatient, setConsultPatient] = useState<QueueEntry | null>(null);
