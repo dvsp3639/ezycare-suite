@@ -505,7 +505,7 @@ const ClinicManagement = () => {
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
                   {!isPastDate && (
-                    <Button variant="outline" size="sm" onClick={() => setEditSlotDoctorId(doc.id)}>
+                    <Button variant="outline" size="sm" onClick={() => openManageSlots(doc.id)}>
                       <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
                     </Button>
                   )}
