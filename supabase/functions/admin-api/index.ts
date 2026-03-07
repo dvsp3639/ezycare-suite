@@ -145,7 +145,7 @@ serve(async (req) => {
 
       if (path === "hospital-users" && method === "POST") {
         const body = await req.json();
-        const { email, password, full_name, phone, role } = body;
+        const { email, password, full_name, phone, role, module_permissions } = body;
 
         if (!email || !password || !role) {
           throw new Error("email, password, and role are required");
@@ -172,6 +172,16 @@ serve(async (req) => {
             .from("profiles")
             .update({ full_name: full_name || email, phone })
             .eq("user_id", authData.user.id);
+        }
+
+        // Save module permissions
+        if (module_permissions && Array.isArray(module_permissions) && module_permissions.length > 0) {
+          const permRows = module_permissions.map((mod: string) => ({
+            user_id: authData.user.id,
+            hospital_id: adminHospitalId,
+            module_id: mod,
+          }));
+          await adminClient.from("user_module_permissions").insert(permRows);
         }
 
         return new Response(
