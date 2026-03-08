@@ -40,9 +40,12 @@ const admissionStatusColors: Record<AdmissionStatus, string> = {
 
 const IPD = () => {
   const { wards, beds, setBeds } = useWardsBeds();
-  const { data: dbAdmissions } = useAdmissions();
+  const { data: dbAdmissions, refetch: refetchAdmissions } = useAdmissions();
   const { data: patientsData } = usePatients();
   const { data: staffData } = useStaffMembers();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
+  const queryClient = useQueryClient();
   const dbPatients = patientsData || [];
   const dbDoctors = (staffData || []).filter((s: any) => s.role === "Doctor" || s.designation?.toLowerCase().includes("doctor")).map((s: any) => ({ id: s.id, name: s.name, specialization: s.specialization || "" }));
 
