@@ -78,6 +78,8 @@ const ClinicManagement = () => {
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
     refreshData,
   } = useClinicData();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const [activeTab, setActiveTab] = useState("slots");
