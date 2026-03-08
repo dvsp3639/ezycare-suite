@@ -342,6 +342,27 @@ const ClinicManagement = () => {
     toast.success(`Started consultation for ${entry.patientName}`);
   };
 
+  const handleSendToDayCare = async (entry: QueueEntry) => {
+    try {
+      await daycareService.createSession({
+        patient_name: entry.patientName,
+        registration_number: entry.registrationNumber,
+        doctor_name: entry.doctorName,
+        status: "In Progress",
+        diagnosis: entry.diagnosis || "",
+        session_date: format(new Date(), "yyyy-MM-dd"),
+        hospital_id: hospitalId,
+        admission_time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        gender: "",
+        mobile: "",
+        age: null,
+      } as any);
+      toast.success(`${entry.patientName} sent to Day Care`);
+    } catch (err: any) {
+      toast.error("Failed to send to Day Care: " + (err.message || "Unknown error"));
+    }
+  };
+
   const handleOpenVitalsDialog = (entry: QueueEntry) => {
     setVitalsPatient(entry);
     setNurseVitals(entry.vitals || emptyVitals());
