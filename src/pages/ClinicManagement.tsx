@@ -16,13 +16,15 @@ import { toast } from "sonner";
 import {
   Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon,
   CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
-  CalendarPlus, Trash2, CheckCircle2, Save, Download,
+  CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
+import { daycareService } from "@/modules/daycare/services";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -76,6 +78,8 @@ const ClinicManagement = () => {
     updateQueueStatus, updateQueueConsultation, updateQueueVitals, updateQueueLabOrders, updateQueueFollowUp,
     refreshData,
   } = useClinicData();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const [activeTab, setActiveTab] = useState("slots");
@@ -336,6 +340,27 @@ const ClinicManagement = () => {
   const handleStartConsultation = (entry: QueueEntry) => {
     updateQueueStatus(entry.id, "In Consultation");
     toast.success(`Started consultation for ${entry.patientName}`);
+  };
+
+  const handleSendToDayCare = async (entry: QueueEntry) => {
+    try {
+      await daycareService.createSession({
+        patient_name: entry.patientName,
+        registration_number: entry.registrationNumber,
+        doctor_name: entry.doctorName,
+        status: "In Progress",
+        diagnosis: entry.diagnosis || "",
+        session_date: format(new Date(), "yyyy-MM-dd"),
+        hospital_id: hospitalId,
+        admission_time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        gender: "",
+        mobile: "",
+        age: null,
+      } as any);
+      toast.success(`${entry.patientName} sent to Day Care`);
+    } catch (err: any) {
+      toast.error("Failed to send to Day Care: " + (err.message || "Unknown error"));
+    }
   };
 
   const handleOpenVitalsDialog = (entry: QueueEntry) => {
@@ -663,9 +688,14 @@ const ClinicManagement = () => {
                         <Button size="sm" variant="outline" onClick={() => handleStartConsultation(q)}>Start</Button>
                       )}
                       {q.status === "In Consultation" && (
-                        <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
-                          <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
+                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleSendToDayCare(q)}>
+                            <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
+                          </Button>
+                        </>
                       )}
                       {q.status === "Completed" && q.diagnosis && (
                         <Button size="sm" variant="ghost" onClick={() => handleOpenConsultDialog(q)}>
