@@ -688,9 +688,14 @@ const ClinicManagement = () => {
                         <Button size="sm" variant="outline" onClick={() => handleStartConsultation(q)}>Start</Button>
                       )}
                       {q.status === "In Consultation" && (
-                        <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
-                          <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
+                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleSendToDayCare(q)}>
+                            <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
+                          </Button>
+                        </>
                       )}
                       {q.status === "Completed" && q.diagnosis && (
                         <Button size="sm" variant="ghost" onClick={() => handleOpenConsultDialog(q)}>
