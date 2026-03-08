@@ -130,21 +130,23 @@ const DayCare = () => {
   const totalRevenue = patients.reduce((sum, p) => sum + (p.bill?.grandTotal || 0), 0);
 
   // ---- Treatment Actions ----
-  const handleAddTreatment = () => {
-    if (!selectedPatientId || !selectedTreatmentId) return;
-    const treat = treatments.find((t) => t.id === selectedTreatmentId);
-    if (!treat) return;
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === selectedPatientId
-          ? { ...p, treatments: [...p.treatments, { treatmentId: treat.id, treatmentName: treat.name, status: "Scheduled" as const, notes: treatmentNotes || undefined }] }
-          : p
-      )
-    );
-    toast({ title: "Treatment Added", description: `${treat.name} added for patient` });
-    setShowAddTreatment(false);
-    setSelectedTreatmentId("");
-    setTreatmentNotes("");
+  const handleAddTreatment = async () => {
+    if (!selectedPatientId || !treatmentNameInput.trim()) return;
+    try {
+      await daycareService.addSessionTreatment({
+        session_id: selectedPatientId,
+        treatment_name: treatmentNameInput.trim(),
+        status: "Scheduled",
+        notes: "",
+        hospital_id: hospitalId,
+      } as any);
+      await refetchSessions();
+      toast({ title: "Treatment Added", description: `${treatmentNameInput} added for patient` });
+      setShowAddTreatment(false);
+      setTreatmentNameInput("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to add treatment", variant: "destructive" });
+    }
   };
 
   const startTreatment = (patientId: string, treatmentId: string) => {
