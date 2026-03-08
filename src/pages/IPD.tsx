@@ -25,8 +25,11 @@ import {
 } from "@/data/mockIPDData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
 import { useAdmissions } from "@/modules/ipd/hooks";
+import { ipdService } from "@/modules/ipd/services";
 import { usePatients } from "@/modules/patients/hooks";
 import { useStaffMembers } from "@/modules/staff/hooks";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 const admissionStatusColors: Record<AdmissionStatus, string> = {
   Active: "bg-success/10 text-success border-success/30",
@@ -37,9 +40,12 @@ const admissionStatusColors: Record<AdmissionStatus, string> = {
 
 const IPD = () => {
   const { wards, beds, setBeds } = useWardsBeds();
-  const { data: dbAdmissions } = useAdmissions();
+  const { data: dbAdmissions, refetch: refetchAdmissions } = useAdmissions();
   const { data: patientsData } = usePatients();
   const { data: staffData } = useStaffMembers();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
+  const queryClient = useQueryClient();
   const dbPatients = patientsData || [];
   const dbDoctors = (staffData || []).filter((s: any) => s.role === "Doctor" || s.designation?.toLowerCase().includes("doctor")).map((s: any) => ({ id: s.id, name: s.name, specialization: s.specialization || "" }));
 
@@ -76,6 +82,36 @@ const IPD = () => {
   const [selectedAdmission, setSelectedAdmission] = useState<IPDAdmission | null>(null);
   const [bedWardFilter, setBedWardFilter] = useState("all");
   const [bedStatusFilter, setBedStatusFilter] = useState("all");
+
+  // Load sub-entries from DB when an admission is selected
+  useEffect(() => {
+    if (!selectedAdmission) return;
+    const admId = selectedAdmission.id;
+    Promise.all([
+      ipdService.getDoctorNotes(admId),
+      ipdService.getNurseNotes(admId),
+      ipdService.getMedicineEntries(admId),
+      ipdService.getSurgicalEntries(admId),
+      ipdService.getDiagnosticEntries(admId),
+      ipdService.getBedTransfers(admId),
+      ipdService.getDischargeSummary(admId),
+    ]).then(([dn, nn, me, se, de, bt, ds]) => {
+      setDoctorNotes(dn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.visitDate, time: n.visitTime, doctor: n.doctor, notes: n.notes, instructions: n.instructions })));
+      setNurseNotes(nn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.noteDate, time: n.noteTime, nurse: n.nurse, vitals: { bp: n.bp, temp: n.temp, pulse: n.pulse, spo2: n.spo2 }, notes: n.notes })));
+      setMedicineEntries(me.map((m: any) => ({ id: m.id, admissionId: m.admissionId, date: m.entryDate, medicineName: m.medicineName, dosage: m.dosage, frequency: m.frequency, quantity: m.quantity, unitPrice: m.unitPrice, total: m.total })));
+      setSurgicalEntries(se.map((s: any) => ({ id: s.id, admissionId: s.admissionId, date: s.entryDate, procedureName: s.procedureName, surgeon: s.surgeon, notes: s.notes, cost: s.cost })));
+      setDiagnosticEntries(de.map((d: any) => ({ id: d.id, admissionId: d.admissionId, date: d.entryDate, testName: d.testName, cost: d.cost, result: d.result })));
+      setBedTransfers(bt.map((t: any) => ({ id: t.id, admissionId: t.admissionId, patientName: t.patientName, fromWard: t.fromWard, fromBed: t.fromBed, toWard: t.toWard, toBed: t.toBed, reason: t.reason, transferDate: t.transferDate, transferredBy: t.transferredBy })));
+      if (ds) {
+        const d = ds as any;
+        setDischargeSummaries((prev) => {
+          const exists = prev.find((x: any) => x.id === d.id);
+          if (exists) return prev;
+          return [...prev, { id: d.id, admissionId: d.admissionId, dischargeDate: d.dischargeDate, conditionAtDischarge: d.conditionAtDischarge, finalDiagnosis: d.finalDiagnosis, treatmentSummary: d.treatmentSummary, followUpDate: d.followUpDate, followUpInstructions: d.followUpInstructions, medicationsOnDischarge: d.medicationsOnDischarge, totalBill: d.totalBill, paidAmount: d.paidAmount, paymentStatus: d.paymentStatus }];
+        });
+      }
+    }).catch(console.error);
+  }, [selectedAdmission?.id]);
 
   // Dialogs
   const [showAdmitDialog, setShowAdmitDialog] = useState(false);
@@ -172,7 +208,7 @@ const IPD = () => {
     }
   };
 
-  const handleAllocateBed = () => {
+  const handleAllocateBed = async () => {
     if (!selectedBed || !allocateForm.patientId || !allocateForm.admittingDoctor) {
       toast.error("Patient and doctor are required"); return;
     }
@@ -180,27 +216,32 @@ const IPD = () => {
     const ward = wards.find((w) => w.id === selectedBed.wardId);
     if (!patient || !ward) return;
 
-    const newAdm: IPDAdmission = {
-      id: `adm-${Date.now()}`, patientId: patient.id, patientName: patient.name,
-      registrationNumber: patient.registrationNumber, age: new Date().getFullYear() - new Date(patient.dob).getFullYear(),
-      gender: patient.gender, contactNumber: patient.mobile, referredBy: allocateForm.referredBy,
-      admittingDoctor: allocateForm.admittingDoctor, department: allocateForm.department || "General Medicine",
-      diagnosis: allocateForm.diagnosis || "", wardId: ward.id, wardName: ward.name,
-      bedId: selectedBed.id, bedNumber: selectedBed.bedNumber, admissionDate: new Date().toLocaleString(),
-      status: "Active", emergencyContact: patient.emergencyContact, insuranceInfo: allocateForm.insuranceInfo || undefined,
-    };
-    setAdmissions((prev) => [newAdm, ...prev]);
-    setBeds((prev) => prev.map((b) => b.id === selectedBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: newAdm.id } : b));
-    toast.success(`${patient.name} admitted to ${ward.name} - ${selectedBed.bedNumber}`);
+    try {
+      const created = await ipdService.createAdmission({
+        patient_id: patient.id, patient_name: patient.name,
+        registration_number: patient.registrationNumber, age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : null,
+        gender: patient.gender, contact_number: patient.mobile, referred_by: allocateForm.referredBy,
+        admitting_doctor: allocateForm.admittingDoctor, department: allocateForm.department || "General Medicine",
+        diagnosis: allocateForm.diagnosis || "", ward_id: ward.id, ward_name: ward.name,
+        bed_id: selectedBed.id, bed_number: selectedBed.bedNumber,
+        status: "Active", emergency_contact: patient.emergencyContact, insurance_info: allocateForm.insuranceInfo || "",
+      } as any);
+      await ipdService.updateBed(selectedBed.id, { status: "Occupied", patient_id: patient.id, admission_id: created.id } as any);
+      await refetchAdmissions();
+      queryClient.invalidateQueries({ queryKey: ["ipd"] });
+      setBeds((prev) => prev.map((b) => b.id === selectedBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: created.id } : b));
+      toast.success(`${patient.name} admitted to ${ward.name} - ${selectedBed.bedNumber}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to admit patient");
+    }
     setShowBedAllocateDialog(false);
     setSelectedBed(null);
   };
 
-  const handleAdmit = () => {
+  const handleAdmit = async () => {
     if (!admitForm.patientId || !admitForm.admittingDoctor) {
       toast.error("Patient and doctor are required"); return;
     }
-    // Find first available bed
     const availableBed = beds.find((b) => b.status === "Available");
     if (!availableBed) { toast.error("No beds available. Please free up a bed first."); return; }
 
@@ -208,128 +249,152 @@ const IPD = () => {
     const ward = wards.find((w) => w.id === availableBed.wardId);
     if (!patient || !ward) return;
 
-    const newAdm: IPDAdmission = {
-      id: `adm-${Date.now()}`, patientId: patient.id, patientName: patient.name,
-      registrationNumber: patient.registrationNumber, age: new Date().getFullYear() - new Date(patient.dob).getFullYear(),
-      gender: patient.gender, contactNumber: patient.mobile, referredBy: admitForm.referredBy || "",
-      admittingDoctor: admitForm.admittingDoctor || "", department: admitForm.department || "General Medicine",
-      diagnosis: admitForm.diagnosis || "", wardId: ward.id, wardName: ward.name,
-      bedId: availableBed.id, bedNumber: availableBed.bedNumber, admissionDate: new Date().toLocaleString(),
-      status: "Active", emergencyContact: patient.emergencyContact, insuranceInfo: admitForm.insuranceInfo,
-    };
-    setAdmissions((prev) => [newAdm, ...prev]);
-    setBeds((prev) => prev.map((b) => b.id === availableBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: newAdm.id } : b));
-    toast.success(`${patient.name} admitted — assigned to ${ward.name} / ${availableBed.bedNumber}. You can transfer bed from Bed Management.`);
+    try {
+      const created = await ipdService.createAdmission({
+        patient_id: patient.id, patient_name: patient.name,
+        registration_number: patient.registrationNumber, age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : null,
+        gender: patient.gender, contact_number: patient.mobile, referred_by: admitForm.referredBy || "",
+        admitting_doctor: admitForm.admittingDoctor, department: admitForm.department || "General Medicine",
+        diagnosis: admitForm.diagnosis || "", ward_id: ward.id, ward_name: ward.name,
+        bed_id: availableBed.id, bed_number: availableBed.bedNumber,
+        status: "Active", emergency_contact: patient.emergencyContact, insurance_info: admitForm.insuranceInfo || "",
+      } as any);
+      await ipdService.updateBed(availableBed.id, { status: "Occupied", patient_id: patient.id, admission_id: created.id } as any);
+      await refetchAdmissions();
+      queryClient.invalidateQueries({ queryKey: ["ipd"] });
+      setBeds((prev) => prev.map((b) => b.id === availableBed.id ? { ...b, status: "Occupied" as BedStatus, patientId: patient.id, patientName: patient.name, admissionId: created.id } : b));
+      toast.success(`${patient.name} admitted — assigned to ${ward.name} / ${availableBed.bedNumber}.`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to admit patient");
+    }
     setShowAdmitDialog(false);
     setAdmitForm({});
   };
 
-  const handleAddDoctorNote = () => {
+  const handleAddDoctorNote = async () => {
     if (!selectedAdmission || !noteForm.notes) { toast.error("Notes required"); return; }
-    const note: DoctorVisitNote = {
-      id: `dn-${Date.now()}`, admissionId: selectedAdmission.id,
-      date: new Date().toISOString().split("T")[0], time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      doctor: noteForm.doctor || "Dr. Unknown", notes: noteForm.notes, instructions: noteForm.instructions,
-    };
-    setDoctorNotes((prev) => [...prev, note]);
-    toast.success("Doctor note added");
+    try {
+      await ipdService.createDoctorNote({
+        admission_id: selectedAdmission.id, visit_date: new Date().toISOString().split("T")[0],
+        visit_time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        doctor: noteForm.doctor || "Dr. Unknown", notes: noteForm.notes, instructions: noteForm.instructions,
+      } as any);
+      const dn = await ipdService.getDoctorNotes(selectedAdmission.id);
+      setDoctorNotes(dn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.visitDate, time: n.visitTime, doctor: n.doctor, notes: n.notes, instructions: n.instructions })));
+      toast.success("Doctor note added");
+    } catch (err: any) { toast.error(err.message || "Failed"); }
     setShowDoctorNoteDialog(false);
     setNoteForm({ doctor: "", notes: "", instructions: "" });
   };
 
-  const handleAddNurseNote = () => {
+  const handleAddNurseNote = async () => {
     if (!selectedAdmission) return;
-    const note: NurseNote = {
-      id: `nn-${Date.now()}`, admissionId: selectedAdmission.id,
-      date: new Date().toISOString().split("T")[0], time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      nurse: nurseForm.nurse || "Nurse", vitals: { bp: nurseForm.bp, temp: nurseForm.temp, pulse: nurseForm.pulse, spo2: nurseForm.spo2 },
-      notes: nurseForm.notes,
-    };
-    setNurseNotes((prev) => [...prev, note]);
-    toast.success("Nurse note added");
+    try {
+      await ipdService.createNurseNote({
+        admission_id: selectedAdmission.id, note_date: new Date().toISOString().split("T")[0],
+        note_time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        nurse: nurseForm.nurse || "Nurse", bp: nurseForm.bp, temp: nurseForm.temp, pulse: nurseForm.pulse, spo2: nurseForm.spo2, notes: nurseForm.notes,
+      } as any);
+      const nn = await ipdService.getNurseNotes(selectedAdmission.id);
+      setNurseNotes(nn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.noteDate, time: n.noteTime, nurse: n.nurse, vitals: { bp: n.bp, temp: n.temp, pulse: n.pulse, spo2: n.spo2 }, notes: n.notes })));
+      toast.success("Nurse note added");
+    } catch (err: any) { toast.error(err.message || "Failed"); }
     setShowNurseNoteDialog(false);
     setNurseForm({ nurse: "", bp: "", temp: "", pulse: "", spo2: "", notes: "" });
   };
 
-  const handleAddMedicine = () => {
+  const handleAddMedicine = async () => {
     if (!selectedAdmission || !medForm.medicineName) { toast.error("Medicine name required"); return; }
-    const entry: MedicineEntry = {
-      id: `me-${Date.now()}`, admissionId: selectedAdmission.id,
-      date: new Date().toISOString().split("T")[0], medicineName: medForm.medicineName,
-      dosage: medForm.dosage, frequency: medForm.frequency, quantity: medForm.quantity,
-      unitPrice: medForm.unitPrice, total: medForm.quantity * medForm.unitPrice,
-    };
-    setMedicineEntries((prev) => [...prev, entry]);
-    toast.success("Medicine entry added");
+    try {
+      await ipdService.createMedicineEntry({
+        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        medicine_name: medForm.medicineName, dosage: medForm.dosage, frequency: medForm.frequency,
+        quantity: medForm.quantity, unit_price: medForm.unitPrice, total: medForm.quantity * medForm.unitPrice,
+      } as any);
+      const me = await ipdService.getMedicineEntries(selectedAdmission.id);
+      setMedicineEntries(me.map((m: any) => ({ id: m.id, admissionId: m.admissionId, date: m.entryDate, medicineName: m.medicineName, dosage: m.dosage, frequency: m.frequency, quantity: m.quantity, unitPrice: m.unitPrice, total: m.total })));
+      toast.success("Medicine entry added");
+    } catch (err: any) { toast.error(err.message || "Failed"); }
     setShowMedicineDialog(false);
     setMedForm({ medicineName: "", dosage: "", frequency: "OD", quantity: 1, unitPrice: 0 });
   };
 
-  const handleAddSurgical = () => {
+  const handleAddSurgical = async () => {
     if (!selectedAdmission || !surgForm.procedureName) { toast.error("Procedure name required"); return; }
-    const entry: SurgicalEntry = {
-      id: `se-${Date.now()}`, admissionId: selectedAdmission.id,
-      date: new Date().toISOString().split("T")[0], procedureName: surgForm.procedureName,
-      surgeon: surgForm.surgeon, notes: surgForm.notes, cost: surgForm.cost,
-    };
-    setSurgicalEntries((prev) => [...prev, entry]);
-    toast.success("Surgical entry added");
+    try {
+      await ipdService.createSurgicalEntry({
+        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        procedure_name: surgForm.procedureName, surgeon: surgForm.surgeon, notes: surgForm.notes, cost: surgForm.cost,
+      } as any);
+      const se = await ipdService.getSurgicalEntries(selectedAdmission.id);
+      setSurgicalEntries(se.map((s: any) => ({ id: s.id, admissionId: s.admissionId, date: s.entryDate, procedureName: s.procedureName, surgeon: s.surgeon, notes: s.notes, cost: s.cost })));
+      toast.success("Surgical entry added");
+    } catch (err: any) { toast.error(err.message || "Failed"); }
     setShowSurgicalDialog(false);
     setSurgForm({ procedureName: "", surgeon: "", notes: "", cost: 0 });
   };
 
-  const handleAddDiagnostic = () => {
+  const handleAddDiagnostic = async () => {
     if (!selectedAdmission || !diagForm.testName) { toast.error("Test name required"); return; }
-    const entry: DiagnosticEntry = {
-      id: `de-${Date.now()}`, admissionId: selectedAdmission.id,
-      date: new Date().toISOString().split("T")[0], testName: diagForm.testName, cost: diagForm.cost,
-    };
-    setDiagnosticEntries((prev) => [...prev, entry]);
-    toast.success("Diagnostic entry added");
+    try {
+      await ipdService.createDiagnosticEntry({
+        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        test_name: diagForm.testName, cost: diagForm.cost,
+      } as any);
+      const de = await ipdService.getDiagnosticEntries(selectedAdmission.id);
+      setDiagnosticEntries(de.map((d: any) => ({ id: d.id, admissionId: d.admissionId, date: d.entryDate, testName: d.testName, cost: d.cost, result: d.result })));
+      toast.success("Diagnostic entry added");
+    } catch (err: any) { toast.error(err.message || "Failed"); }
     setShowDiagnosticDialog(false);
     setDiagForm({ testName: "", cost: 0 });
   };
 
-  const handleBedTransfer = () => {
+  const handleBedTransfer = async () => {
     if (!selectedAdmission || !transferForm.toBed) { toast.error("Select destination bed"); return; }
     const destBed = beds.find((b) => b.id === transferForm.toBed);
     const destWard = wards.find((w) => w.id === destBed?.wardId);
     if (!destBed || !destWard) return;
 
-    const transfer: BedTransfer = {
-      id: `bt-${Date.now()}`, admissionId: selectedAdmission.id, patientName: selectedAdmission.patientName,
-      fromWard: selectedAdmission.wardName, fromBed: selectedAdmission.bedNumber,
-      toWard: destWard.name, toBed: destBed.bedNumber, reason: transferForm.reason,
-      transferDate: new Date().toLocaleString(), transferredBy: "Current User",
-    };
-    setBedTransfers((prev) => [...prev, transfer]);
-    setBeds((prev) => prev.map((b) => {
-      if (b.id === selectedAdmission.bedId) return { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined };
-      if (b.id === destBed.id) return { ...b, status: "Occupied" as BedStatus, patientId: selectedAdmission.patientId, patientName: selectedAdmission.patientName, admissionId: selectedAdmission.id };
-      return b;
-    }));
-    setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : a));
-    setSelectedAdmission((prev) => prev ? { ...prev, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : null);
-    toast.success(`Patient transferred to ${destWard.name} - ${destBed.bedNumber}`);
+    try {
+      await ipdService.createBedTransfer({
+        admission_id: selectedAdmission.id, patient_name: selectedAdmission.patientName,
+        from_ward: selectedAdmission.wardName, from_bed: selectedAdmission.bedNumber,
+        to_ward: destWard.name, to_bed: destBed.bedNumber, reason: transferForm.reason,
+        transferred_by: "Current User",
+      } as any);
+      await ipdService.updateBed(selectedAdmission.bedId, { status: "Available", patient_id: null, admission_id: null } as any);
+      await ipdService.updateBed(destBed.id, { status: "Occupied", patient_id: selectedAdmission.patientId, admission_id: selectedAdmission.id } as any);
+      await ipdService.updateAdmission(selectedAdmission.id, { ward_id: destWard.id, ward_name: destWard.name, bed_id: destBed.id, bed_number: destBed.bedNumber } as any);
+      setBeds((prev) => prev.map((b) => {
+        if (b.id === selectedAdmission.bedId) return { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined };
+        if (b.id === destBed.id) return { ...b, status: "Occupied" as BedStatus, patientId: selectedAdmission.patientId, patientName: selectedAdmission.patientName, admissionId: selectedAdmission.id };
+        return b;
+      }));
+      setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : a));
+      setSelectedAdmission((prev) => prev ? { ...prev, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : null);
+      toast.success(`Patient transferred to ${destWard.name} - ${destBed.bedNumber}`);
+    } catch (err: any) { toast.error(err.message || "Transfer failed"); }
     setShowBedTransferDialog(false);
     setTransferForm({ toWard: "", toBed: "", reason: "" });
   };
 
-  const handleDischarge = () => {
+  const handleDischarge = async () => {
     if (!selectedAdmission || !dischargeForm.finalDiagnosis) { toast.error("Final diagnosis required"); return; }
-    const ds: DischargeSummary = {
-      id: `ds-${Date.now()}`, admissionId: selectedAdmission.id,
-      dischargeDate: new Date().toLocaleString(), conditionAtDischarge: dischargeForm.conditionAtDischarge,
-      finalDiagnosis: dischargeForm.finalDiagnosis, treatmentSummary: dischargeForm.treatmentSummary,
-      followUpDate: dischargeForm.followUpDate, followUpInstructions: dischargeForm.followUpInstructions,
-      medicationsOnDischarge: dischargeForm.medicationsOnDischarge,
-      totalBill: billBreakdown?.grandTotal || 0, paidAmount: 0, paymentStatus: "Pending",
-    };
-    setDischargeSummaries((prev) => [...prev, ds]);
-    setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, status: "Discharged" as AdmissionStatus, dischargeDate: ds.dischargeDate } : a));
-    setBeds((prev) => prev.map((b) => b.id === selectedAdmission.bedId ? { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined } : b));
-    setSelectedAdmission((prev) => prev ? { ...prev, status: "Discharged", dischargeDate: ds.dischargeDate } : null);
-    toast.success("Patient discharged successfully");
+    try {
+      await ipdService.createDischargeSummary({
+        admission_id: selectedAdmission.id, condition_at_discharge: dischargeForm.conditionAtDischarge,
+        final_diagnosis: dischargeForm.finalDiagnosis, treatment_summary: dischargeForm.treatmentSummary,
+        follow_up_date: dischargeForm.followUpDate || null, follow_up_instructions: dischargeForm.followUpInstructions,
+        medications_on_discharge: dischargeForm.medicationsOnDischarge,
+        total_bill: billBreakdown?.grandTotal || 0, paid_amount: 0, payment_status: "Pending",
+      } as any);
+      await ipdService.updateAdmission(selectedAdmission.id, { status: "Discharged", discharge_date: new Date().toISOString() } as any);
+      await ipdService.updateBed(selectedAdmission.bedId, { status: "Available", patient_id: null, admission_id: null } as any);
+      await refetchAdmissions();
+      setBeds((prev) => prev.map((b) => b.id === selectedAdmission.bedId ? { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined } : b));
+      setSelectedAdmission((prev) => prev ? { ...prev, status: "Discharged", dischargeDate: new Date().toISOString() } : null);
+      toast.success("Patient discharged successfully");
+    } catch (err: any) { toast.error(err.message || "Discharge failed"); }
     setShowDischargeDialog(false);
     setDischargeForm({ conditionAtDischarge: "", finalDiagnosis: "", treatmentSummary: "", followUpDate: "", followUpInstructions: "", medicationsOnDischarge: "" });
   };

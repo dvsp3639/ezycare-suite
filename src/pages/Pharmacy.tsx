@@ -27,13 +27,17 @@ import {
 } from "@/data/mockPharmacyData";
 import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
+import { pharmacyService } from "@/modules/pharmacy/services";
+import { useAuth } from "@/contexts/AuthContext";
 
 type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
   const { data: dbPatients } = usePatients();
-  const { data: dbMedicines } = useMedicines();
+  const { data: dbMedicines, refetch: refetchMedicines } = useMedicines();
 
   const allPatients: ClinicPatient[] = useMemo(() =>
     (dbPatients || []).map((p: any) => ({
@@ -196,17 +200,44 @@ const Pharmacy = () => {
     setShowPayment(true);
   };
 
-  const handleCompleteOrder = () => {
+  const handleCompleteOrder = async () => {
     if (isIP && !paymentMode) {
       toast.error("Please select a payment mode");
       return;
     }
-    setOrderCompleted(true);
-    toast.success(
-      isReturn
-        ? `${issueType} processed — ₹${netAmount.toFixed(2)} refunded`
-        : `${issueType} completed — ₹${netAmount.toFixed(2)} ${isIP ? `(${paymentMode})` : "(Cash)"}`
-    );
+    const finalPaymentMode = isIP ? paymentMode : "Cash";
+    try {
+      await pharmacyService.createOrder(
+        {
+          patient_name: selectedPatient?.name || "", registration_number: selectedPatient?.registrationNumber || "",
+          doctor_name: doctorPrescription?.doctorName || "", issue_type: issueType, issue_date: new Date().toISOString().split("T")[0],
+          age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: selectedPatient?.mobile || "",
+          total_amount: subtotal, discount: discountAmount, gst_amount: gstAmount, net_amount: netAmount,
+          payment_mode: finalPaymentMode, status: "Completed",
+        } as any,
+        orderItems.map((i) => ({
+          medicine_id: i.medicineId || null, medicine_name: i.medicineName, batch_no: i.batchNo,
+          quantity: i.quantity, mrp: i.mrp, discount: i.discount, gst_percent: i.gstPercent, amount: i.amount,
+          hospital_id: hospitalId,
+        } as any))
+      );
+      // Deduct stock
+      for (const item of orderItems) {
+        if (item.medicineId) {
+          const stockChange = isReturn ? item.quantity : -item.quantity;
+          await pharmacyService.updateMedicineStock(item.medicineId, stockChange).catch(console.error);
+        }
+      }
+      await refetchMedicines();
+      setOrderCompleted(true);
+      toast.success(
+        isReturn
+          ? `${issueType} processed — ₹${netAmount.toFixed(2)} refunded`
+          : `${issueType} completed — ₹${netAmount.toFixed(2)} ${isIP ? `(${paymentMode})` : "(Cash)"}`
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to complete order");
+    }
   };
 
   const handleNewTransaction = () => {
