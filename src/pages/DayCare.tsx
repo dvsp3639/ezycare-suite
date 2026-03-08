@@ -149,24 +149,28 @@ const DayCare = () => {
     }
   };
 
-  const startTreatment = (patientId: string, treatmentId: string) => {
+  const startTreatment = async (patientId: string, treatmentId: string) => {
+    const startTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
     setPatients((prev) =>
       prev.map((p) =>
         p.id === patientId
-          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "Scheduled" ? { ...t, status: "In Progress" as const, startTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }) } : t) }
+          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "Scheduled" ? { ...t, status: "In Progress" as const, startTime } : t) }
           : p
       )
     );
+    await daycareService.updateSessionTreatment(treatmentId, { status: "In Progress", start_time: startTime } as any).catch(console.error);
   };
 
-  const completeTreatment = (patientId: string, treatmentId: string) => {
+  const completeTreatment = async (patientId: string, treatmentId: string) => {
+    const endTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
     setPatients((prev) =>
       prev.map((p) =>
         p.id === patientId
-          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "In Progress" ? { ...t, status: "Completed" as const, endTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }) } : t) }
+          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "In Progress" ? { ...t, status: "Completed" as const, endTime } : t) }
           : p
       )
     );
+    await daycareService.updateSessionTreatment(treatmentId, { status: "Completed", end_time: endTime } as any).catch(console.error);
   };
 
   // ---- Billing Actions ----
