@@ -44,7 +44,7 @@ const TimeSlotPicker = ({ open, onOpenChange, onSelect, selectedTime, slots, doc
         <div className="grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto p-1">
           {activeSlots.map((slot) => {
             const full = slot.bookedPatients >= slot.maxPatients;
-            const isPast = checkToday && parseTime12(slot.time) <= currentMinutes;
+            const isPast = checkToday && currentMinutes >= parseTime12(slot.time) + 30;
             const disabled = full || isPast;
             const selected = slot.time === selectedTime;
 
