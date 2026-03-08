@@ -184,8 +184,40 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
     clinicService.saveVitals({ appointmentId: id, ...vitals } as any).catch(console.error);
   }, []);
 
-  const updateQueueLabOrders = useCallback((id: string, labOrders: LabOrder[]) => {
+  const updateQueueLabOrders = useCallback(async (id: string, labOrders: LabOrder[]) => {
     setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, labOrders } : q)));
+    // Persist each new lab order to DB
+    for (const lab of labOrders) {
+      if (lab.id.startsWith("lab-")) {
+        try {
+          const created = await diagnosticsService.createLabOrder({
+            appointment_id: id,
+            test_name: lab.testName,
+            category: lab.category,
+            priority: lab.priority,
+            status: "Ordered",
+            price: lab.price,
+            clinical_notes: lab.clinicalNotes || "",
+            ordered_by: lab.orderedBy,
+            patient_name: lab.patientName,
+            patient_reg_no: lab.patientRegNo,
+            payment_status: "Pending",
+            payment_mode: null,
+            report_notes: "",
+            ordered_at: new Date().toISOString(),
+            sample_collected_at: null,
+            completed_at: null,
+          });
+          // Update the local ID to the DB ID
+          setQueue((prev) => prev.map((q) => q.id === id ? {
+            ...q,
+            labOrders: q.labOrders?.map((l) => l.id === lab.id ? { ...l, id: created.id } : l),
+          } : q));
+        } catch (err) {
+          console.error("Failed to persist lab order:", err);
+        }
+      }
+    }
   }, []);
 
   const updateQueueFollowUp = useCallback((id: string, followUpDate: string) => {
