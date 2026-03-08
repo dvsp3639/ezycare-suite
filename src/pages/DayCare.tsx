@@ -472,24 +472,13 @@ const DayCare = () => {
           <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Treatment</Label>
-              <Select value={selectedTreatmentId} onValueChange={setSelectedTreatmentId}>
-                <SelectTrigger><SelectValue placeholder="Select treatment" /></SelectTrigger>
-                <SelectContent>
-                  {treatments.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name} — ₹{t.price} ({t.duration})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Notes (optional)</Label>
-              <Textarea value={treatmentNotes} onChange={(e) => setTreatmentNotes(e.target.value)} placeholder="Special instructions…" />
+              <Label>Notes</Label>
+              <Textarea value={treatmentNameInput} onChange={(e) => setTreatmentNameInput(e.target.value)} placeholder="Enter treatment notes…" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddTreatment(false)}>Cancel</Button>
-            <Button onClick={handleAddTreatment} disabled={!selectedTreatmentId}>Add Treatment</Button>
+            <Button onClick={handleAddTreatment} disabled={!treatmentNameInput.trim()}>Add Treatment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
