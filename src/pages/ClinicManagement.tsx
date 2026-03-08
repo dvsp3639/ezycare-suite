@@ -23,6 +23,8 @@ import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
+import { daycareService } from "@/modules/daycare/services";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   type DoctorSchedule,
   type QueueEntry,
