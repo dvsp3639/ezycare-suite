@@ -263,6 +263,15 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
         ),
       }))
     );
+    // Persist results to DB
+    const dbResults = results.map((r) => ({
+      parameter: r.parameter,
+      value: r.value,
+      unit: r.unit,
+      normal_range: r.normalRange,
+      is_abnormal: r.isAbnormal,
+    }));
+    diagnosticsService.saveResults(labOrderId, dbResults, reportNotes).catch(console.error);
   }, []);
 
   const updateLabOrderPayment = useCallback((labOrderId: string, paymentMode: "Cash" | "Credit") => {
