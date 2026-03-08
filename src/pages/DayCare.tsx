@@ -51,8 +51,10 @@ const CHART_COLORS = [
 
 const DayCare = () => {
   const { toast } = useToast();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
   const today = format(new Date(), "yyyy-MM-dd");
-  const { data: dbSessions } = useDayCareSessions(today);
+  const { data: dbSessions, refetch: refetchSessions } = useDayCareSessions(today);
   const { data: dbTreatments } = useDayCareTreatments();
 
   const [patients, setPatients] = useState<DayCarePatient[]>([]);
