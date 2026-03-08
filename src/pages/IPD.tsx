@@ -25,8 +25,11 @@ import {
 } from "@/data/mockIPDData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
 import { useAdmissions } from "@/modules/ipd/hooks";
+import { ipdService } from "@/modules/ipd/services";
 import { usePatients } from "@/modules/patients/hooks";
 import { useStaffMembers } from "@/modules/staff/hooks";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 const admissionStatusColors: Record<AdmissionStatus, string> = {
   Active: "bg-success/10 text-success border-success/30",
