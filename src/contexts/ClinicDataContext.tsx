@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import { format } from "date-fns";
 import { clinicService } from "@/modules/clinic/services";
 import { staffService } from "@/modules/staff/services";
+import { diagnosticsService } from "@/modules/diagnostics/services";
+import type { Appointment } from "@/modules/clinic/types";
 import type { Appointment } from "@/modules/clinic/types";
 import {
   type DoctorSchedule,
