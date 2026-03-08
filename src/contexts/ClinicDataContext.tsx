@@ -248,6 +248,8 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
         ),
       }))
     );
+    // Persist to DB
+    diagnosticsService.updateLabOrderStatus(labOrderId, status).catch(console.error);
   }, []);
 
   const updateLabOrderResults = useCallback((labOrderId: string, results: LabResult[], reportNotes?: string, reportFiles?: { name: string; url: string; type: string }[]) => {
