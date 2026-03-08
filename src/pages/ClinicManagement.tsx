@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import {
   Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon,
   CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
-  CalendarPlus, Trash2, CheckCircle2, Save, Download,
+  CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClinicData } from "@/contexts/ClinicDataContext";
