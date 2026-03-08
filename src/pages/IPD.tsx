@@ -349,46 +349,52 @@ const IPD = () => {
     setDiagForm({ testName: "", cost: 0 });
   };
 
-  const handleBedTransfer = () => {
+  const handleBedTransfer = async () => {
     if (!selectedAdmission || !transferForm.toBed) { toast.error("Select destination bed"); return; }
     const destBed = beds.find((b) => b.id === transferForm.toBed);
     const destWard = wards.find((w) => w.id === destBed?.wardId);
     if (!destBed || !destWard) return;
 
-    const transfer: BedTransfer = {
-      id: `bt-${Date.now()}`, admissionId: selectedAdmission.id, patientName: selectedAdmission.patientName,
-      fromWard: selectedAdmission.wardName, fromBed: selectedAdmission.bedNumber,
-      toWard: destWard.name, toBed: destBed.bedNumber, reason: transferForm.reason,
-      transferDate: new Date().toLocaleString(), transferredBy: "Current User",
-    };
-    setBedTransfers((prev) => [...prev, transfer]);
-    setBeds((prev) => prev.map((b) => {
-      if (b.id === selectedAdmission.bedId) return { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined };
-      if (b.id === destBed.id) return { ...b, status: "Occupied" as BedStatus, patientId: selectedAdmission.patientId, patientName: selectedAdmission.patientName, admissionId: selectedAdmission.id };
-      return b;
-    }));
-    setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : a));
-    setSelectedAdmission((prev) => prev ? { ...prev, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : null);
-    toast.success(`Patient transferred to ${destWard.name} - ${destBed.bedNumber}`);
+    try {
+      await ipdService.createBedTransfer({
+        admission_id: selectedAdmission.id, patient_name: selectedAdmission.patientName,
+        from_ward: selectedAdmission.wardName, from_bed: selectedAdmission.bedNumber,
+        to_ward: destWard.name, to_bed: destBed.bedNumber, reason: transferForm.reason,
+        transferred_by: "Current User",
+      } as any);
+      await ipdService.updateBed(selectedAdmission.bedId, { status: "Available", patient_id: null, admission_id: null } as any);
+      await ipdService.updateBed(destBed.id, { status: "Occupied", patient_id: selectedAdmission.patientId, admission_id: selectedAdmission.id } as any);
+      await ipdService.updateAdmission(selectedAdmission.id, { ward_id: destWard.id, ward_name: destWard.name, bed_id: destBed.id, bed_number: destBed.bedNumber } as any);
+      setBeds((prev) => prev.map((b) => {
+        if (b.id === selectedAdmission.bedId) return { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined };
+        if (b.id === destBed.id) return { ...b, status: "Occupied" as BedStatus, patientId: selectedAdmission.patientId, patientName: selectedAdmission.patientName, admissionId: selectedAdmission.id };
+        return b;
+      }));
+      setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : a));
+      setSelectedAdmission((prev) => prev ? { ...prev, wardId: destWard.id, wardName: destWard.name, bedId: destBed.id, bedNumber: destBed.bedNumber } : null);
+      toast.success(`Patient transferred to ${destWard.name} - ${destBed.bedNumber}`);
+    } catch (err: any) { toast.error(err.message || "Transfer failed"); }
     setShowBedTransferDialog(false);
     setTransferForm({ toWard: "", toBed: "", reason: "" });
   };
 
-  const handleDischarge = () => {
+  const handleDischarge = async () => {
     if (!selectedAdmission || !dischargeForm.finalDiagnosis) { toast.error("Final diagnosis required"); return; }
-    const ds: DischargeSummary = {
-      id: `ds-${Date.now()}`, admissionId: selectedAdmission.id,
-      dischargeDate: new Date().toLocaleString(), conditionAtDischarge: dischargeForm.conditionAtDischarge,
-      finalDiagnosis: dischargeForm.finalDiagnosis, treatmentSummary: dischargeForm.treatmentSummary,
-      followUpDate: dischargeForm.followUpDate, followUpInstructions: dischargeForm.followUpInstructions,
-      medicationsOnDischarge: dischargeForm.medicationsOnDischarge,
-      totalBill: billBreakdown?.grandTotal || 0, paidAmount: 0, paymentStatus: "Pending",
-    };
-    setDischargeSummaries((prev) => [...prev, ds]);
-    setAdmissions((prev) => prev.map((a) => a.id === selectedAdmission.id ? { ...a, status: "Discharged" as AdmissionStatus, dischargeDate: ds.dischargeDate } : a));
-    setBeds((prev) => prev.map((b) => b.id === selectedAdmission.bedId ? { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined } : b));
-    setSelectedAdmission((prev) => prev ? { ...prev, status: "Discharged", dischargeDate: ds.dischargeDate } : null);
-    toast.success("Patient discharged successfully");
+    try {
+      await ipdService.createDischargeSummary({
+        admission_id: selectedAdmission.id, condition_at_discharge: dischargeForm.conditionAtDischarge,
+        final_diagnosis: dischargeForm.finalDiagnosis, treatment_summary: dischargeForm.treatmentSummary,
+        follow_up_date: dischargeForm.followUpDate || null, follow_up_instructions: dischargeForm.followUpInstructions,
+        medications_on_discharge: dischargeForm.medicationsOnDischarge,
+        total_bill: billBreakdown?.grandTotal || 0, paid_amount: 0, payment_status: "Pending",
+      } as any);
+      await ipdService.updateAdmission(selectedAdmission.id, { status: "Discharged", discharge_date: new Date().toISOString() } as any);
+      await ipdService.updateBed(selectedAdmission.bedId, { status: "Available", patient_id: null, admission_id: null } as any);
+      await refetchAdmissions();
+      setBeds((prev) => prev.map((b) => b.id === selectedAdmission.bedId ? { ...b, status: "Available" as BedStatus, patientId: undefined, patientName: undefined, admissionId: undefined } : b));
+      setSelectedAdmission((prev) => prev ? { ...prev, status: "Discharged", dischargeDate: new Date().toISOString() } : null);
+      toast.success("Patient discharged successfully");
+    } catch (err: any) { toast.error(err.message || "Discharge failed"); }
     setShowDischargeDialog(false);
     setDischargeForm({ conditionAtDischarge: "", finalDiagnosis: "", treatmentSummary: "", followUpDate: "", followUpInstructions: "", medicationsOnDischarge: "" });
   };

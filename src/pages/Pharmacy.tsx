@@ -27,6 +27,8 @@ import {
 } from "@/data/mockPharmacyData";
 import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
+import { pharmacyService } from "@/modules/pharmacy/services";
+import { useAuth } from "@/contexts/AuthContext";
 
 type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
