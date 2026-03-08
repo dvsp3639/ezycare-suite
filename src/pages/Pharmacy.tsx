@@ -34,8 +34,10 @@ type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
   const { data: dbPatients } = usePatients();
-  const { data: dbMedicines } = useMedicines();
+  const { data: dbMedicines, refetch: refetchMedicines } = useMedicines();
 
   const allPatients: ClinicPatient[] = useMemo(() =>
     (dbPatients || []).map((p: any) => ({
