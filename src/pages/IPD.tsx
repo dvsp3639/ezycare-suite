@@ -83,6 +83,35 @@ const IPD = () => {
   const [bedWardFilter, setBedWardFilter] = useState("all");
   const [bedStatusFilter, setBedStatusFilter] = useState("all");
 
+  // Load sub-entries from DB when an admission is selected
+  useEffect(() => {
+    if (!selectedAdmission) return;
+    const admId = selectedAdmission.id;
+    Promise.all([
+      ipdService.getDoctorNotes(admId),
+      ipdService.getNurseNotes(admId),
+      ipdService.getMedicineEntries(admId),
+      ipdService.getSurgicalEntries(admId),
+      ipdService.getDiagnosticEntries(admId),
+      ipdService.getBedTransfers(admId),
+      ipdService.getDischargeSummary(admId),
+    ]).then(([dn, nn, me, se, de, bt, ds]) => {
+      setDoctorNotes(dn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.visitDate, time: n.visitTime, doctor: n.doctor, notes: n.notes, instructions: n.instructions })));
+      setNurseNotes(nn.map((n: any) => ({ id: n.id, admissionId: n.admissionId, date: n.noteDate, time: n.noteTime, nurse: n.nurse, vitals: { bp: n.bp, temp: n.temp, pulse: n.pulse, spo2: n.spo2 }, notes: n.notes })));
+      setMedicineEntries(me.map((m: any) => ({ id: m.id, admissionId: m.admissionId, date: m.entryDate, medicineName: m.medicineName, dosage: m.dosage, frequency: m.frequency, quantity: m.quantity, unitPrice: m.unitPrice, total: m.total })));
+      setSurgicalEntries(se.map((s: any) => ({ id: s.id, admissionId: s.admissionId, date: s.entryDate, procedureName: s.procedureName, surgeon: s.surgeon, notes: s.notes, cost: s.cost })));
+      setDiagnosticEntries(de.map((d: any) => ({ id: d.id, admissionId: d.admissionId, date: d.entryDate, testName: d.testName, cost: d.cost, result: d.result })));
+      setBedTransfers(bt.map((t: any) => ({ id: t.id, admissionId: t.admissionId, patientName: t.patientName, fromWard: t.fromWard, fromBed: t.fromBed, toWard: t.toWard, toBed: t.toBed, reason: t.reason, transferDate: t.transferDate, transferredBy: t.transferredBy })));
+      if (ds) {
+        setDischargeSummaries((prev) => {
+          const exists = prev.find((d: any) => d.id === ds.id);
+          if (exists) return prev;
+          return [...prev, { id: ds.id, admissionId: ds.admissionId, dischargeDate: ds.dischargeDate, conditionAtDischarge: ds.conditionAtDischarge, finalDiagnosis: ds.finalDiagnosis, treatmentSummary: ds.treatmentSummary, followUpDate: ds.followUpDate, followUpInstructions: ds.followUpInstructions, medicationsOnDischarge: ds.medicationsOnDischarge, totalBill: ds.totalBill, paidAmount: ds.paidAmount, paymentStatus: ds.paymentStatus }];
+        });
+      }
+    }).catch(console.error);
+  }, [selectedAdmission?.id]);
+
   // Dialogs
   const [showAdmitDialog, setShowAdmitDialog] = useState(false);
   const [showDoctorNoteDialog, setShowDoctorNoteDialog] = useState(false);
