@@ -21,6 +21,8 @@ import {
   type DayCarePatient, type DayCareTreatment, type DayCareBillingItem, type DayCareBill,
 } from "@/data/mockDayCareData";
 import { useDayCareSessions, useDayCareTreatments } from "@/modules/daycare/hooks";
+import { daycareService } from "@/modules/daycare/services";
+import { useAuth } from "@/contexts/AuthContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
 const statusColor = (s: DayCarePatient["status"]) => {
@@ -49,8 +51,10 @@ const CHART_COLORS = [
 
 const DayCare = () => {
   const { toast } = useToast();
+  const { roles } = useAuth();
+  const hospitalId = roles?.[0]?.hospital_id || "";
   const today = format(new Date(), "yyyy-MM-dd");
-  const { data: dbSessions } = useDayCareSessions(today);
+  const { data: dbSessions, refetch: refetchSessions } = useDayCareSessions(today);
   const { data: dbTreatments } = useDayCareTreatments();
 
   const [patients, setPatients] = useState<DayCarePatient[]>([]);
@@ -97,8 +101,7 @@ const DayCare = () => {
   // Add Treatment Dialog
   const [showAddTreatment, setShowAddTreatment] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [selectedTreatmentId, setSelectedTreatmentId] = useState("");
-  const [treatmentNotes, setTreatmentNotes] = useState("");
+  const [treatmentNameInput, setTreatmentNameInput] = useState("");
 
   // Billing Dialog
   const [showBilling, setShowBilling] = useState(false);
@@ -127,41 +130,47 @@ const DayCare = () => {
   const totalRevenue = patients.reduce((sum, p) => sum + (p.bill?.grandTotal || 0), 0);
 
   // ---- Treatment Actions ----
-  const handleAddTreatment = () => {
-    if (!selectedPatientId || !selectedTreatmentId) return;
-    const treat = treatments.find((t) => t.id === selectedTreatmentId);
-    if (!treat) return;
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === selectedPatientId
-          ? { ...p, treatments: [...p.treatments, { treatmentId: treat.id, treatmentName: treat.name, status: "Scheduled" as const, notes: treatmentNotes || undefined }] }
-          : p
-      )
-    );
-    toast({ title: "Treatment Added", description: `${treat.name} added for patient` });
-    setShowAddTreatment(false);
-    setSelectedTreatmentId("");
-    setTreatmentNotes("");
+  const handleAddTreatment = async () => {
+    if (!selectedPatientId || !treatmentNameInput.trim()) return;
+    try {
+      await daycareService.addSessionTreatment({
+        session_id: selectedPatientId,
+        treatment_name: treatmentNameInput.trim(),
+        status: "Scheduled",
+        notes: "",
+        hospital_id: hospitalId,
+      } as any);
+      await refetchSessions();
+      toast({ title: "Treatment Added", description: `${treatmentNameInput} added for patient` });
+      setShowAddTreatment(false);
+      setTreatmentNameInput("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to add treatment", variant: "destructive" });
+    }
   };
 
-  const startTreatment = (patientId: string, treatmentId: string) => {
+  const startTreatment = async (patientId: string, treatmentId: string) => {
+    const startTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
     setPatients((prev) =>
       prev.map((p) =>
         p.id === patientId
-          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "Scheduled" ? { ...t, status: "In Progress" as const, startTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }) } : t) }
+          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "Scheduled" ? { ...t, status: "In Progress" as const, startTime } : t) }
           : p
       )
     );
+    await daycareService.updateSessionTreatment(treatmentId, { status: "In Progress", start_time: startTime } as any).catch(console.error);
   };
 
-  const completeTreatment = (patientId: string, treatmentId: string) => {
+  const completeTreatment = async (patientId: string, treatmentId: string) => {
+    const endTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
     setPatients((prev) =>
       prev.map((p) =>
         p.id === patientId
-          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "In Progress" ? { ...t, status: "Completed" as const, endTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }) } : t) }
+          ? { ...p, treatments: p.treatments.map((t) => t.treatmentId === treatmentId && t.status === "In Progress" ? { ...t, status: "Completed" as const, endTime } : t) }
           : p
       )
     );
+    await daycareService.updateSessionTreatment(treatmentId, { status: "Completed", end_time: endTime } as any).catch(console.error);
   };
 
   // ---- Billing Actions ----
@@ -202,7 +211,7 @@ const DayCare = () => {
   const billingSubtotal = billingItems.reduce((s, i) => s + i.total, 0);
   const billingGrandTotal = billingSubtotal - billingDiscount + billingTax;
 
-  const saveBill = (paymentStatus: "Pending" | "Paid") => {
+  const saveBill = async (paymentStatus: "Pending" | "Paid") => {
     if (!billingPatientId) return;
     const bill: DayCareBill = {
       id: `bill-${Date.now()}`, patientId: billingPatientId, items: billingItems,
@@ -210,8 +219,17 @@ const DayCare = () => {
       paymentStatus, paymentMode: paymentStatus === "Paid" ? billingPaymentMode : undefined,
       createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }),
     };
-    setPatients((prev) => prev.map((p) => p.id === billingPatientId ? { ...p, bill, status: "Completed" as const } : p));
-    toast({ title: paymentStatus === "Paid" ? "Bill Paid" : "Bill Saved", description: `₹${billingGrandTotal.toLocaleString()}` });
+    try {
+      await daycareService.createBill(
+        { session_id: billingPatientId, subtotal: billingSubtotal, discount: billingDiscount, tax: billingTax, grand_total: billingGrandTotal, payment_status: paymentStatus, payment_mode: paymentStatus === "Paid" ? billingPaymentMode : null, hospital_id: hospitalId } as any,
+        billingItems.map((i) => ({ description: i.description, category: i.category, qty: i.qty, unit_price: i.unitPrice, total: i.total, hospital_id: hospitalId }))
+      );
+      await daycareService.updateSession(billingPatientId, { status: "Completed" } as any);
+      setPatients((prev) => prev.map((p) => p.id === billingPatientId ? { ...p, bill, status: "Completed" as const } : p));
+      toast({ title: paymentStatus === "Paid" ? "Bill Paid" : "Bill Saved", description: `₹${billingGrandTotal.toLocaleString()}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save bill", variant: "destructive" });
+    }
     setShowBilling(false);
   };
 
@@ -467,24 +485,13 @@ const DayCare = () => {
           <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Treatment</Label>
-              <Select value={selectedTreatmentId} onValueChange={setSelectedTreatmentId}>
-                <SelectTrigger><SelectValue placeholder="Select treatment" /></SelectTrigger>
-                <SelectContent>
-                  {treatments.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name} — ₹{t.price} ({t.duration})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Notes (optional)</Label>
-              <Textarea value={treatmentNotes} onChange={(e) => setTreatmentNotes(e.target.value)} placeholder="Special instructions…" />
+              <Label>Notes</Label>
+              <Textarea value={treatmentNameInput} onChange={(e) => setTreatmentNameInput(e.target.value)} placeholder="Enter treatment notes…" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddTreatment(false)}>Cancel</Button>
-            <Button onClick={handleAddTreatment} disabled={!selectedTreatmentId}>Add Treatment</Button>
+            <Button onClick={handleAddTreatment} disabled={!treatmentNameInput.trim()}>Add Treatment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
