@@ -285,6 +285,8 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
         ),
       }))
     );
+    // Persist to DB
+    diagnosticsService.updateLabOrderPayment(labOrderId, paymentMode).catch(console.error);
   }, []);
 
   return (
