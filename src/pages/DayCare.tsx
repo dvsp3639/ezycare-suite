@@ -21,6 +21,8 @@ import {
   type DayCarePatient, type DayCareTreatment, type DayCareBillingItem, type DayCareBill,
 } from "@/data/mockDayCareData";
 import { useDayCareSessions, useDayCareTreatments } from "@/modules/daycare/hooks";
+import { daycareService } from "@/modules/daycare/services";
+import { useAuth } from "@/contexts/AuthContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
 const statusColor = (s: DayCarePatient["status"]) => {
