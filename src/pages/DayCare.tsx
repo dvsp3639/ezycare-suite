@@ -101,8 +101,7 @@ const DayCare = () => {
   // Add Treatment Dialog
   const [showAddTreatment, setShowAddTreatment] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [selectedTreatmentId, setSelectedTreatmentId] = useState("");
-  const [treatmentNotes, setTreatmentNotes] = useState("");
+  const [treatmentNameInput, setTreatmentNameInput] = useState("");
 
   // Billing Dialog
   const [showBilling, setShowBilling] = useState(false);
