@@ -211,7 +211,7 @@ const DayCare = () => {
   const billingSubtotal = billingItems.reduce((s, i) => s + i.total, 0);
   const billingGrandTotal = billingSubtotal - billingDiscount + billingTax;
 
-  const saveBill = (paymentStatus: "Pending" | "Paid") => {
+  const saveBill = async (paymentStatus: "Pending" | "Paid") => {
     if (!billingPatientId) return;
     const bill: DayCareBill = {
       id: `bill-${Date.now()}`, patientId: billingPatientId, items: billingItems,
@@ -219,8 +219,17 @@ const DayCare = () => {
       paymentStatus, paymentMode: paymentStatus === "Paid" ? billingPaymentMode : undefined,
       createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }),
     };
-    setPatients((prev) => prev.map((p) => p.id === billingPatientId ? { ...p, bill, status: "Completed" as const } : p));
-    toast({ title: paymentStatus === "Paid" ? "Bill Paid" : "Bill Saved", description: `₹${billingGrandTotal.toLocaleString()}` });
+    try {
+      await daycareService.createBill(
+        { session_id: billingPatientId, subtotal: billingSubtotal, discount: billingDiscount, tax: billingTax, grand_total: billingGrandTotal, payment_status: paymentStatus, payment_mode: paymentStatus === "Paid" ? billingPaymentMode : null, hospital_id: hospitalId } as any,
+        billingItems.map((i) => ({ description: i.description, category: i.category, qty: i.qty, unit_price: i.unitPrice, total: i.total, hospital_id: hospitalId }))
+      );
+      await daycareService.updateSession(billingPatientId, { status: "Completed" } as any);
+      setPatients((prev) => prev.map((p) => p.id === billingPatientId ? { ...p, bill, status: "Completed" as const } : p));
+      toast({ title: paymentStatus === "Paid" ? "Bill Paid" : "Bill Saved", description: `₹${billingGrandTotal.toLocaleString()}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save bill", variant: "destructive" });
+    }
     setShowBilling(false);
   };
 
