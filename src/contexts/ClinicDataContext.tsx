@@ -4,7 +4,6 @@ import { clinicService } from "@/modules/clinic/services";
 import { staffService } from "@/modules/staff/services";
 import { diagnosticsService } from "@/modules/diagnostics/services";
 import type { Appointment } from "@/modules/clinic/types";
-import type { Appointment } from "@/modules/clinic/types";
 import {
   type DoctorSchedule,
   type QueueEntry,
