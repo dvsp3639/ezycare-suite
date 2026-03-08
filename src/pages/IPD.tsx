@@ -103,10 +103,11 @@ const IPD = () => {
       setDiagnosticEntries(de.map((d: any) => ({ id: d.id, admissionId: d.admissionId, date: d.entryDate, testName: d.testName, cost: d.cost, result: d.result })));
       setBedTransfers(bt.map((t: any) => ({ id: t.id, admissionId: t.admissionId, patientName: t.patientName, fromWard: t.fromWard, fromBed: t.fromBed, toWard: t.toWard, toBed: t.toBed, reason: t.reason, transferDate: t.transferDate, transferredBy: t.transferredBy })));
       if (ds) {
+        const d = ds as any;
         setDischargeSummaries((prev) => {
-          const exists = prev.find((d: any) => d.id === ds.id);
+          const exists = prev.find((x: any) => x.id === d.id);
           if (exists) return prev;
-          return [...prev, { id: ds.id, admissionId: ds.admissionId, dischargeDate: ds.dischargeDate, conditionAtDischarge: ds.conditionAtDischarge, finalDiagnosis: ds.finalDiagnosis, treatmentSummary: ds.treatmentSummary, followUpDate: ds.followUpDate, followUpInstructions: ds.followUpInstructions, medicationsOnDischarge: ds.medicationsOnDischarge, totalBill: ds.totalBill, paidAmount: ds.paidAmount, paymentStatus: ds.paymentStatus }];
+          return [...prev, { id: d.id, admissionId: d.admissionId, dischargeDate: d.dischargeDate, conditionAtDischarge: d.conditionAtDischarge, finalDiagnosis: d.finalDiagnosis, treatmentSummary: d.treatmentSummary, followUpDate: d.followUpDate, followUpInstructions: d.followUpInstructions, medicationsOnDischarge: d.medicationsOnDischarge, totalBill: d.totalBill, paidAmount: d.paidAmount, paymentStatus: d.paymentStatus }];
         });
       }
     }).catch(console.error);
