@@ -1050,7 +1050,14 @@ const ClinicManagement = () => {
 
                 {/* Labs Tab */}
                 <TabsContent value="labs" className="mt-4 space-y-4">
-                  <Label className="text-sm font-semibold flex items-center gap-1"><FlaskConical className="h-4 w-4" /> Lab Test Orders</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold flex items-center gap-1"><FlaskConical className="h-4 w-4" /> Lab Test Orders</Label>
+                    {isReadOnly && consultPatient && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => consultPatient && handleOpenConsultDialog(consultPatient)}>
+                        <Clock className="h-3 w-3 mr-1" /> Refresh Status
+                      </Button>
+                    )}
+                  </div>
                   {!isReadOnly && (
                     <div className="space-y-3 bg-muted/30 rounded-lg p-4 border border-border">
                       <div className="grid grid-cols-2 gap-2">
