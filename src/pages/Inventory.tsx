@@ -25,7 +25,9 @@ import { type LabTestDefinition } from "@/data/mockDiagnosticsData";
 import type { LabCategory } from "@/data/mockClinicData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
 import { useInventoryItems, useStockTransfers } from "@/modules/inventory/hooks";
-import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
+import {
+  useLabTestCatalog, useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem,
+} from "@/modules/diagnostics/hooks";
 
 // ──── Asset Types ────
 export type AssetStatus = "Active" | "Under Maintenance" | "Retired" | "Disposed";
@@ -86,6 +88,9 @@ const Inventory = () => {
   const { data: dbItems } = useInventoryItems();
   const { data: dbTransfers } = useStockTransfers();
   const { data: dbLabCatalog } = useLabTestCatalog();
+  const createTestMutation = useCreateTestCatalogItem();
+  const updateTestMutation = useUpdateTestCatalogItem();
+  const deleteTestMutation = useDeleteTestCatalogItem();
 
   const [activeTab, setActiveTab] = useState("stock");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -333,21 +338,21 @@ const Inventory = () => {
     }
   };
 
-  // Lab test handlers
+  // Lab test handlers — persisted to DB
   const handleAddTest = () => {
     if (!testForm.name) { toast.error("Test name required"); return; }
-    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normalRange: "" }));
-    const newTest: LabTestDefinition = {
-      id: `lt-${Date.now()}`,
-      name: testForm.name,
-      category: testForm.category as LabCategory,
-      price: testForm.price,
-      parameters: params.length > 0 ? params : [{ name: "Result", unit: "", normalRange: "Normal" }],
-    };
-    setLabTests((prev) => [...prev, newTest]);
-    toast.success(`Test "${testForm.name}" added`);
-    setShowAddTest(false);
-    setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    createTestMutation.mutate({
+      item: { name: testForm.name, category: testForm.category as any, price: testForm.price },
+      parameters: params.length > 0 ? params : [{ name: "Result", unit: "", normal_range: "Normal" }],
+    }, {
+      onSuccess: () => {
+        toast.success(`Test "${testForm.name}" added`);
+        setShowAddTest(false);
+        setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+      },
+      onError: (err: any) => toast.error(err.message || "Failed to add test"),
+    });
   };
 
   const handleEditTest = (test: LabTestDefinition) => {
@@ -362,22 +367,26 @@ const Inventory = () => {
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normalRange: "" }));
-    setLabTests((prev) => prev.map((t) => t.id === editTest.id ? {
-      ...t,
-      name: testForm.name,
-      category: testForm.category as LabCategory,
-      price: testForm.price,
-      parameters: params.length > 0 ? params : t.parameters,
-    } : t));
-    toast.success(`Test "${testForm.name}" updated`);
-    setEditTest(null);
-    setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    updateTestMutation.mutate({
+      id: editTest.id,
+      updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
+      parameters: params.length > 0 ? params : undefined,
+    }, {
+      onSuccess: () => {
+        toast.success(`Test "${testForm.name}" updated`);
+        setEditTest(null);
+        setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+      },
+      onError: (err: any) => toast.error(err.message || "Failed to update test"),
+    });
   };
 
   const handleRemoveTest = (testId: string) => {
-    setLabTests((prev) => prev.filter((t) => t.id !== testId));
-    toast.success("Test removed");
+    deleteTestMutation.mutate(testId, {
+      onSuccess: () => toast.success("Test removed"),
+      onError: (err: any) => toast.error(err.message || "Failed to delete test"),
+    });
   };
 
   const handleAddCategory = () => {
