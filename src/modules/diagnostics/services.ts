@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
-import type { LabTestCatalogItem, LabOrder, LabResult, LabOrderInsert } from "./types";
+import type { LabTestCatalogItem, LabOrder, LabResult, LabOrderInsert, LabTestParameter } from "./types";
 
 export const diagnosticsService = {
+  // ─── Test Catalog ───
   async getTestCatalog(): Promise<LabTestCatalogItem[]> {
     const { data, error } = await supabase
       .from("lab_test_catalog")
@@ -11,20 +12,48 @@ export const diagnosticsService = {
     if (error) throw error;
     return (data || []).map((d: any) => ({
       ...snakeToCamel(d),
-      parameters: snakeToCamel(d.lab_test_parameters),
+      parameters: (d.lab_test_parameters || []).map((p: any) => snakeToCamel(p)),
     })) as LabTestCatalogItem[];
   },
 
   async createTestCatalogItem(item: Partial<LabTestCatalogItem>): Promise<LabTestCatalogItem> {
+    const { parameters, ...rest } = item as any;
     const { data, error } = await supabase
       .from("lab_test_catalog")
-      .insert(camelToSnake(item) as any)
+      .insert(camelToSnake(rest) as any)
       .select()
       .single();
     if (error) throw error;
     return snakeToCamel(data) as LabTestCatalogItem;
   },
 
+  async updateTestCatalogItem(id: string, updates: Partial<LabTestCatalogItem>): Promise<void> {
+    const { parameters, ...rest } = updates as any;
+    const { error } = await supabase
+      .from("lab_test_catalog")
+      .update(camelToSnake(rest) as any)
+      .eq("id", id);
+    if (error) throw error;
+  },
+
+  async deleteTestCatalogItem(id: string): Promise<void> {
+    // Delete parameters first, then the test
+    await supabase.from("lab_test_parameters").delete().eq("test_id", id);
+    const { error } = await supabase.from("lab_test_catalog").delete().eq("id", id);
+    if (error) throw error;
+  },
+
+  // ─── Test Parameters ───
+  async saveTestParameters(testId: string, params: Omit<LabTestParameter, "id" | "test_id" | "hospital_id">[]): Promise<void> {
+    await supabase.from("lab_test_parameters").delete().eq("test_id", testId);
+    if (params.length > 0) {
+      const rows = params.map((p) => ({ ...camelToSnake(p), test_id: testId }));
+      const { error } = await supabase.from("lab_test_parameters").insert(rows as any);
+      if (error) throw error;
+    }
+  },
+
+  // ─── Lab Orders ───
   async getLabOrders(filters?: { status?: string; category?: string }): Promise<LabOrder[]> {
     let query = supabase
       .from("lab_orders")
@@ -36,7 +65,7 @@ export const diagnosticsService = {
     if (error) throw error;
     return (data || []).map((d: any) => ({
       ...snakeToCamel(d),
-      results: snakeToCamel(d.lab_results),
+      results: (d.lab_results || []).map((r: any) => snakeToCamel(r)),
     })) as LabOrder[];
   },
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { clinicService } from "@/modules/clinic/services";
 import { staffService } from "@/modules/staff/services";
 import { diagnosticsService } from "@/modules/diagnostics/services";
@@ -95,6 +96,7 @@ function mapDbAppointment(a: any): QueueEntry {
 }
 
 export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [clinicPatients] = useState<ClinicPatient[]>([]);
@@ -212,6 +214,8 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
             ...q,
             labOrders: q.labOrders?.map((l) => l.id === lab.id ? { ...l, id: created.id } : l),
           } : q));
+          // Invalidate diagnostics queries for cross-module sync
+          queryClient.invalidateQueries({ queryKey: ["diagnostics"] });
         } catch (err) {
           console.error("Failed to persist lab order:", err);
         }

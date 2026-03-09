@@ -14,13 +14,16 @@ import { toast } from "sonner";
 import {
   FlaskConical, Search, ClipboardList, TestTube, FileCheck, Eye, Printer,
   AlertTriangle, CheckCircle2, Clock, Beaker, ArrowRight, IndianRupee,
-  Upload, FileImage, FileText, Download, X,
+  Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useClinicData } from "@/contexts/ClinicDataContext";
-import type { LabOrder, LabResult } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
-import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
+import {
+  useLabTestCatalog, useLabOrders,
+  useUpdateLabOrderStatus, useUpdateLabOrderPayment, useSaveLabResults,
+  useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem,
+} from "@/modules/diagnostics/hooks";
+import type { LabTestCatalogItem } from "@/modules/diagnostics/types";
 
 const statusColors: Record<string, string> = {
   Ordered: "bg-warning/10 text-warning border-warning/20",
@@ -29,26 +32,94 @@ const statusColors: Record<string, string> = {
   Completed: "bg-success/10 text-success border-success/20",
 };
 
+// Map DB lab order (snake_case via snakeToCamel) to display format
+interface DisplayLabOrder {
+  id: string;
+  testName: string;
+  category: string;
+  priority: "Routine" | "Urgent";
+  status: "Ordered" | "Sample Collected" | "In Progress" | "Completed";
+  price: number;
+  paymentStatus?: string;
+  paymentMode?: string | null;
+  clinicalNotes?: string;
+  orderedBy: string;
+  orderedAt: string;
+  patientName: string;
+  patientRegNo: string;
+  sampleCollectedAt?: string | null;
+  completedAt?: string | null;
+  results?: { parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[];
+  reportNotes?: string;
+  reportFiles?: { name: string; url: string; type: string }[];
+}
+
+function mapDbOrder(o: any): DisplayLabOrder {
+  return {
+    id: o.id,
+    testName: o.testName,
+    category: o.category,
+    priority: o.priority,
+    status: o.status,
+    price: o.price,
+    paymentStatus: o.paymentStatus,
+    paymentMode: o.paymentMode,
+    clinicalNotes: o.clinicalNotes,
+    orderedBy: o.orderedBy,
+    orderedAt: o.orderedAt ? new Date(o.orderedAt).toLocaleTimeString() : "",
+    patientName: o.patientName,
+    patientRegNo: o.patientRegNo,
+    sampleCollectedAt: o.sampleCollectedAt ? new Date(o.sampleCollectedAt).toLocaleTimeString() : null,
+    completedAt: o.completedAt ? new Date(o.completedAt).toLocaleTimeString() : null,
+    results: (o.results || []).map((r: any) => ({
+      parameter: r.parameter,
+      value: r.value || "",
+      unit: r.unit || "",
+      normalRange: r.normalRange || "",
+      isAbnormal: r.isAbnormal || false,
+    })),
+    reportNotes: o.reportNotes,
+  };
+}
+
 const Diagnostics = () => {
-  const { allLabOrders, updateLabOrderStatus, updateLabOrderResults, updateLabOrderPayment } = useClinicData();
-  const { data: labTestCatalog = [] } = useLabTestCatalog();
+  const { data: labTestCatalog = [], isLoading: catalogLoading } = useLabTestCatalog();
+  const { data: rawLabOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useLabOrders();
+
+  const updateStatusMutation = useUpdateLabOrderStatus();
+  const updatePaymentMutation = useUpdateLabOrderPayment();
+  const saveResultsMutation = useSaveLabResults();
+  const createTestMutation = useCreateTestCatalogItem();
+  const updateTestMutation = useUpdateTestCatalogItem();
+  const deleteTestMutation = useDeleteTestCatalogItem();
+
+  const allLabOrders = useMemo(() => rawLabOrders.map(mapDbOrder), [rawLabOrders]);
+
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
   // Result entry dialog
-  const [resultOrder, setResultOrder] = useState<LabOrder | null>(null);
-  const [resultValues, setResultValues] = useState<LabResult[]>([]);
+  const [resultOrder, setResultOrder] = useState<DisplayLabOrder | null>(null);
+  const [resultValues, setResultValues] = useState<{ parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[]>([]);
   const [reportNotes, setReportNotes] = useState("");
   const [reportFiles, setReportFiles] = useState<{ name: string; url: string; type: string }[]>([]);
 
   // Report view dialog
-  const [viewOrder, setViewOrder] = useState<LabOrder | null>(null);
+  const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
 
   // Payment dialog
-  const [paymentOrder, setPaymentOrder] = useState<LabOrder | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
   const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit">("Cash");
+
+  // Test catalog management
+  const [catalogTab, setCatalogTab] = useState<string>("all");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [showAddTest, setShowAddTest] = useState(false);
+  const [editTest, setEditTest] = useState<LabTestCatalogItem | null>(null);
+  const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: "" });
+  const [testParams, setTestParams] = useState<{ name: string; unit: string; normalRange: string }[]>([]);
 
   const pendingOrders = useMemo(() =>
     allLabOrders.filter((o) => o.status !== "Completed"), [allLabOrders]
@@ -58,7 +129,7 @@ const Diagnostics = () => {
     allLabOrders.filter((o) => o.status === "Completed"), [allLabOrders]
   );
 
-  const filterOrders = (orders: LabOrder[]) =>
+  const filterOrders = (orders: DisplayLabOrder[]) =>
     orders.filter((o) => {
       const matchSearch = !searchQuery ||
         o.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,11 +149,11 @@ const Diagnostics = () => {
   const completedCount = completedOrders.length;
 
   // Payment: show payment dialog before accepting (collecting sample)
-  const handleAcceptOrder = (order: LabOrder) => {
+  const handleAcceptOrder = (order: DisplayLabOrder) => {
     if (order.paymentStatus === "Paid") {
-      // Already paid, go directly to collect sample
-      updateLabOrderStatus(order.id, "Sample Collected");
-      toast.success(`Sample collected for ${order.testName} — ${order.patientName}`);
+      updateStatusMutation.mutate({ id: order.id, status: "Sample Collected" }, {
+        onSuccess: () => { toast.success(`Sample collected for ${order.testName} — ${order.patientName}`); refetchOrders(); },
+      });
     } else {
       setPaymentOrder(order);
       setPaymentMode("Cash");
@@ -91,31 +162,33 @@ const Diagnostics = () => {
 
   const handleConfirmPayment = () => {
     if (!paymentOrder) return;
-    updateLabOrderPayment(paymentOrder.id, paymentMode);
-    toast.success(`Payment ₹${paymentOrder.price} received via ${paymentMode}`);
-    // After payment, collect sample
-    setTimeout(() => {
-      updateLabOrderStatus(paymentOrder.id, "Sample Collected");
-      toast.success(`Sample collected for ${paymentOrder.testName}`);
-    }, 300);
+    updatePaymentMutation.mutate({ id: paymentOrder.id, paymentMode }, {
+      onSuccess: () => {
+        toast.success(`Payment ₹${paymentOrder.price} received via ${paymentMode}`);
+        updateStatusMutation.mutate({ id: paymentOrder.id, status: "Sample Collected" }, {
+          onSuccess: () => { toast.success(`Sample collected for ${paymentOrder.testName}`); refetchOrders(); },
+        });
+      },
+    });
     setPaymentOrder(null);
   };
 
-  const handleStartProcessing = (order: LabOrder) => {
-    updateLabOrderStatus(order.id, "In Progress");
-    toast.success(`Processing started for ${order.testName}`);
+  const handleStartProcessing = (order: DisplayLabOrder) => {
+    updateStatusMutation.mutate({ id: order.id, status: "In Progress" }, {
+      onSuccess: () => { toast.success(`Processing started for ${order.testName}`); refetchOrders(); },
+    });
   };
 
-  const handleOpenResultEntry = (order: LabOrder) => {
+  const handleOpenResultEntry = (order: DisplayLabOrder) => {
     setResultOrder(order);
-    const testDef = labTestCatalog.find((t) => t.name === order.testName);
-    if (testDef) {
+    const testDef = labTestCatalog.find((t: any) => t.name === order.testName);
+    if (testDef && testDef.parameters && testDef.parameters.length > 0) {
       setResultValues(
-        testDef.parameters.map((p) => ({
+        testDef.parameters.map((p: any) => ({
           parameter: p.name,
           value: "",
-          unit: p.unit,
-          normalRange: p.normal_range || "",
+          unit: p.unit || "",
+          normalRange: p.normalRange || p.normal_range || "",
           isAbnormal: false,
         }))
       );
@@ -123,7 +196,7 @@ const Diagnostics = () => {
       setResultValues([{ parameter: "Result", value: "", unit: "", normalRange: "", isAbnormal: false }]);
     }
     setReportNotes("");
-    setReportFiles(order.reportFiles || []);
+    setReportFiles([]);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,9 +220,20 @@ const Diagnostics = () => {
       toast.error("Please enter results or upload report files");
       return;
     }
-    updateLabOrderResults(resultOrder.id, filledResults, reportNotes || undefined, reportFiles.length > 0 ? reportFiles : undefined);
-    toast.success(`Report saved for ${resultOrder.testName} — ${resultOrder.patientName}`);
-    setResultOrder(null);
+    const dbResults = filledResults.map((r) => ({
+      parameter: r.parameter,
+      value: r.value,
+      unit: r.unit,
+      normal_range: r.normalRange,
+      is_abnormal: r.isAbnormal,
+    }));
+    saveResultsMutation.mutate({ labOrderId: resultOrder.id, results: dbResults, reportNotes: reportNotes || undefined }, {
+      onSuccess: () => {
+        toast.success(`Report saved for ${resultOrder.testName} — ${resultOrder.patientName}`);
+        setResultOrder(null);
+        refetchOrders();
+      },
+    });
   };
 
   const updateResultValue = (idx: number, value: string) => {
@@ -164,7 +248,7 @@ const Diagnostics = () => {
     );
   };
 
-  const handlePrintReport = (order: LabOrder) => {
+  const handlePrintReport = (order: DisplayLabOrder) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow || !order.results) return;
     printWindow.document.write(`
@@ -234,6 +318,81 @@ const Diagnostics = () => {
     return <FileText className="h-4 w-4 text-warning" />;
   };
 
+  // ─── Test Catalog CRUD ───
+  const filteredCatalog = labTestCatalog.filter((t: any) => {
+    const matchCat = catalogTab === "all" || t.category === catalogTab;
+    const matchSearch = !catalogSearch || t.name.toLowerCase().includes(catalogSearch.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  const openAddTest = () => {
+    setTestForm({ name: "", category: "Blood", price: "" });
+    setTestParams([{ name: "", unit: "", normalRange: "" }]);
+    setEditTest(null);
+    setShowAddTest(true);
+  };
+
+  const openEditTest = (test: LabTestCatalogItem) => {
+    setTestForm({ name: test.name, category: test.category, price: String(test.price) });
+    setTestParams(
+      (test.parameters || []).length > 0
+        ? (test.parameters || []).map((p: any) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || p.normal_range || "" }))
+        : [{ name: "", unit: "", normalRange: "" }]
+    );
+    setEditTest(test);
+    setShowAddTest(true);
+  };
+
+  const addParamRow = () => setTestParams((prev) => [...prev, { name: "", unit: "", normalRange: "" }]);
+  const removeParamRow = (idx: number) => setTestParams((prev) => prev.filter((_, i) => i !== idx));
+  const updateParamRow = (idx: number, field: string, value: string) => {
+    setTestParams((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
+  };
+
+  const handleSaveTest = () => {
+    if (!testForm.name.trim()) { toast.error("Test name is required"); return; }
+    if (!testForm.price || Number(testForm.price) <= 0) { toast.error("Valid price is required"); return; }
+    const validParams = testParams.filter((p) => p.name.trim());
+
+    if (editTest) {
+      updateTestMutation.mutate({
+        id: editTest.id,
+        updates: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
+        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange })),
+      }, {
+        onSuccess: () => { toast.success(`Test "${testForm.name}" updated`); setShowAddTest(false); },
+        onError: (err: any) => toast.error(err.message || "Failed to update test"),
+      });
+    } else {
+      createTestMutation.mutate({
+        item: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
+        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange })),
+      }, {
+        onSuccess: () => { toast.success(`Test "${testForm.name}" added to catalog`); setShowAddTest(false); },
+        onError: (err: any) => toast.error(err.message || "Failed to add test"),
+      });
+    }
+  };
+
+  const handleDeleteTest = (test: LabTestCatalogItem) => {
+    if (!confirm(`Delete "${test.name}" from catalog?`)) return;
+    deleteTestMutation.mutate(test.id, {
+      onSuccess: () => toast.success(`"${test.name}" deleted`),
+      onError: (err: any) => toast.error(err.message || "Failed to delete test"),
+    });
+  };
+
+  if (ordersLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
+        <div className="text-center py-16 text-muted-foreground">
+          <FlaskConical className="h-12 w-12 mx-auto mb-3 opacity-30 animate-pulse" />
+          <p className="text-sm">Loading diagnostics data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
@@ -279,6 +438,7 @@ const Diagnostics = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="pending"><Clock className="h-4 w-4 mr-1.5" /> Pending ({pendingOrders.length})</TabsTrigger>
           <TabsTrigger value="completed"><CheckCircle2 className="h-4 w-4 mr-1.5" /> Completed ({completedOrders.length})</TabsTrigger>
+          <TabsTrigger value="catalog"><Settings2 className="h-4 w-4 mr-1.5" /> Test Catalog ({labTestCatalog.length})</TabsTrigger>
         </TabsList>
 
         {/* Pending Orders */}
@@ -384,7 +544,6 @@ const Diagnostics = () => {
                     <TableHead>Priority</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Abnormal</TableHead>
-                    <TableHead>Files</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -416,15 +575,6 @@ const Diagnostics = () => {
                             <Badge variant="outline" className="text-[10px] text-success border-success/20">Normal</Badge>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {order.reportFiles && order.reportFiles.length > 0 ? (
-                            <Badge variant="outline" className="text-[10px] text-info border-info/20 bg-info/10">
-                              <Upload className="h-3 w-3 mr-0.5" /> {order.reportFiles.length}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button size="sm" variant="ghost" onClick={() => setViewOrder(order)}>
                             <Eye className="h-3.5 w-3.5 mr-1" /> View
@@ -436,6 +586,75 @@ const Diagnostics = () => {
                       </TableRow>
                     );
                   })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ─── Test Catalog Management ─── */}
+        <TabsContent value="catalog">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder="Search tests..." className="pl-9 h-10" />
+            </div>
+            <Select value={catalogTab} onValueChange={setCatalogTab}>
+              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="Blood">🩸 Blood</SelectItem>
+                <SelectItem value="Urine">🧪 Urine</SelectItem>
+                <SelectItem value="Radiology">📷 Radiology</SelectItem>
+                <SelectItem value="Serology">🔬 Serology</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={openAddTest}><Plus className="h-3.5 w-3.5 mr-1" /> Add Test</Button>
+          </div>
+
+          {catalogLoading ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">Loading catalog...</div>
+          ) : filteredCatalog.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <FlaskConical className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No tests in catalog</p>
+              <p className="text-xs mt-1">Add tests to make them available for ordering in consultations</p>
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Test Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Price (₹)</TableHead>
+                    <TableHead>Parameters</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCatalog.map((test: any) => (
+                    <TableRow key={test.id}>
+                      <TableCell className="font-medium text-foreground">{test.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-[10px]", labCategoryColors[test.category])}>{test.category}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono">₹{test.price}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {(test.parameters || []).length > 0
+                          ? (test.parameters || []).map((p: any) => p.name).join(", ")
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEditTest(test)}>
+                          <Edit className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteTest(test)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -611,7 +830,7 @@ const Diagnostics = () => {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setResultOrder(null)}>Cancel</Button>
-                <Button onClick={handleSaveResults}>
+                <Button onClick={handleSaveResults} disabled={saveResultsMutation.isPending}>
                   <CheckCircle2 className="h-4 w-4 mr-1.5" /> Save & Complete Report
                 </Button>
               </DialogFooter>
@@ -675,37 +894,6 @@ const Diagnostics = () => {
                 </TableBody>
               </Table>
 
-              {/* Report Files visible to doctor */}
-              {viewOrder.reportFiles && viewOrder.reportFiles.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold flex items-center gap-1.5">
-                    <Upload className="h-4 w-4" /> Attached Report Files
-                  </Label>
-                  <div className="space-y-2">
-                    {viewOrder.reportFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-muted/50 border border-border rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {file.type.startsWith("image/") ? <FileImage className="h-4 w-4 text-info" /> : <FileText className="h-4 w-4 text-warning" />}
-                          <span className="text-sm text-foreground truncate">{file.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <a href={file.url} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="ghost" className="h-7 text-xs">
-                              <Eye className="h-3.5 w-3.5 mr-1" /> View
-                            </Button>
-                          </a>
-                          <a href={file.url} download={file.name}>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs">
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {viewOrder.reportNotes && (
                 <div className="bg-muted/50 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground mb-0.5">Report Remarks</p>
@@ -728,6 +916,71 @@ const Diagnostics = () => {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add/Edit Test Dialog ─── */}
+      <Dialog open={showAddTest} onOpenChange={setShowAddTest}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-primary" />
+              {editTest ? "Edit Test" : "Add New Test"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Test Name *</Label>
+              <Input value={testForm.name} onChange={(e) => setTestForm({ ...testForm, name: e.target.value })} placeholder="e.g. Complete Blood Count (CBC)" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Category *</Label>
+                <Select value={testForm.category} onValueChange={(v) => setTestForm({ ...testForm, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Blood">🩸 Blood</SelectItem>
+                    <SelectItem value="Urine">🧪 Urine</SelectItem>
+                    <SelectItem value="Radiology">📷 Radiology</SelectItem>
+                    <SelectItem value="Serology">🔬 Serology</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Price (₹) *</Label>
+                <Input type="number" value={testForm.price} onChange={(e) => setTestForm({ ...testForm, price: e.target.value })} placeholder="350" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Parameters</Label>
+                <Button size="sm" variant="outline" onClick={addParamRow}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
+              </div>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {testParams.map((p, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
+                    <Input value={p.name} onChange={(e) => updateParamRow(idx, "name", e.target.value)} placeholder="Parameter name" className="text-sm" />
+                    <Input value={p.unit} onChange={(e) => updateParamRow(idx, "unit", e.target.value)} placeholder="Unit" className="text-sm" />
+                    <Input value={p.normalRange} onChange={(e) => updateParamRow(idx, "normalRange", e.target.value)} placeholder="Normal" className="text-sm" />
+                    {testParams.length > 1 && (
+                      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => removeParamRow(idx)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTest(false)}>Cancel</Button>
+            <Button onClick={handleSaveTest} disabled={createTestMutation.isPending || updateTestMutation.isPending}>
+              <CheckCircle2 className="h-4 w-4 mr-1.5" /> {editTest ? "Update Test" : "Add Test"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
