@@ -776,8 +776,8 @@ const Diagnostics = () => {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setResultOrder(null)}>Cancel</Button>
-                <Button onClick={handleSaveResults} disabled={saveResultsMutation.isPending}>
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Save & Complete Report
+                <Button onClick={handleSaveResults} disabled={saveResultsMutation.isPending || uploading}>
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> {uploading ? "Uploading..." : "Save & Complete Report"}
                 </Button>
               </DialogFooter>
             </>
