@@ -185,71 +185,54 @@ const Diagnostics = () => {
 
   const handleOpenResultEntry = (order: DisplayLabOrder) => {
     setResultOrder(order);
-    const testDef = labTestCatalog.find((t: any) => t.name === order.testName);
-    if (testDef && testDef.parameters && testDef.parameters.length > 0) {
-      setResultValues(
-        testDef.parameters.map((p: any) => ({
-          parameter: p.name,
-          value: "",
-          unit: p.unit || "",
-          normalRange: p.normalRange || p.normal_range || "",
-          isAbnormal: false,
-        }))
-      );
-    } else {
-      setResultValues([]);
-    }
     setReportNotes("");
-    setReportFiles([]);
+    setReportFile(null);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      const url = URL.createObjectURL(file);
-      setReportFiles((prev) => [...prev, { name: file.name, url, type: file.type }]);
-    });
+    const file = e.target.files?.[0];
+    if (file) setReportFile(file);
     e.target.value = "";
   };
 
-  const removeFile = (idx: number) => {
-    setReportFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSaveResults = () => {
+  const handleSaveResults = async () => {
     if (!resultOrder) return;
-    const filledResults = resultValues.filter((r) => r.value.trim());
-    if (filledResults.length === 0 && reportFiles.length === 0) {
-      toast.error("Please enter results or upload report files");
+    if (!reportFile) {
+      toast.error("Please upload a report file");
       return;
     }
-    const dbResults = filledResults.map((r) => ({
-      parameter: r.parameter,
-      value: r.value,
-      unit: r.unit,
-      normal_range: r.normalRange,
-      is_abnormal: r.isAbnormal,
-    }));
-    saveResultsMutation.mutate({ labOrderId: resultOrder.id, results: dbResults, reportNotes: reportNotes ?? "" }, {
-      onSuccess: () => {
-        toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
-        setResultOrder(null);
-        refetchOrders();
-      },
-    });
-  };
+    setUploading(true);
+    try {
+      // Upload file to storage
+      const filePath = `${resultOrder.id}/${Date.now()}-${reportFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("lab-reports")
+        .upload(filePath, reportFile);
+      if (uploadError) throw uploadError;
 
-  const updateResultValue = (idx: number, value: string) => {
-    setResultValues((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, value } : r))
-    );
-  };
+      const { data: urlData } = supabase.storage
+        .from("lab-reports")
+        .getPublicUrl(filePath);
 
-  const toggleAbnormal = (idx: number) => {
-    setResultValues((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, isAbnormal: !r.isAbnormal } : r))
-    );
+      // Save results with file URL
+      saveResultsMutation.mutate({
+        labOrderId: resultOrder.id,
+        results: [],
+        reportNotes: reportNotes ?? "",
+        reportFileUrl: urlData.publicUrl,
+        reportFileName: reportFile.name,
+      }, {
+        onSuccess: () => {
+          toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
+          setResultOrder(null);
+          refetchOrders();
+        },
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload report file");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handlePrintReport = (order: DisplayLabOrder) => {
