@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { clinicService } from "@/modules/clinic/services";
 import { staffService } from "@/modules/staff/services";
 import { diagnosticsService } from "@/modules/diagnostics/services";
