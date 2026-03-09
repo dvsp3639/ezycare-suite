@@ -88,6 +88,9 @@ const Inventory = () => {
   const { data: dbItems } = useInventoryItems();
   const { data: dbTransfers } = useStockTransfers();
   const { data: dbLabCatalog } = useLabTestCatalog();
+  const createTestMutation = useCreateTestCatalogItem();
+  const updateTestMutation = useUpdateTestCatalogItem();
+  const deleteTestMutation = useDeleteTestCatalogItem();
 
   const [activeTab, setActiveTab] = useState("stock");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
