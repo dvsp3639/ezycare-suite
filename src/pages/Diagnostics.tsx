@@ -732,75 +732,34 @@ const Diagnostics = () => {
                 </div>
               )}
 
-              <div className="space-y-3">
-                {resultValues.map((r, idx) => (
-                  <div key={idx} className="border border-border rounded-lg p-3 bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-foreground">{r.parameter}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Normal: {r.normalRange} {r.unit}</span>
-                        <div className="flex items-center gap-1.5">
-                          <Switch
-                            checked={r.isAbnormal}
-                            onCheckedChange={() => toggleAbnormal(idx)}
-                            className="h-4 w-8"
-                          />
-                          <span className={cn("text-xs font-medium", r.isAbnormal ? "text-destructive" : "text-success")}>
-                            {r.isAbnormal ? "Abnormal" : "Normal"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Input
-                      value={r.value}
-                      onChange={(e) => updateResultValue(idx, e.target.value)}
-                      placeholder={`Enter value ${r.unit ? `(${r.unit})` : ""}`}
-                      className={cn("text-sm", r.isAbnormal && "border-destructive/50")}
-                    />
-                  </div>
-                ))}
-              </div>
-
               {/* File Upload Section */}
               <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
-                    <Upload className="h-4 w-4" /> Upload Report Files
+                    <Upload className="h-4 w-4" /> Upload Report File
                   </Label>
                   <label className="cursor-pointer">
                     <input
                       type="file"
-                      multiple
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={handleFileUpload}
                     />
                     <Button size="sm" variant="outline" asChild>
-                      <span><Upload className="h-3.5 w-3.5 mr-1" /> Choose Files</span>
+                      <span><Upload className="h-3.5 w-3.5 mr-1" /> Choose File</span>
                     </Button>
                   </label>
                 </div>
                 <p className="text-xs text-muted-foreground">Accepts PDF, DOC, DOCX, JPG, PNG, WEBP</p>
-                {reportFiles.length > 0 && (
-                  <div className="space-y-2">
-                    {reportFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {getFileIcon(file.type)}
-                          <span className="text-sm text-foreground truncate">{file.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <a href={file.url} target="_blank" rel="noopener noreferrer">
-                            <Button size="icon" variant="ghost" className="h-7 w-7">
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          </a>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFile(idx)}>
-                            <X className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                {reportFile && (
+                  <div className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getFileIcon(reportFile.type)}
+                      <span className="text-sm text-foreground truncate">{reportFile.name}</span>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setReportFile(null)}>
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </div>
                 )}
               </div>
