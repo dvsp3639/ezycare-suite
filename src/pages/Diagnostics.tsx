@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,8 @@ interface DisplayLabOrder {
   completedAt?: string | null;
   results?: { parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[];
   reportNotes?: string;
-  reportFiles?: { name: string; url: string; type: string }[];
+  reportFileUrl?: string;
+  reportFileName?: string;
 }
 
 function mapDbOrder(o: any): DisplayLabOrder {
@@ -79,6 +81,8 @@ function mapDbOrder(o: any): DisplayLabOrder {
       isAbnormal: r.isAbnormal || false,
     })),
     reportNotes: o.reportNotes,
+    reportFileUrl: o.reportFileUrl || "",
+    reportFileName: o.reportFileName || "",
   };
 }
 
@@ -102,9 +106,9 @@ const Diagnostics = () => {
 
   // Result entry dialog
   const [resultOrder, setResultOrder] = useState<DisplayLabOrder | null>(null);
-  const [resultValues, setResultValues] = useState<{ parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[]>([]);
   const [reportNotes, setReportNotes] = useState("");
-  const [reportFiles, setReportFiles] = useState<{ name: string; url: string; type: string }[]>([]);
+  const [reportFile, setReportFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
@@ -181,71 +185,54 @@ const Diagnostics = () => {
 
   const handleOpenResultEntry = (order: DisplayLabOrder) => {
     setResultOrder(order);
-    const testDef = labTestCatalog.find((t: any) => t.name === order.testName);
-    if (testDef && testDef.parameters && testDef.parameters.length > 0) {
-      setResultValues(
-        testDef.parameters.map((p: any) => ({
-          parameter: p.name,
-          value: "",
-          unit: p.unit || "",
-          normalRange: p.normalRange || p.normal_range || "",
-          isAbnormal: false,
-        }))
-      );
-    } else {
-      setResultValues([]);
-    }
     setReportNotes("");
-    setReportFiles([]);
+    setReportFile(null);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      const url = URL.createObjectURL(file);
-      setReportFiles((prev) => [...prev, { name: file.name, url, type: file.type }]);
-    });
+    const file = e.target.files?.[0];
+    if (file) setReportFile(file);
     e.target.value = "";
   };
 
-  const removeFile = (idx: number) => {
-    setReportFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSaveResults = () => {
+  const handleSaveResults = async () => {
     if (!resultOrder) return;
-    const filledResults = resultValues.filter((r) => r.value.trim());
-    if (filledResults.length === 0 && reportFiles.length === 0) {
-      toast.error("Please enter results or upload report files");
+    if (!reportFile) {
+      toast.error("Please upload a report file");
       return;
     }
-    const dbResults = filledResults.map((r) => ({
-      parameter: r.parameter,
-      value: r.value,
-      unit: r.unit,
-      normal_range: r.normalRange,
-      is_abnormal: r.isAbnormal,
-    }));
-    saveResultsMutation.mutate({ labOrderId: resultOrder.id, results: dbResults, reportNotes: reportNotes ?? "" }, {
-      onSuccess: () => {
-        toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
-        setResultOrder(null);
-        refetchOrders();
-      },
-    });
-  };
+    setUploading(true);
+    try {
+      // Upload file to storage
+      const filePath = `${resultOrder.id}/${Date.now()}-${reportFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("lab-reports")
+        .upload(filePath, reportFile);
+      if (uploadError) throw uploadError;
 
-  const updateResultValue = (idx: number, value: string) => {
-    setResultValues((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, value } : r))
-    );
-  };
+      const { data: urlData } = supabase.storage
+        .from("lab-reports")
+        .getPublicUrl(filePath);
 
-  const toggleAbnormal = (idx: number) => {
-    setResultValues((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, isAbnormal: !r.isAbnormal } : r))
-    );
+      // Save results with file URL
+      saveResultsMutation.mutate({
+        labOrderId: resultOrder.id,
+        results: [],
+        reportNotes: reportNotes ?? "",
+        reportFileUrl: urlData.publicUrl,
+        reportFileName: reportFile.name,
+      }, {
+        onSuccess: () => {
+          toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
+          setResultOrder(null);
+          refetchOrders();
+        },
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload report file");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handlePrintReport = (order: DisplayLabOrder) => {
@@ -745,75 +732,34 @@ const Diagnostics = () => {
                 </div>
               )}
 
-              <div className="space-y-3">
-                {resultValues.map((r, idx) => (
-                  <div key={idx} className="border border-border rounded-lg p-3 bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-foreground">{r.parameter}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Normal: {r.normalRange} {r.unit}</span>
-                        <div className="flex items-center gap-1.5">
-                          <Switch
-                            checked={r.isAbnormal}
-                            onCheckedChange={() => toggleAbnormal(idx)}
-                            className="h-4 w-8"
-                          />
-                          <span className={cn("text-xs font-medium", r.isAbnormal ? "text-destructive" : "text-success")}>
-                            {r.isAbnormal ? "Abnormal" : "Normal"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Input
-                      value={r.value}
-                      onChange={(e) => updateResultValue(idx, e.target.value)}
-                      placeholder={`Enter value ${r.unit ? `(${r.unit})` : ""}`}
-                      className={cn("text-sm", r.isAbnormal && "border-destructive/50")}
-                    />
-                  </div>
-                ))}
-              </div>
-
               {/* File Upload Section */}
               <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
-                    <Upload className="h-4 w-4" /> Upload Report Files
+                    <Upload className="h-4 w-4" /> Upload Report File
                   </Label>
                   <label className="cursor-pointer">
                     <input
                       type="file"
-                      multiple
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={handleFileUpload}
                     />
                     <Button size="sm" variant="outline" asChild>
-                      <span><Upload className="h-3.5 w-3.5 mr-1" /> Choose Files</span>
+                      <span><Upload className="h-3.5 w-3.5 mr-1" /> Choose File</span>
                     </Button>
                   </label>
                 </div>
                 <p className="text-xs text-muted-foreground">Accepts PDF, DOC, DOCX, JPG, PNG, WEBP</p>
-                {reportFiles.length > 0 && (
-                  <div className="space-y-2">
-                    {reportFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {getFileIcon(file.type)}
-                          <span className="text-sm text-foreground truncate">{file.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <a href={file.url} target="_blank" rel="noopener noreferrer">
-                            <Button size="icon" variant="ghost" className="h-7 w-7">
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          </a>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFile(idx)}>
-                            <X className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                {reportFile && (
+                  <div className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getFileIcon(reportFile.type)}
+                      <span className="text-sm text-foreground truncate">{reportFile.name}</span>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setReportFile(null)}>
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -830,8 +776,8 @@ const Diagnostics = () => {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setResultOrder(null)}>Cancel</Button>
-                <Button onClick={handleSaveResults} disabled={saveResultsMutation.isPending}>
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Save & Complete Report
+                <Button onClick={handleSaveResults} disabled={saveResultsMutation.isPending || uploading}>
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> {uploading ? "Uploading..." : "Save & Complete Report"}
                 </Button>
               </DialogFooter>
             </>
@@ -842,7 +788,7 @@ const Diagnostics = () => {
       {/* Report View Dialog */}
       <Dialog open={!!viewOrder} onOpenChange={(v) => !v && setViewOrder(null)}>
         <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
-          {viewOrder && viewOrder.results && (
+          {viewOrder && (
             <>
               <DialogHeader>
                 <DialogTitle className="font-display flex items-center gap-2">
@@ -865,34 +811,14 @@ const Diagnostics = () => {
                 <div><span className="text-muted-foreground">Payment:</span> <strong className="text-success">{viewOrder.paymentStatus} ({viewOrder.paymentMode})</strong></div>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Parameter</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Normal Range</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {viewOrder.results.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-sm font-medium">{r.parameter}</TableCell>
-                      <TableCell className={cn("text-sm font-mono", r.isAbnormal && "text-destructive font-bold")}>{r.value}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.unit}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.normalRange}</TableCell>
-                      <TableCell>
-                        {r.isAbnormal ? (
-                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30 bg-destructive/10">Abnormal</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-success border-success/20 bg-success/10">Normal</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {viewOrder.reportFileUrl && (
+                <div className="border border-border rounded-lg p-3 bg-card">
+                  <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
+                  <a href={viewOrder.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                    <Download className="h-4 w-4" /> {viewOrder.reportFileName || "Download Report"}
+                  </a>
+                </div>
+              )}
 
               {viewOrder.reportNotes && (
                 <div className="bg-muted/50 rounded-lg p-3">
@@ -909,9 +835,6 @@ const Diagnostics = () => {
               )}
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => handlePrintReport(viewOrder)}>
-                  <Printer className="h-4 w-4 mr-1.5" /> Print Report
-                </Button>
                 <Button variant="outline" onClick={() => setViewOrder(null)}>Close</Button>
               </DialogFooter>
             </>

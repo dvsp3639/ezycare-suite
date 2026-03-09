@@ -61,6 +61,8 @@ export interface LabOrder {
   results?: LabResult[];
   reportNotes?: string;
   reportFiles?: { name: string; url: string; type: string }[];
+  reportFileUrl?: string;
+  reportFileName?: string;
 }
 
 export interface QueueEntry {

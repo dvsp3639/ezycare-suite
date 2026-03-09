@@ -1002,6 +1002,8 @@ export type Database = {
           payment_status: string | null
           price: number
           priority: string
+          report_file_name: string | null
+          report_file_url: string | null
           report_notes: string | null
           sample_collected_at: string | null
           status: string
@@ -1023,6 +1025,8 @@ export type Database = {
           payment_status?: string | null
           price?: number
           priority?: string
+          report_file_name?: string | null
+          report_file_url?: string | null
           report_notes?: string | null
           sample_collected_at?: string | null
           status?: string
@@ -1044,6 +1048,8 @@ export type Database = {
           payment_status?: string | null
           price?: number
           priority?: string
+          report_file_name?: string | null
+          report_file_url?: string | null
           report_notes?: string | null
           sample_collected_at?: string | null
           status?: string

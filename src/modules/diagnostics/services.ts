@@ -96,7 +96,7 @@ export const diagnosticsService = {
     if (error) throw error;
   },
 
-  async saveResults(labOrderId: string, results: Omit<LabResult, "id" | "lab_order_id" | "hospital_id">[], reportNotes?: string): Promise<void> {
+  async saveResults(labOrderId: string, results: Omit<LabResult, "id" | "lab_order_id" | "hospital_id">[], reportNotes?: string, reportFileUrl?: string, reportFileName?: string): Promise<void> {
     await supabase.from("lab_results").delete().eq("lab_order_id", labOrderId);
     if (results.length > 0) {
       const rows = results.map((r) => ({ ...camelToSnake(r), lab_order_id: labOrderId }));
@@ -104,11 +104,14 @@ export const diagnosticsService = {
       if (error) throw error;
     }
     // Always mark as Completed when saving results
-    const { error: updateError } = await supabase.from("lab_orders").update({
+    const updateData: any = {
       report_notes: reportNotes ?? "",
       status: "Completed",
       completed_at: new Date().toISOString(),
-    } as any).eq("id", labOrderId);
+    };
+    if (reportFileUrl) updateData.report_file_url = reportFileUrl;
+    if (reportFileName) updateData.report_file_name = reportFileName;
+    const { error: updateError } = await supabase.from("lab_orders").update(updateData).eq("id", labOrderId);
     if (updateError) throw updateError;
   },
 };
