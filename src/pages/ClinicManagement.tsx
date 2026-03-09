@@ -375,15 +375,50 @@ const ClinicManagement = () => {
     setVitalsPatient(null);
   };
 
-  const handleOpenConsultDialog = (entry: QueueEntry) => {
+  const handleOpenConsultDialog = async (entry: QueueEntry) => {
     setConsultPatient(entry);
     setConsultTab("vitals");
     setConsultDiagnosis(entry.diagnosis || "");
     setConsultNotes(entry.doctorNotes || "");
     setConsultVitals(entry.vitals || emptyVitals());
     setConsultPrescriptions(entry.structuredPrescription?.length ? [...entry.structuredPrescription] : [emptyPrescriptionItem()]);
-    setConsultLabOrders(entry.labOrders || []);
     setConsultFollowUp(entry.followUpDate ? new Date(entry.followUpDate) : undefined);
+
+    // Fetch lab orders from DB for this appointment (cross-module sync)
+    try {
+      const { diagnosticsService } = await import("@/modules/diagnostics/services");
+      const dbOrders = await diagnosticsService.getLabOrders();
+      const appointmentOrders = dbOrders
+        .filter((o: any) => o.appointmentId === entry.id)
+        .map((o: any): LabOrder => ({
+          id: o.id,
+          testName: o.testName,
+          category: o.category as LabCategory,
+          priority: o.priority as "Routine" | "Urgent",
+          status: o.status as LabOrder["status"],
+          price: o.price,
+          paymentStatus: o.paymentStatus as any,
+          paymentMode: o.paymentMode as any,
+          clinicalNotes: o.clinicalNotes,
+          orderedBy: o.orderedBy,
+          orderedAt: o.orderedAt ? new Date(o.orderedAt).toLocaleTimeString() : "",
+          patientName: o.patientName,
+          patientRegNo: o.patientRegNo,
+          sampleCollectedAt: o.sampleCollectedAt ? new Date(o.sampleCollectedAt).toLocaleTimeString() : undefined,
+          completedAt: o.completedAt ? new Date(o.completedAt).toLocaleTimeString() : undefined,
+          results: (o.results || []).map((r: any) => ({
+            parameter: r.parameter,
+            value: r.value || "",
+            unit: r.unit || "",
+            normalRange: r.normalRange || "",
+            isAbnormal: r.isAbnormal || false,
+          })),
+          reportNotes: o.reportNotes,
+        }));
+      setConsultLabOrders(appointmentOrders.length > 0 ? appointmentOrders : (entry.labOrders || []));
+    } catch {
+      setConsultLabOrders(entry.labOrders || []);
+    }
   };
 
   const handleSaveData = () => {
