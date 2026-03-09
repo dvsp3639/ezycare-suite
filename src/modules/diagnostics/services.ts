@@ -54,13 +54,14 @@ export const diagnosticsService = {
   },
 
   // ─── Lab Orders ───
-  async getLabOrders(filters?: { status?: string; category?: string }): Promise<LabOrder[]> {
+  async getLabOrders(filters?: { status?: string; category?: string; appointmentId?: string }): Promise<LabOrder[]> {
     let query = supabase
       .from("lab_orders")
       .select("*, lab_results(*)")
       .order("ordered_at", { ascending: false });
     if (filters?.status) query = query.eq("status", filters.status);
     if (filters?.category) query = query.eq("category", filters.category);
+    if (filters?.appointmentId) query = query.eq("appointment_id", filters.appointmentId);
     const { data, error } = await query;
     if (error) throw error;
     return (data || []).map((d: any) => ({

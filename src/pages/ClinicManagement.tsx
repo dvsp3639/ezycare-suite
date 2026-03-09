@@ -35,7 +35,7 @@ import {
   type Vitals,
 } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
-import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
+import { useLabTestCatalog, useLabOrders } from "@/modules/diagnostics/hooks";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -384,37 +384,35 @@ const ClinicManagement = () => {
     setConsultPrescriptions(entry.structuredPrescription?.length ? [...entry.structuredPrescription] : [emptyPrescriptionItem()]);
     setConsultFollowUp(entry.followUpDate ? new Date(entry.followUpDate) : undefined);
 
-    // Fetch lab orders from DB for this appointment (cross-module sync)
+    // Fetch lab orders from DB filtered by appointment_id
     try {
       const { diagnosticsService } = await import("@/modules/diagnostics/services");
-      const dbOrders = await diagnosticsService.getLabOrders();
-      const appointmentOrders = dbOrders
-        .filter((o: any) => o.appointmentId === entry.id)
-        .map((o: any): LabOrder => ({
-          id: o.id,
-          testName: o.testName,
-          category: o.category as LabCategory,
-          priority: o.priority as "Routine" | "Urgent",
-          status: o.status as LabOrder["status"],
-          price: o.price,
-          paymentStatus: o.paymentStatus as any,
-          paymentMode: o.paymentMode as any,
-          clinicalNotes: o.clinicalNotes,
-          orderedBy: o.orderedBy,
-          orderedAt: o.orderedAt ? new Date(o.orderedAt).toLocaleTimeString() : "",
-          patientName: o.patientName,
-          patientRegNo: o.patientRegNo,
-          sampleCollectedAt: o.sampleCollectedAt ? new Date(o.sampleCollectedAt).toLocaleTimeString() : undefined,
-          completedAt: o.completedAt ? new Date(o.completedAt).toLocaleTimeString() : undefined,
-          results: (o.results || []).map((r: any) => ({
-            parameter: r.parameter,
-            value: r.value || "",
-            unit: r.unit || "",
-            normalRange: r.normalRange || "",
-            isAbnormal: r.isAbnormal || false,
-          })),
-          reportNotes: o.reportNotes,
-        }));
+      const dbOrders = await diagnosticsService.getLabOrders({ appointmentId: entry.id });
+      const appointmentOrders = dbOrders.map((o: any): LabOrder => ({
+        id: o.id,
+        testName: o.testName,
+        category: o.category as LabCategory,
+        priority: o.priority as "Routine" | "Urgent",
+        status: o.status as LabOrder["status"],
+        price: o.price,
+        paymentStatus: o.paymentStatus as any,
+        paymentMode: o.paymentMode as any,
+        clinicalNotes: o.clinicalNotes,
+        orderedBy: o.orderedBy,
+        orderedAt: o.orderedAt ? new Date(o.orderedAt).toLocaleTimeString() : "",
+        patientName: o.patientName,
+        patientRegNo: o.patientRegNo,
+        sampleCollectedAt: o.sampleCollectedAt ? new Date(o.sampleCollectedAt).toLocaleTimeString() : undefined,
+        completedAt: o.completedAt ? new Date(o.completedAt).toLocaleTimeString() : undefined,
+        results: (o.results || []).map((r: any) => ({
+          parameter: r.parameter,
+          value: r.value || "",
+          unit: r.unit || "",
+          normalRange: r.normalRange || "",
+          isAbnormal: r.isAbnormal || false,
+        })),
+        reportNotes: o.reportNotes,
+      }));
       setConsultLabOrders(appointmentOrders.length > 0 ? appointmentOrders : (entry.labOrders || []));
     } catch {
       setConsultLabOrders(entry.labOrders || []);
@@ -1052,7 +1050,14 @@ const ClinicManagement = () => {
 
                 {/* Labs Tab */}
                 <TabsContent value="labs" className="mt-4 space-y-4">
-                  <Label className="text-sm font-semibold flex items-center gap-1"><FlaskConical className="h-4 w-4" /> Lab Test Orders</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold flex items-center gap-1"><FlaskConical className="h-4 w-4" /> Lab Test Orders</Label>
+                    {isReadOnly && consultPatient && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => consultPatient && handleOpenConsultDialog(consultPatient)}>
+                        <Clock className="h-3 w-3 mr-1" /> Refresh Status
+                      </Button>
+                    )}
+                  </div>
                   {!isReadOnly && (
                     <div className="space-y-3 bg-muted/30 rounded-lg p-4 border border-border">
                       <div className="grid grid-cols-2 gap-2">

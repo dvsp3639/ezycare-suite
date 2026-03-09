@@ -14,10 +14,11 @@ export function useLabTestCatalog() {
   });
 }
 
-export function useLabOrders(filters?: { status?: string; category?: string }) {
+export function useLabOrders(filters?: { status?: string; category?: string; appointmentId?: string }) {
   return useQuery({
     queryKey: KEYS.orders(filters),
     queryFn: () => diagnosticsService.getLabOrders(filters),
+    refetchInterval: 15000, // Auto-refresh every 15s for cross-module sync
   });
 }
 
