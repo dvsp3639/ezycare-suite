@@ -193,7 +193,7 @@ const Diagnostics = () => {
         }))
       );
     } else {
-      setResultValues([{ parameter: "Result", value: "", unit: "", normalRange: "", isAbnormal: false }]);
+      setResultValues([]);
     }
     setReportNotes("");
     setReportFiles([]);
@@ -227,9 +227,9 @@ const Diagnostics = () => {
       normal_range: r.normalRange,
       is_abnormal: r.isAbnormal,
     }));
-    saveResultsMutation.mutate({ labOrderId: resultOrder.id, results: dbResults, reportNotes: reportNotes || undefined }, {
+    saveResultsMutation.mutate({ labOrderId: resultOrder.id, results: dbResults, reportNotes: reportNotes ?? "" }, {
       onSuccess: () => {
-        toast.success(`Report saved for ${resultOrder.testName} — ${resultOrder.patientName}`);
+        toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
         setResultOrder(null);
         refetchOrders();
       },
