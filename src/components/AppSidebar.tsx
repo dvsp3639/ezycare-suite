@@ -35,10 +35,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
-        <img src={ezyopIcon} alt="EZY OP" className="w-10 h-10 rounded-lg flex-shrink-0 bg-white p-1" />
+      <div className="p-5 flex items-center gap-3 border-b border-sidebar-border">
+        <div className="w-12 h-12 rounded-xl flex-shrink-0 bg-white shadow-sm flex items-center justify-center">
+          <img src={ezyopIcon} alt="EZY OP" className="w-9 h-9 object-contain" />
+        </div>
         {!collapsed && (
-          <span className="font-display font-bold text-sidebar-foreground text-xl">
+          <span className="font-display font-extrabold text-sidebar-foreground text-2xl tracking-tight">
             Ezy<span className="text-sidebar-primary">op</span>
           </span>
         )}
