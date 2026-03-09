@@ -1114,49 +1114,26 @@ const ClinicManagement = () => {
                             <Badge variant="outline" className={cn("text-[10px]", labCategoryColors[lab.category])}>{lab.category}</Badge>
                             <Badge variant="outline" className={cn("text-[10px]", lab.priority === "Urgent" ? "text-destructive border-destructive/30 bg-destructive/10" : "text-muted-foreground")}>{lab.priority}</Badge>
                             <Badge variant="outline" className={cn("text-[10px]", lab.status === "Completed" ? "text-success border-success/20 bg-success/10" : lab.status === "In Progress" ? "text-info border-info/20 bg-info/10" : "text-muted-foreground")}>{lab.status}</Badge>
-                            {lab.status === "Completed" && lab.results && (
+                            {lab.status === "Completed" && (
                               <Badge variant="outline" className="text-[10px] text-success border-success/20 bg-success/10 cursor-pointer">
                                 <CheckCircle2 className="h-3 w-3 mr-0.5" /> Report Ready
                               </Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-1">
-                            {lab.status === "Completed" && lab.results && (
+                            {lab.status === "Completed" && (
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <Button size="sm" variant="ghost" className="h-7 text-xs"><Eye className="h-3 w-3 mr-1" /> View</Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-80 max-h-60 overflow-y-auto" align="end">
                                   <h4 className="text-sm font-semibold mb-2">{lab.testName} Report</h4>
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="text-xs p-1">Parameter</TableHead>
-                                        <TableHead className="text-xs p-1">Value</TableHead>
-                                        <TableHead className="text-xs p-1">Normal</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {lab.results.map((r, i) => (
-                                        <TableRow key={i}>
-                                          <TableCell className={cn("text-xs p-1", r.isAbnormal && "text-destructive font-semibold")}>{r.parameter}</TableCell>
-                                          <TableCell className={cn("text-xs p-1 font-mono", r.isAbnormal && "text-destructive font-bold")}>{r.value} {r.unit}</TableCell>
-                                          <TableCell className="text-xs p-1 text-muted-foreground">{r.normalRange}</TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                  {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
-                                  {lab.reportFiles && lab.reportFiles.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border space-y-1">
-                                      <p className="text-xs font-semibold text-foreground flex items-center gap-1"><Download className="h-3 w-3" /> Attached Files</p>
-                                      {lab.reportFiles.map((file, fi) => (
-                                        <a key={fi} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-info hover:underline">
-                                          <FileText className="h-3 w-3" /> {file.name}
-                                        </a>
-                                      ))}
-                                    </div>
+                                  {lab.reportFileUrl && (
+                                    <a href={lab.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline mb-2">
+                                      <Download className="h-4 w-4" /> {lab.reportFileName || "Download Report"}
+                                    </a>
                                   )}
+                                  {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
                                 </PopoverContent>
                               </Popover>
                             )}
