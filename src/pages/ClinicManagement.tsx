@@ -35,7 +35,7 @@ import {
   type Vitals,
 } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
-import { useLabTestCatalog } from "@/modules/diagnostics/hooks";
+import { useLabTestCatalog, useLabOrders } from "@/modules/diagnostics/hooks";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
