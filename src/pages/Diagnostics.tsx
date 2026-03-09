@@ -106,9 +106,9 @@ const Diagnostics = () => {
 
   // Result entry dialog
   const [resultOrder, setResultOrder] = useState<DisplayLabOrder | null>(null);
-  const [resultValues, setResultValues] = useState<{ parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[]>([]);
   const [reportNotes, setReportNotes] = useState("");
-  const [reportFiles, setReportFiles] = useState<{ name: string; url: string; type: string }[]>([]);
+  const [reportFile, setReportFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
