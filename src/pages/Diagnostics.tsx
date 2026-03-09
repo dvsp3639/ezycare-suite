@@ -80,6 +80,8 @@ function mapDbOrder(o: any): DisplayLabOrder {
       isAbnormal: r.isAbnormal || false,
     })),
     reportNotes: o.reportNotes,
+    reportFileUrl: o.reportFileUrl || "",
+    reportFileName: o.reportFileName || "",
   };
 }
 
