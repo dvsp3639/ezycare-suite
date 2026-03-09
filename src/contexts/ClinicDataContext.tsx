@@ -96,6 +96,7 @@ function mapDbAppointment(a: any): QueueEntry {
 }
 
 export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [clinicPatients] = useState<ClinicPatient[]>([]);
