@@ -412,6 +412,8 @@ const ClinicManagement = () => {
           isAbnormal: r.isAbnormal || false,
         })),
         reportNotes: o.reportNotes,
+        reportFileUrl: o.reportFileUrl || "",
+        reportFileName: o.reportFileName || "",
       }));
       setConsultLabOrders(appointmentOrders.length > 0 ? appointmentOrders : (entry.labOrders || []));
     } catch {
