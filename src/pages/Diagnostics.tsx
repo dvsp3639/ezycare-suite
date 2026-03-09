@@ -788,7 +788,7 @@ const Diagnostics = () => {
       {/* Report View Dialog */}
       <Dialog open={!!viewOrder} onOpenChange={(v) => !v && setViewOrder(null)}>
         <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
-          {viewOrder && viewOrder.results && (
+          {viewOrder && (
             <>
               <DialogHeader>
                 <DialogTitle className="font-display flex items-center gap-2">
@@ -811,34 +811,14 @@ const Diagnostics = () => {
                 <div><span className="text-muted-foreground">Payment:</span> <strong className="text-success">{viewOrder.paymentStatus} ({viewOrder.paymentMode})</strong></div>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Parameter</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Normal Range</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {viewOrder.results.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-sm font-medium">{r.parameter}</TableCell>
-                      <TableCell className={cn("text-sm font-mono", r.isAbnormal && "text-destructive font-bold")}>{r.value}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.unit}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.normalRange}</TableCell>
-                      <TableCell>
-                        {r.isAbnormal ? (
-                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30 bg-destructive/10">Abnormal</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-success border-success/20 bg-success/10">Normal</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {viewOrder.reportFileUrl && (
+                <div className="border border-border rounded-lg p-3 bg-card">
+                  <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
+                  <a href={viewOrder.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                    <Download className="h-4 w-4" /> {viewOrder.reportFileName || "Download Report"}
+                  </a>
+                </div>
+              )}
 
               {viewOrder.reportNotes && (
                 <div className="bg-muted/50 rounded-lg p-3">
@@ -855,9 +835,6 @@ const Diagnostics = () => {
               )}
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => handlePrintReport(viewOrder)}>
-                  <Printer className="h-4 w-4 mr-1.5" /> Print Report
-                </Button>
                 <Button variant="outline" onClick={() => setViewOrder(null)}>Close</Button>
               </DialogFooter>
             </>
