@@ -214,6 +214,8 @@ export const ClinicDataProvider = ({ children }: { children: ReactNode }) => {
             ...q,
             labOrders: q.labOrders?.map((l) => l.id === lab.id ? { ...l, id: created.id } : l),
           } : q));
+          // Invalidate diagnostics queries for cross-module sync
+          queryClient.invalidateQueries({ queryKey: ["diagnostics"] });
         } catch (err) {
           console.error("Failed to persist lab order:", err);
         }
