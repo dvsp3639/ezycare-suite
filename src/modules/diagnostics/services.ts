@@ -103,12 +103,12 @@ export const diagnosticsService = {
       const { error } = await supabase.from("lab_results").insert(rows as any);
       if (error) throw error;
     }
-    if (reportNotes !== undefined) {
-      await supabase.from("lab_orders").update({
-        report_notes: reportNotes,
-        status: "Completed",
-        completed_at: new Date().toISOString(),
-      } as any).eq("id", labOrderId);
-    }
+    // Always mark as Completed when saving results
+    const { error: updateError } = await supabase.from("lab_orders").update({
+      report_notes: reportNotes ?? "",
+      status: "Completed",
+      completed_at: new Date().toISOString(),
+    } as any).eq("id", labOrderId);
+    if (updateError) throw updateError;
   },
 };

@@ -193,7 +193,7 @@ const Diagnostics = () => {
         }))
       );
     } else {
-      setResultValues([{ parameter: "Result", value: "", unit: "", normalRange: "", isAbnormal: false }]);
+      setResultValues([]);
     }
     setReportNotes("");
     setReportFiles([]);
