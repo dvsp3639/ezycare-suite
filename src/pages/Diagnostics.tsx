@@ -51,7 +51,8 @@ interface DisplayLabOrder {
   completedAt?: string | null;
   results?: { parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[];
   reportNotes?: string;
-  reportFiles?: { name: string; url: string; type: string }[];
+  reportFileUrl?: string;
+  reportFileName?: string;
 }
 
 function mapDbOrder(o: any): DisplayLabOrder {
