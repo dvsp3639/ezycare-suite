@@ -202,7 +202,11 @@ const Inventory = () => {
     });
   }, [inventory, pharmaSearch]);
 
-  const allLabCategories = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
+  const allLabCategories = useMemo(() => {
+    const defaults = ["Blood", "Urine", "Radiology", "Serology"];
+    const fromDb = labTests.map((t) => t.category);
+    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean);
+  }, [labCustomCategories, labTests]);
 
   // ──── Filtered Inventory ────
   const filteredInventory = useMemo(() => {
