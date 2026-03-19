@@ -99,6 +99,15 @@ const Diagnostics = () => {
 
   const allLabOrders = useMemo(() => rawLabOrders.map(mapDbOrder), [rawLabOrders]);
 
+  const defaultCategories = ["Blood", "Urine", "Radiology", "Serology"];
+  const categoryEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
+  const allCategories = useMemo(() => {
+    const fromCatalog = labTestCatalog.map((t: any) => t.category || t.category);
+    const fromOrders = rawLabOrders.map((o: any) => o.category);
+    const all = new Set([...defaultCategories, ...fromCatalog, ...fromOrders]);
+    return Array.from(all).filter(Boolean);
+  }, [labTestCatalog, rawLabOrders]);
+
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
