@@ -414,10 +414,9 @@ const Diagnostics = () => {
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="Blood">🩸 Blood</SelectItem>
-            <SelectItem value="Urine">🧪 Urine</SelectItem>
-            <SelectItem value="Radiology">📷 Radiology</SelectItem>
-            <SelectItem value="Serology">🔬 Serology</SelectItem>
+            {allCategories.map((cat) => (
+              <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
