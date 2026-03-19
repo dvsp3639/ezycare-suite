@@ -870,10 +870,9 @@ const Diagnostics = () => {
                 <Select value={testForm.category} onValueChange={(v) => setTestForm({ ...testForm, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Blood">🩸 Blood</SelectItem>
-                    <SelectItem value="Urine">🧪 Urine</SelectItem>
-                    <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                    <SelectItem value="Serology">🔬 Serology</SelectItem>
+                    {allCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
