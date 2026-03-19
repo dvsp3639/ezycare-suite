@@ -598,10 +598,9 @@ const Diagnostics = () => {
               <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Blood">🩸 Blood</SelectItem>
-                <SelectItem value="Urine">🧪 Urine</SelectItem>
-                <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                <SelectItem value="Serology">🔬 Serology</SelectItem>
+                {allCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button size="sm" onClick={openAddTest}><Plus className="h-3.5 w-3.5 mr-1" /> Add Test</Button>
