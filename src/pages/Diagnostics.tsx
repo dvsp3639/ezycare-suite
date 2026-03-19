@@ -99,6 +99,15 @@ const Diagnostics = () => {
 
   const allLabOrders = useMemo(() => rawLabOrders.map(mapDbOrder), [rawLabOrders]);
 
+  const defaultCategories = ["Blood", "Urine", "Radiology", "Serology"];
+  const categoryEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
+  const allCategories = useMemo(() => {
+    const fromCatalog = labTestCatalog.map((t: any) => t.category || t.category);
+    const fromOrders = rawLabOrders.map((o: any) => o.category);
+    const all = new Set([...defaultCategories, ...fromCatalog, ...fromOrders]);
+    return Array.from(all).filter(Boolean);
+  }, [labTestCatalog, rawLabOrders]);
+
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -405,10 +414,9 @@ const Diagnostics = () => {
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="Blood">🩸 Blood</SelectItem>
-            <SelectItem value="Urine">🧪 Urine</SelectItem>
-            <SelectItem value="Radiology">📷 Radiology</SelectItem>
-            <SelectItem value="Serology">🔬 Serology</SelectItem>
+            {allCategories.map((cat) => (
+              <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -590,10 +598,9 @@ const Diagnostics = () => {
               <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Blood">🩸 Blood</SelectItem>
-                <SelectItem value="Urine">🧪 Urine</SelectItem>
-                <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                <SelectItem value="Serology">🔬 Serology</SelectItem>
+                {allCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button size="sm" onClick={openAddTest}><Plus className="h-3.5 w-3.5 mr-1" /> Add Test</Button>
@@ -863,10 +870,9 @@ const Diagnostics = () => {
                 <Select value={testForm.category} onValueChange={(v) => setTestForm({ ...testForm, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Blood">🩸 Blood</SelectItem>
-                    <SelectItem value="Urine">🧪 Urine</SelectItem>
-                    <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                    <SelectItem value="Serology">🔬 Serology</SelectItem>
+                    {allCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{categoryEmojis[cat] ? `${categoryEmojis[cat]} ` : ""}{cat}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
