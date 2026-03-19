@@ -128,6 +128,7 @@ const Inventory = () => {
 
   useEffect(() => {
     if (dbLabCatalog) {
+      const defaults = ["Blood", "Urine", "Radiology", "Serology"];
       setLabTests((dbLabCatalog as any[]).map((t: any) => ({
         id: t.id, name: t.name, category: t.category || "Blood",
         price: t.price || 0,
@@ -135,6 +136,10 @@ const Inventory = () => {
           name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
         })),
       })));
+      // Sync custom categories from DB
+      const dbCategories = (dbLabCatalog as any[]).map((t: any) => t.category).filter(Boolean);
+      const newCustom = dbCategories.filter((c: string) => !defaults.includes(c));
+      setLabCustomCategories((prev) => Array.from(new Set([...prev, ...newCustom])));
     }
   }, [dbLabCatalog]);
 
@@ -202,7 +207,11 @@ const Inventory = () => {
     });
   }, [inventory, pharmaSearch]);
 
-  const allLabCategories = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
+  const allLabCategories = useMemo(() => {
+    const defaults = ["Blood", "Urine", "Radiology", "Serology"];
+    const fromDb = labTests.map((t) => t.category);
+    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean);
+  }, [labCustomCategories, labTests]);
 
   // ──── Filtered Inventory ────
   const filteredInventory = useMemo(() => {
