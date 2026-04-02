@@ -1068,10 +1068,9 @@ const ClinicManagement = () => {
                           <Select value={newLabCategory} onValueChange={(v) => { setNewLabCategory(v as LabCategory); setNewLabTest(""); }}>
                             <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Blood">🩸 Blood</SelectItem>
-                              <SelectItem value="Urine">🧪 Urine</SelectItem>
-                              <SelectItem value="Radiology">📷 Radiology</SelectItem>
-                              <SelectItem value="Serology">🔬 Serology</SelectItem>
+                              {labCategories.map((cat) => (
+                                <SelectItem key={cat} value={cat}>{labCatEmojis[cat] ? `${labCatEmojis[cat]} ` : ""}{cat}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
