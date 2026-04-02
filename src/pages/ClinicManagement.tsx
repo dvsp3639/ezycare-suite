@@ -82,6 +82,12 @@ const ClinicManagement = () => {
   const hospitalId = roles?.[0]?.hospital_id || "";
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
+  const labCatEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
+  const labCategories = useMemo(() => {
+    const defaults = ["Blood", "Urine", "Radiology", "Serology"];
+    const fromCatalog = labTestCatalog.map((t: any) => t.category).filter(Boolean);
+    return Array.from(new Set([...defaults, ...fromCatalog]));
+  }, [labTestCatalog]);
   const [activeTab, setActiveTab] = useState("slots");
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
