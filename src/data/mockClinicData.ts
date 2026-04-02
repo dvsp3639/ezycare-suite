@@ -32,7 +32,7 @@ export interface PrescriptionItem {
   instructions: string;
 }
 
-export type LabCategory = "Blood" | "Urine" | "Radiology" | "Serology";
+export type LabCategory = string;
 
 export interface LabResult {
   parameter: string;
