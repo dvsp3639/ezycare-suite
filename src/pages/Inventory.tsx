@@ -785,7 +785,7 @@ const Inventory = () => {
               <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Category
               </Button>
-              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
+              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setTestMode("single"); setTemplateSearch(""); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Add Test
               </Button>
             </div>
