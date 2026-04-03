@@ -449,12 +449,22 @@ const Inventory = () => {
     setShowAddCategory(false);
   };
 
-  const handleAddLabCategory = () => {
+  const handleAddLabCategory = async () => {
     if (!newLabCategory.trim()) return;
-    const allExisting = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
+    const allExisting = allLabCategories;
     if (allExisting.includes(newLabCategory.trim())) { toast.error("Category already exists"); return; }
-    setLabCustomCategories((prev) => [...prev, newLabCategory.trim()]);
-    toast.success(`Lab category "${newLabCategory}" added`);
+    // Create a placeholder test in DB so the category persists
+    try {
+      await createTestMutation.mutateAsync({
+        item: { name: `__placeholder_${newLabCategory.trim()}__`, category: newLabCategory.trim() as any, price: 0 },
+        parameters: [],
+      });
+      toast.success(`Lab category "${newLabCategory}" added`);
+    } catch (err: any) {
+      // Even if DB fails, add locally
+      setLabCustomCategories((prev) => [...prev, newLabCategory.trim()]);
+      toast.success(`Lab category "${newLabCategory}" added locally`);
+    }
     setNewLabCategory("");
     setShowAddLabCategory(false);
   };
