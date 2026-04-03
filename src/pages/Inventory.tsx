@@ -179,6 +179,9 @@ const Inventory = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
+  const [isComposite, setIsComposite] = useState(false);
+  const [compositeSearch, setCompositeSearch] = useState("");
+  const [selectedChildTests, setSelectedChildTests] = useState<{ id: string; name: string; price: number }[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [showAddLabCategory, setShowAddLabCategory] = useState(false);
@@ -348,17 +351,36 @@ const Inventory = () => {
   };
 
   // Lab test handlers — persisted to DB
-  const handleAddTest = () => {
+  const handleAddTest = async () => {
     if (!testForm.name) { toast.error("Test name required"); return; }
     const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    const totalPrice = isComposite && selectedChildTests.length > 0
+      ? selectedChildTests.reduce((s, t) => s + t.price, 0) + testForm.price
+      : testForm.price;
     createTestMutation.mutate({
-      item: { name: testForm.name, category: testForm.category as any, price: testForm.price },
-      parameters: params.length > 0 ? params : [{ name: "Result", unit: "", normal_range: "Normal" }],
+      item: { name: testForm.name, category: testForm.category as any, price: totalPrice },
+      parameters: isComposite
+        ? selectedChildTests.flatMap((ct) => {
+            const catalogTest = labTests.find((t) => t.id === ct.id);
+            return catalogTest?.parameters?.length
+              ? catalogTest.parameters.map((p) => ({ name: `${ct.name} - ${p.name}`, unit: p.unit || "", normal_range: p.normalRange || "" }))
+              : [{ name: ct.name, unit: "", normal_range: "" }];
+          })
+        : params.length > 0 ? params : [{ name: "Result", unit: "", normal_range: "Normal" }],
     }, {
-      onSuccess: () => {
+      onSuccess: async (created) => {
+        if (isComposite && selectedChildTests.length > 0) {
+          // Save composite test items
+          const { supabase } = await import("@/integrations/supabase/client");
+          const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
+          await supabase.from("composite_test_items" as any).insert(rows);
+        }
         toast.success(`Test "${testForm.name}" added`);
         setShowAddTest(false);
         setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+        setIsComposite(false);
+        setSelectedChildTests([]);
+        setCompositeSearch("");
       },
       onError: (err: any) => toast.error(err.message || "Failed to add test"),
     });
@@ -745,7 +767,7 @@ const Inventory = () => {
               <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Category
               </Button>
-              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setShowAddTest(true); }}>
+              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Add Test
               </Button>
             </div>
@@ -1470,8 +1492,8 @@ const Inventory = () => {
       </Dialog>
 
       {/* Add/Edit Test Dialog */}
-      <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) { setShowAddTest(false); setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); } }}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) { setShowAddTest(false); setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
@@ -1490,13 +1512,77 @@ const Inventory = () => {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Price (₹)</Label>
-              <Input type="number" value={testForm.price} onChange={(e) => setTestForm((p) => ({ ...p, price: +e.target.value }))} />
+              <Label className="text-xs">Price (₹){isComposite && selectedChildTests.length > 0 && ` — child tests total: ₹${selectedChildTests.reduce((s, t) => s + t.price, 0)}`}</Label>
+              <Input type="number" value={testForm.price} onChange={(e) => setTestForm((p) => ({ ...p, price: +e.target.value }))} placeholder={isComposite ? "Additional charge (0 if none)" : "Test price"} />
             </div>
-            <div>
-              <Label className="text-xs">Parameters (comma separated)</Label>
-              <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
-            </div>
+
+            {!editTest && (
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="compositeToggle" checked={isComposite} onChange={(e) => { setIsComposite(e.target.checked); if (!e.target.checked) { setSelectedChildTests([]); setCompositeSearch(""); } }} className="rounded border-border" />
+                <Label htmlFor="compositeToggle" className="text-xs cursor-pointer">Composite Test (combine existing tests)</Label>
+              </div>
+            )}
+
+            {isComposite && !editTest && (
+              <div className="space-y-2">
+                <Label className="text-xs">Search & add tests (type 3+ letters)</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    className="pl-8"
+                    value={compositeSearch}
+                    onChange={(e) => setCompositeSearch(e.target.value)}
+                    placeholder="Search tests..."
+                  />
+                </div>
+                {compositeSearch.length >= 3 && (
+                  <div className="border border-border rounded-md max-h-40 overflow-y-auto bg-popover">
+                    {labTests
+                      .filter((t) => t.name.toLowerCase().includes(compositeSearch.toLowerCase()) && !selectedChildTests.some((s) => s.id === t.id))
+                      .slice(0, 20)
+                      .map((t) => (
+                        <button
+                          key={t.id}
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between"
+                          onClick={() => {
+                            setSelectedChildTests((prev) => [...prev, { id: t.id, name: t.name, price: t.price }]);
+                            setCompositeSearch("");
+                          }}
+                        >
+                          <span>{t.name}</span>
+                          <span className="text-xs text-muted-foreground">₹{t.price} · {t.category}</span>
+                        </button>
+                      ))}
+                    {labTests.filter((t) => t.name.toLowerCase().includes(compositeSearch.toLowerCase()) && !selectedChildTests.some((s) => s.id === t.id)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">No matching tests</p>
+                    )}
+                  </div>
+                )}
+                {selectedChildTests.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Selected tests ({selectedChildTests.length})</Label>
+                    {selectedChildTests.map((ct) => (
+                      <div key={ct.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1">
+                        <span className="text-xs">{ct.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">₹{ct.price}</span>
+                          <button onClick={() => setSelectedChildTests((prev) => prev.filter((t) => t.id !== ct.id))} className="text-destructive hover:text-destructive/80">
+                            <XCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!isComposite && (
+              <div>
+                <Label className="text-xs">Parameters (comma separated)</Label>
+                <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowAddTest(false); setEditTest(null); }}>Cancel</Button>
