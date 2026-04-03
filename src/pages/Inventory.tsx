@@ -179,6 +179,9 @@ const Inventory = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
+  const [isComposite, setIsComposite] = useState(false);
+  const [compositeSearch, setCompositeSearch] = useState("");
+  const [selectedChildTests, setSelectedChildTests] = useState<{ id: string; name: string; price: number }[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [showAddLabCategory, setShowAddLabCategory] = useState(false);
