@@ -823,6 +823,13 @@ const Inventory = () => {
             })}
           </div>
 
+          {labTests.length === 0 && !dbLabCatalog && (
+            <p className="text-sm text-muted-foreground py-8 text-center">Loading lab test catalog...</p>
+          )}
+          {labTests.length === 0 && dbLabCatalog && (
+            <p className="text-sm text-muted-foreground py-8 text-center">No lab tests found. Add tests using the "Add Test" button above.</p>
+          )}
+
           {allLabCategories.map((cat) => {
             const tests = labTests.filter((t) => t.category === cat);
             if (tests.length === 0) return null;
