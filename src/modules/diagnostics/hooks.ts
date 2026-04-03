@@ -11,7 +11,10 @@ export function useLabTestCatalog() {
   return useQuery({
     queryKey: KEYS.catalog,
     queryFn: diagnosticsService.getTestCatalog,
-    staleTime: 0, // Always refetch to sync categories across modules
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   });
 }
 
