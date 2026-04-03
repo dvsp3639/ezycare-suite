@@ -383,7 +383,7 @@ const Inventory = () => {
           params.push(...catalogTest.parameters.map((p) => ({
             name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
             unit: p.unit || "",
-            normal_range: p.normalRange || p.normal_range || "",
+            normal_range: p.normalRange || "",
           })));
         }
       }
