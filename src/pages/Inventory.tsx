@@ -1565,12 +1565,30 @@ const Inventory = () => {
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {/* Step 1: Test Name first */}
+            <div>
+              <Label className="text-xs">Test Name *</Label>
+              <Input value={testForm.name} onChange={(e) => setTestForm((p) => ({ ...p, name: e.target.value }))} placeholder="Enter your test name" autoFocus />
+            </div>
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {allLabCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 2: Search and add sub-tests */}
             {!editTest && (
               <div className="space-y-2">
-                <Label className="text-xs">Search catalog tests and click to select</Label>
+                <Label className="text-xs">Add Tests (parameters & price auto-fetched)</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input className="pl-8" value={compositeSearch} onChange={(e) => setCompositeSearch(e.target.value)} placeholder="Search tests..." autoFocus />
+                  <Input className="pl-8" value={compositeSearch} onChange={(e) => setCompositeSearch(e.target.value)} placeholder="Search tests to include..." />
                 </div>
                 {catalogSearchResults.length > 0 && (
                   <div className="border border-border rounded-md max-h-48 overflow-y-auto bg-popover">
@@ -1595,7 +1613,7 @@ const Inventory = () => {
                 )}
                 {selectedChildTests.length > 0 && (
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Selected tests ({selectedChildTests.length}){selectedChildTests.length > 1 && " — will create composite test"}</Label>
+                    <Label className="text-xs text-muted-foreground">Included tests ({selectedChildTests.length})</Label>
                     {selectedChildTests.map((ct) => (
                       <div key={ct.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1">
                         <span className="text-xs">{ct.name}</span>
@@ -1604,51 +1622,33 @@ const Inventory = () => {
                           <button type="button" onClick={() => {
                             const newList = selectedChildTests.filter((t) => t.id !== ct.id);
                             setSelectedChildTests(newList);
-                            // If back to single, restore that test's details
-                            if (newList.length === 1) {
-                              const remaining = labTests.find((t) => t.id === newList[0].id);
-                              if (remaining) setTestForm({ name: remaining.name, category: remaining.category, price: remaining.price, parameters: remaining.parameters.map((p) => p.name).join(", ") });
-                            }
-                            if (newList.length > 1) {
-                              setTestForm((prev) => ({ ...prev, price: newList.reduce((sum, test) => sum + test.price, 0) }));
-                            }
-                            if (newList.length === 0) setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
+                            const totalPrice = newList.reduce((sum, t) => sum + t.price, 0);
+                            setTestForm((prev) => ({ ...prev, price: totalPrice }));
                           }} className="text-destructive hover:text-destructive/80">
                             <XCircle className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
                     ))}
-                    {selectedChildTests.length > 1 && (
-                      <p className="text-xs text-muted-foreground mt-1">Total: ₹{selectedChildTests.reduce((s, t) => s + t.price, 0)}</p>
-                    )}
+                    <p className="text-xs font-medium mt-1">Total Price: ₹{selectedChildTests.reduce((s, t) => s + t.price, 0)}</p>
                   </div>
                 )}
               </div>
             )}
+
+            {/* Price - auto-calculated but editable */}
             <div>
-              <Label className="text-xs">Test Name *</Label>
-              <Input value={testForm.name} onChange={(e) => setTestForm((p) => ({ ...p, name: e.target.value }))} placeholder={selectedChildTests.length > 1 ? "Composite test name" : "Test name"} />
-            </div>
-            <div>
-              <Label className="text-xs">Category</Label>
-              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {allLabCategories.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Price (₹)</Label>
+              <Label className="text-xs">Price (₹) {selectedChildTests.length > 0 && <span className="text-muted-foreground">— auto-calculated</span>}</Label>
               <Input type="number" value={testForm.price} onChange={(e) => setTestForm((p) => ({ ...p, price: +e.target.value }))} />
             </div>
-            <div>
-              <Label className="text-xs">Parameters (comma separated)</Label>
-              <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
-            </div>
+
+            {/* Parameters only for edit mode or when no sub-tests selected */}
+            {(editTest || selectedChildTests.length === 0) && (
+              <div>
+                <Label className="text-xs">Parameters (comma separated)</Label>
+                <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetTestDialog}>Cancel</Button>
