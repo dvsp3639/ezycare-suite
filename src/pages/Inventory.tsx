@@ -356,14 +356,7 @@ const Inventory = () => {
   // Lab test handlers — persisted to DB
   const handleAddTest = async () => {
     if (!testForm.name.trim()) { toast.error("Test name required"); return; }
-    if (!isComposite && testMode === "multi" && !testForm.parameters.trim()) {
-      toast.error("Add at least one parameter for a multi test");
-      return;
-    }
-    if (isComposite && selectedChildTests.length === 0) {
-      toast.error("Select at least one existing test");
-      return;
-    }
+    const isMultiSelect = selectedChildTests.length > 1;
 
     const params = testForm.parameters
       .split(",")
@@ -371,13 +364,13 @@ const Inventory = () => {
       .filter(Boolean)
       .map((p) => ({ name: p, unit: "", normal_range: "" }));
 
-    const totalPrice = isComposite && selectedChildTests.length > 0
+    const totalPrice = isMultiSelect
       ? selectedChildTests.reduce((s, t) => s + t.price, 0) + testForm.price
       : testForm.price;
 
     createTestMutation.mutate({
       item: { name: testForm.name.trim(), category: testForm.category as any, price: totalPrice },
-      parameters: isComposite
+      parameters: isMultiSelect
         ? selectedChildTests.flatMap((ct) => {
             const catalogTest = labTests.find((t) => t.id === ct.id);
             return catalogTest?.parameters?.length
@@ -387,17 +380,14 @@ const Inventory = () => {
         : params,
     }, {
       onSuccess: async (created) => {
-        if (isComposite && selectedChildTests.length > 0) {
+        if (isMultiSelect) {
           const { supabase } = await import("@/integrations/supabase/client");
           const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
           await supabase.from("composite_test_items" as any).insert(rows);
         }
-        toast.success(`Test \"${testForm.name}\" added`);
+        toast.success(`Test "${testForm.name}" added`);
         setShowAddTest(false);
         setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
-        setTestMode("single");
-        setTemplateSearch("");
-        setIsComposite(false);
         setSelectedChildTests([]);
         setCompositeSearch("");
       },
