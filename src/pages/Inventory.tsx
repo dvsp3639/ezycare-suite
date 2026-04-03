@@ -129,14 +129,15 @@ const Inventory = () => {
   useEffect(() => {
     if (dbLabCatalog) {
       const defaults = ["Blood", "Urine", "Radiology", "Serology"];
-      setLabTests((dbLabCatalog as any[]).map((t: any) => ({
+      const allTests = (dbLabCatalog as any[]).filter((t: any) => !t.name?.startsWith("__placeholder_"));
+      setLabTests(allTests.map((t: any) => ({
         id: t.id, name: t.name, category: t.category || "Blood",
         price: t.price || 0,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
         })),
       })));
-      // Sync custom categories from DB
+      // Sync custom categories from DB (including placeholder categories)
       const dbCategories = (dbLabCatalog as any[]).map((t: any) => t.category).filter(Boolean);
       const newCustom = dbCategories.filter((c: string) => !defaults.includes(c));
       setLabCustomCategories((prev) => Array.from(new Set([...prev, ...newCustom])));
@@ -393,7 +394,7 @@ const Inventory = () => {
         }
         toast.success(`Test \"${testForm.name}\" added`);
         setShowAddTest(false);
-        setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+        setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
         setTestMode("single");
         setTemplateSearch("");
         setIsComposite(false);
@@ -449,12 +450,22 @@ const Inventory = () => {
     setShowAddCategory(false);
   };
 
-  const handleAddLabCategory = () => {
+  const handleAddLabCategory = async () => {
     if (!newLabCategory.trim()) return;
-    const allExisting = ["Blood", "Urine", "Radiology", "Serology", ...labCustomCategories];
+    const allExisting = allLabCategories;
     if (allExisting.includes(newLabCategory.trim())) { toast.error("Category already exists"); return; }
-    setLabCustomCategories((prev) => [...prev, newLabCategory.trim()]);
-    toast.success(`Lab category "${newLabCategory}" added`);
+    // Create a placeholder test in DB so the category persists
+    try {
+      await createTestMutation.mutateAsync({
+        item: { name: `__placeholder_${newLabCategory.trim()}__`, category: newLabCategory.trim() as any, price: 0 },
+        parameters: [],
+      });
+      toast.success(`Lab category "${newLabCategory}" added`);
+    } catch (err: any) {
+      // Even if DB fails, add locally
+      setLabCustomCategories((prev) => [...prev, newLabCategory.trim()]);
+      toast.success(`Lab category "${newLabCategory}" added locally`);
+    }
     setNewLabCategory("");
     setShowAddLabCategory(false);
   };
@@ -780,12 +791,15 @@ const Inventory = () => {
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+              {labTests.length > 0 && <Badge variant="secondary" className="text-xs">{labTests.length} tests loaded</Badge>}
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Category
               </Button>
-              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setTestMode("single"); setTemplateSearch(""); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
+              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" }); setTestMode("single"); setTemplateSearch(""); setIsComposite(false); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Add Test
               </Button>
             </div>
@@ -808,6 +822,13 @@ const Inventory = () => {
               );
             })}
           </div>
+
+          {labTests.length === 0 && !dbLabCatalog && (
+            <p className="text-sm text-muted-foreground py-8 text-center">Loading lab test catalog...</p>
+          )}
+          {labTests.length === 0 && dbLabCatalog && (
+            <p className="text-sm text-muted-foreground py-8 text-center">No lab tests found. Add tests using the "Add Test" button above.</p>
+          )}
 
           {allLabCategories.map((cat) => {
             const tests = labTests.filter((t) => t.category === cat);
