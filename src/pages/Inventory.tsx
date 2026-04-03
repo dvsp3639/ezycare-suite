@@ -502,26 +502,17 @@ const Inventory = () => {
   const handleSelectCatalogTest = (test: LabTestDefinition) => {
     if (selectedChildTests.some((selected) => selected.id === test.id)) return;
 
-    const nextSelectedTests = [...selectedChildTests, { id: test.id, name: test.name, price: test.price }];
-    const parameterNames = test.parameters.map((parameter) => parameter.name).join(", ");
-
+    const nextSelectedTests = [...selectedChildTests, { id: test.id, name: test.name, price: test.price, category: test.category }];
     setSelectedChildTests(nextSelectedTests);
 
-    if (nextSelectedTests.length === 1) {
-      setTestForm({
-        name: test.name,
-        category: test.category,
-        price: test.price,
-        parameters: parameterNames,
-      });
-    } else {
-      setTestForm((prev) => ({
-        ...prev,
-        name: prev.name === selectedChildTests[0]?.name ? "" : prev.name,
-        category: prev.category || test.category,
-        price: nextSelectedTests.reduce((sum, selected) => sum + selected.price, 0),
-      }));
-    }
+    // Auto-calculate total price and aggregate category from first test
+    const totalPrice = nextSelectedTests.reduce((sum, t) => sum + t.price, 0);
+    setTestForm((prev) => ({
+      ...prev,
+      category: prev.category || test.category,
+      price: totalPrice,
+      parameters: "", // parameters auto-fetched from sub-tests, no manual entry needed
+    }));
 
     setCompositeSearch("");
   };
