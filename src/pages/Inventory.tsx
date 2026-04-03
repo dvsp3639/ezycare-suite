@@ -791,7 +791,10 @@ const Inventory = () => {
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+              {labTests.length > 0 && <Badge variant="secondary" className="text-xs">{labTests.length} tests loaded</Badge>}
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Category
