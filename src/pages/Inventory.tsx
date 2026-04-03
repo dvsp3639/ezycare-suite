@@ -129,14 +129,15 @@ const Inventory = () => {
   useEffect(() => {
     if (dbLabCatalog) {
       const defaults = ["Blood", "Urine", "Radiology", "Serology"];
-      setLabTests((dbLabCatalog as any[]).map((t: any) => ({
+      const allTests = (dbLabCatalog as any[]).filter((t: any) => !t.name?.startsWith("__placeholder_"));
+      setLabTests(allTests.map((t: any) => ({
         id: t.id, name: t.name, category: t.category || "Blood",
         price: t.price || 0,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
         })),
       })));
-      // Sync custom categories from DB
+      // Sync custom categories from DB (including placeholder categories)
       const dbCategories = (dbLabCatalog as any[]).map((t: any) => t.category).filter(Boolean);
       const newCustom = dbCategories.filter((c: string) => !defaults.includes(c));
       setLabCustomCategories((prev) => Array.from(new Set([...prev, ...newCustom])));
