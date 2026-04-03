@@ -394,7 +394,7 @@ const Inventory = () => {
         }
         toast.success(`Test \"${testForm.name}\" added`);
         setShowAddTest(false);
-        setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+        setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
         setTestMode("single");
         setTemplateSearch("");
         setIsComposite(false);
