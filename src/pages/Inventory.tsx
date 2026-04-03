@@ -215,7 +215,7 @@ const Inventory = () => {
   const allLabCategories = useMemo(() => {
     const defaults = ["Blood", "Urine", "Radiology", "Serology"];
     const fromDb = labTests.map((t) => t.category);
-    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean);
+    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
   }, [labCustomCategories, labTests]);
 
   // ──── Filtered Inventory ────
