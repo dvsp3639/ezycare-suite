@@ -370,40 +370,43 @@ const Inventory = () => {
   // Lab test handlers — persisted to DB
   const handleAddTest = async () => {
     if (!testForm.name.trim()) { toast.error("Test name required"); return; }
-    const isMultiSelect = selectedChildTests.length > 1;
+    const hasChildren = selectedChildTests.length > 0;
 
-    const params = testForm.parameters
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => ({ name: p, unit: "", normal_range: "" }));
+    // If sub-tests selected, aggregate their parameters automatically
+    let params: { name: string; unit: string; normal_range: string }[] = [];
+    if (hasChildren) {
+      // Fetch parameters from each selected child test
+      for (const ct of selectedChildTests) {
+        const catalogTest = labTests.find((t) => t.id === ct.id);
+        if (catalogTest?.parameters) {
+          params.push(...catalogTest.parameters.map((p) => ({
+            name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
+            unit: p.unit || "",
+            normal_range: p.normalRange || p.normal_range || "",
+          })));
+        }
+      }
+    } else {
+      // Manual parameters entry
+      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    }
 
-    const totalPrice = isMultiSelect
+    const totalPrice = hasChildren
       ? selectedChildTests.reduce((s, t) => s + t.price, 0)
       : testForm.price;
 
     createTestMutation.mutate({
       item: { name: testForm.name.trim(), category: testForm.category as any, price: totalPrice },
-      parameters: isMultiSelect
-        ? selectedChildTests.flatMap((ct) => {
-            const catalogTest = labTests.find((t) => t.id === ct.id);
-            return catalogTest?.parameters?.length
-              ? catalogTest.parameters.map((p) => ({ name: `${ct.name} - ${p.name}`, unit: p.unit || "", normal_range: p.normalRange || "" }))
-              : [];
-          })
-        : params,
+      parameters: params,
     }, {
-      onSuccess: async (created) => {
-        if (isMultiSelect) {
-          const { supabase } = await import("@/integrations/supabase/client");
+      onSuccess: async (created: any) => {
+        // Save composite_test_items if multiple sub-tests
+        if (hasChildren && created?.id) {
           const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
           await supabase.from("composite_test_items" as any).insert(rows);
         }
         toast.success(`Test "${testForm.name}" added`);
-        setShowAddTest(false);
-        setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
-        setSelectedChildTests([]);
-        setCompositeSearch("");
+        resetTestDialog();
       },
       onError: (err: any) => toast.error(err.message || "Failed to add test"),
     });
