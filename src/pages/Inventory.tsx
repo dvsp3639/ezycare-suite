@@ -351,17 +351,36 @@ const Inventory = () => {
   };
 
   // Lab test handlers — persisted to DB
-  const handleAddTest = () => {
+  const handleAddTest = async () => {
     if (!testForm.name) { toast.error("Test name required"); return; }
     const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    const totalPrice = isComposite && selectedChildTests.length > 0
+      ? selectedChildTests.reduce((s, t) => s + t.price, 0) + testForm.price
+      : testForm.price;
     createTestMutation.mutate({
-      item: { name: testForm.name, category: testForm.category as any, price: testForm.price },
-      parameters: params.length > 0 ? params : [{ name: "Result", unit: "", normal_range: "Normal" }],
+      item: { name: testForm.name, category: testForm.category as any, price: totalPrice },
+      parameters: isComposite
+        ? selectedChildTests.flatMap((ct) => {
+            const catalogTest = labTests.find((t) => t.id === ct.id);
+            return catalogTest?.parameters?.length
+              ? catalogTest.parameters.map((p) => ({ name: `${ct.name} - ${p.name}`, unit: p.unit || "", normal_range: p.normalRange || "" }))
+              : [{ name: ct.name, unit: "", normal_range: "" }];
+          })
+        : params.length > 0 ? params : [{ name: "Result", unit: "", normal_range: "Normal" }],
     }, {
-      onSuccess: () => {
+      onSuccess: async (created) => {
+        if (isComposite && selectedChildTests.length > 0) {
+          // Save composite test items
+          const { supabase } = await import("@/integrations/supabase/client");
+          const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
+          await supabase.from("composite_test_items" as any).insert(rows);
+        }
         toast.success(`Test "${testForm.name}" added`);
         setShowAddTest(false);
         setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
+        setIsComposite(false);
+        setSelectedChildTests([]);
+        setCompositeSearch("");
       },
       onError: (err: any) => toast.error(err.message || "Failed to add test"),
     });
