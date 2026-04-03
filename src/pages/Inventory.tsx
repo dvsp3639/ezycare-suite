@@ -87,7 +87,10 @@ const Inventory = () => {
   const { wardInventoryItems, addWard, updateWard, deleteWard, toggleBedMaintenance } = useWardsBeds();
   const { data: dbItems } = useInventoryItems();
   const { data: dbTransfers } = useStockTransfers();
-  const { data: dbLabCatalog } = useLabTestCatalog();
+  const { data: dbLabCatalog, error: labCatalogError, isLoading: labCatalogLoading } = useLabTestCatalog();
+  useEffect(() => {
+    console.log("[Inventory] Lab catalog:", { loading: labCatalogLoading, error: labCatalogError?.message, count: dbLabCatalog?.length });
+  }, [dbLabCatalog, labCatalogError, labCatalogLoading]);
   const createTestMutation = useCreateTestCatalogItem();
   const updateTestMutation = useUpdateTestCatalogItem();
   const deleteTestMutation = useDeleteTestCatalogItem();
