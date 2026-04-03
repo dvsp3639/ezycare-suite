@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -370,40 +371,43 @@ const Inventory = () => {
   // Lab test handlers — persisted to DB
   const handleAddTest = async () => {
     if (!testForm.name.trim()) { toast.error("Test name required"); return; }
-    const isMultiSelect = selectedChildTests.length > 1;
+    const hasChildren = selectedChildTests.length > 0;
 
-    const params = testForm.parameters
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => ({ name: p, unit: "", normal_range: "" }));
+    // If sub-tests selected, aggregate their parameters automatically
+    let params: { name: string; unit: string; normal_range: string }[] = [];
+    if (hasChildren) {
+      // Fetch parameters from each selected child test
+      for (const ct of selectedChildTests) {
+        const catalogTest = labTests.find((t) => t.id === ct.id);
+        if (catalogTest?.parameters) {
+          params.push(...catalogTest.parameters.map((p) => ({
+            name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
+            unit: p.unit || "",
+            normal_range: p.normalRange || "",
+          })));
+        }
+      }
+    } else {
+      // Manual parameters entry
+      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    }
 
-    const totalPrice = isMultiSelect
+    const totalPrice = hasChildren
       ? selectedChildTests.reduce((s, t) => s + t.price, 0)
       : testForm.price;
 
     createTestMutation.mutate({
       item: { name: testForm.name.trim(), category: testForm.category as any, price: totalPrice },
-      parameters: isMultiSelect
-        ? selectedChildTests.flatMap((ct) => {
-            const catalogTest = labTests.find((t) => t.id === ct.id);
-            return catalogTest?.parameters?.length
-              ? catalogTest.parameters.map((p) => ({ name: `${ct.name} - ${p.name}`, unit: p.unit || "", normal_range: p.normalRange || "" }))
-              : [];
-          })
-        : params,
+      parameters: params,
     }, {
-      onSuccess: async (created) => {
-        if (isMultiSelect) {
-          const { supabase } = await import("@/integrations/supabase/client");
+      onSuccess: async (created: any) => {
+        // Save composite_test_items if multiple sub-tests
+        if (hasChildren && created?.id) {
           const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
           await supabase.from("composite_test_items" as any).insert(rows);
         }
         toast.success(`Test "${testForm.name}" added`);
-        setShowAddTest(false);
-        setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
-        setSelectedChildTests([]);
-        setCompositeSearch("");
+        resetTestDialog();
       },
       onError: (err: any) => toast.error(err.message || "Failed to add test"),
     });
@@ -502,26 +506,17 @@ const Inventory = () => {
   const handleSelectCatalogTest = (test: LabTestDefinition) => {
     if (selectedChildTests.some((selected) => selected.id === test.id)) return;
 
-    const nextSelectedTests = [...selectedChildTests, { id: test.id, name: test.name, price: test.price }];
-    const parameterNames = test.parameters.map((parameter) => parameter.name).join(", ");
-
+    const nextSelectedTests = [...selectedChildTests, { id: test.id, name: test.name, price: test.price, category: test.category }];
     setSelectedChildTests(nextSelectedTests);
 
-    if (nextSelectedTests.length === 1) {
-      setTestForm({
-        name: test.name,
-        category: test.category,
-        price: test.price,
-        parameters: parameterNames,
-      });
-    } else {
-      setTestForm((prev) => ({
-        ...prev,
-        name: prev.name === selectedChildTests[0]?.name ? "" : prev.name,
-        category: prev.category || test.category,
-        price: nextSelectedTests.reduce((sum, selected) => sum + selected.price, 0),
-      }));
-    }
+    // Auto-calculate total price and aggregate category from first test
+    const totalPrice = nextSelectedTests.reduce((sum, t) => sum + t.price, 0);
+    setTestForm((prev) => ({
+      ...prev,
+      category: prev.category || test.category,
+      price: totalPrice,
+      parameters: "", // parameters auto-fetched from sub-tests, no manual entry needed
+    }));
 
     setCompositeSearch("");
   };
@@ -1574,12 +1569,30 @@ const Inventory = () => {
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {/* Step 1: Test Name first */}
+            <div>
+              <Label className="text-xs">Test Name *</Label>
+              <Input value={testForm.name} onChange={(e) => setTestForm((p) => ({ ...p, name: e.target.value }))} placeholder="Enter your test name" autoFocus />
+            </div>
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {allLabCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 2: Search and add sub-tests */}
             {!editTest && (
               <div className="space-y-2">
-                <Label className="text-xs">Search catalog tests and click to select</Label>
+                <Label className="text-xs">Add Tests (parameters & price auto-fetched)</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input className="pl-8" value={compositeSearch} onChange={(e) => setCompositeSearch(e.target.value)} placeholder="Search tests..." autoFocus />
+                  <Input className="pl-8" value={compositeSearch} onChange={(e) => setCompositeSearch(e.target.value)} placeholder="Search tests to include..." />
                 </div>
                 {catalogSearchResults.length > 0 && (
                   <div className="border border-border rounded-md max-h-48 overflow-y-auto bg-popover">
@@ -1604,7 +1617,7 @@ const Inventory = () => {
                 )}
                 {selectedChildTests.length > 0 && (
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Selected tests ({selectedChildTests.length}){selectedChildTests.length > 1 && " — will create composite test"}</Label>
+                    <Label className="text-xs text-muted-foreground">Included tests ({selectedChildTests.length})</Label>
                     {selectedChildTests.map((ct) => (
                       <div key={ct.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1">
                         <span className="text-xs">{ct.name}</span>
@@ -1613,51 +1626,33 @@ const Inventory = () => {
                           <button type="button" onClick={() => {
                             const newList = selectedChildTests.filter((t) => t.id !== ct.id);
                             setSelectedChildTests(newList);
-                            // If back to single, restore that test's details
-                            if (newList.length === 1) {
-                              const remaining = labTests.find((t) => t.id === newList[0].id);
-                              if (remaining) setTestForm({ name: remaining.name, category: remaining.category, price: remaining.price, parameters: remaining.parameters.map((p) => p.name).join(", ") });
-                            }
-                            if (newList.length > 1) {
-                              setTestForm((prev) => ({ ...prev, price: newList.reduce((sum, test) => sum + test.price, 0) }));
-                            }
-                            if (newList.length === 0) setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
+                            const totalPrice = newList.reduce((sum, t) => sum + t.price, 0);
+                            setTestForm((prev) => ({ ...prev, price: totalPrice }));
                           }} className="text-destructive hover:text-destructive/80">
                             <XCircle className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
                     ))}
-                    {selectedChildTests.length > 1 && (
-                      <p className="text-xs text-muted-foreground mt-1">Total: ₹{selectedChildTests.reduce((s, t) => s + t.price, 0)}</p>
-                    )}
+                    <p className="text-xs font-medium mt-1">Total Price: ₹{selectedChildTests.reduce((s, t) => s + t.price, 0)}</p>
                   </div>
                 )}
               </div>
             )}
+
+            {/* Price - auto-calculated but editable */}
             <div>
-              <Label className="text-xs">Test Name *</Label>
-              <Input value={testForm.name} onChange={(e) => setTestForm((p) => ({ ...p, name: e.target.value }))} placeholder={selectedChildTests.length > 1 ? "Composite test name" : "Test name"} />
-            </div>
-            <div>
-              <Label className="text-xs">Category</Label>
-              <Select value={testForm.category} onValueChange={(v) => setTestForm((p) => ({ ...p, category: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {allLabCategories.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Price (₹)</Label>
+              <Label className="text-xs">Price (₹) {selectedChildTests.length > 0 && <span className="text-muted-foreground">— auto-calculated</span>}</Label>
               <Input type="number" value={testForm.price} onChange={(e) => setTestForm((p) => ({ ...p, price: +e.target.value }))} />
             </div>
-            <div>
-              <Label className="text-xs">Parameters (comma separated)</Label>
-              <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
-            </div>
+
+            {/* Parameters only for edit mode or when no sub-tests selected */}
+            {(editTest || selectedChildTests.length === 0) && (
+              <div>
+                <Label className="text-xs">Parameters (comma separated)</Label>
+                <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetTestDialog}>Cancel</Button>
