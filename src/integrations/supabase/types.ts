@@ -271,6 +271,52 @@ export type Database = {
           },
         ]
       }
+      composite_test_items: {
+        Row: {
+          child_test_id: string
+          created_at: string
+          hospital_id: string
+          id: string
+          parent_test_id: string
+        }
+        Insert: {
+          child_test_id: string
+          created_at?: string
+          hospital_id: string
+          id?: string
+          parent_test_id: string
+        }
+        Update: {
+          child_test_id?: string
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          parent_test_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composite_test_items_child_test_id_fkey"
+            columns: ["child_test_id"]
+            isOneToOne: false
+            referencedRelation: "lab_test_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composite_test_items_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composite_test_items_parent_test_id_fkey"
+            columns: ["parent_test_id"]
+            isOneToOne: false
+            referencedRelation: "lab_test_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daycare_bill_items: {
         Row: {
           bill_id: string
