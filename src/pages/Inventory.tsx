@@ -216,6 +216,23 @@ const Inventory = () => {
     return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
   }, [labCustomCategories, labTests]);
 
+  const catalogSearchResults = useMemo(() => {
+    const query = compositeSearch.trim().toLowerCase();
+
+    if (!query) return [];
+
+    return labTests
+      .filter((test) => {
+        if (selectedChildTests.some((selected) => selected.id === test.id)) return false;
+
+        return (
+          test.name.toLowerCase().includes(query) ||
+          test.category.toLowerCase().includes(query)
+        );
+      })
+      .slice(0, 30);
+  }, [compositeSearch, labTests, selectedChildTests]);
+
   // ──── Filtered Inventory ────
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
@@ -362,7 +379,7 @@ const Inventory = () => {
       .map((p) => ({ name: p, unit: "", normal_range: "" }));
 
     const totalPrice = isMultiSelect
-      ? selectedChildTests.reduce((s, t) => s + t.price, 0) + testForm.price
+      ? selectedChildTests.reduce((s, t) => s + t.price, 0)
       : testForm.price;
 
     createTestMutation.mutate({
@@ -472,6 +489,41 @@ const Inventory = () => {
     if (testsInCat.length > 0) { toast.error(`Cannot remove — ${testsInCat.length} tests in this category`); return; }
     setLabCustomCategories((prev) => prev.filter((c) => c !== cat));
     toast.success(`Category "${cat}" removed`);
+  };
+
+  const resetTestDialog = () => {
+    setShowAddTest(false);
+    setEditTest(null);
+    setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
+    setSelectedChildTests([]);
+    setCompositeSearch("");
+  };
+
+  const handleSelectCatalogTest = (test: LabTestDefinition) => {
+    if (selectedChildTests.some((selected) => selected.id === test.id)) return;
+
+    const nextSelectedTests = [...selectedChildTests, { id: test.id, name: test.name, price: test.price }];
+    const parameterNames = test.parameters.map((parameter) => parameter.name).join(", ");
+
+    setSelectedChildTests(nextSelectedTests);
+
+    if (nextSelectedTests.length === 1) {
+      setTestForm({
+        name: test.name,
+        category: test.category,
+        price: test.price,
+        parameters: parameterNames,
+      });
+    } else {
+      setTestForm((prev) => ({
+        ...prev,
+        name: prev.name === selectedChildTests[0]?.name ? "" : prev.name,
+        category: prev.category || test.category,
+        price: nextSelectedTests.reduce((sum, selected) => sum + selected.price, 0),
+      }));
+    }
+
+    setCompositeSearch("");
   };
 
   const allCategories = [...inventoryCategories, ...customCategories];
@@ -1518,34 +1570,37 @@ const Inventory = () => {
       </Dialog>
 
       {/* Add/Edit Test Dialog */}
-      <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) { setShowAddTest(false); setEditTest(null); setTestForm({ name: "", category: "Blood", price: 0, parameters: "" }); setSelectedChildTests([]); setCompositeSearch(""); } }}>
+      <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {!editTest && (
               <div className="space-y-2">
-                <Label className="text-xs">Search & select tests from catalog (type 3+ letters)</Label>
+                <Label className="text-xs">Search catalog tests and click to select</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input className="pl-8" value={compositeSearch} onChange={(e) => setCompositeSearch(e.target.value)} placeholder="Search tests..." autoFocus />
                 </div>
-                {compositeSearch.length >= 3 && (
+                {catalogSearchResults.length > 0 && (
                   <div className="border border-border rounded-md max-h-48 overflow-y-auto bg-popover">
-                    {labTests.filter((t) => t.name.toLowerCase().includes(compositeSearch.toLowerCase()) && !selectedChildTests.some((s) => s.id === t.id)).slice(0, 30).map((t) => (
-                      <button key={t.id} className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between" onClick={() => {
-                        setSelectedChildTests((prev) => [...prev, { id: t.id, name: t.name, price: t.price }]);
-                        // If it's the first test selected, auto-fill form
-                        if (selectedChildTests.length === 0) {
-                          setTestForm({ name: t.name, category: t.category, price: t.price, parameters: t.parameters.map((p) => p.name).join(", ") });
-                        }
-                        setCompositeSearch("");
-                      }}>
+                    {catalogSearchResults.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectCatalogTest(t);
+                        }}
+                      >
                         <span>{t.name}</span>
                         <span className="text-xs text-muted-foreground">{t.category} · ₹{t.price}</span>
                       </button>
                     ))}
-                    {labTests.filter((t) => t.name.toLowerCase().includes(compositeSearch.toLowerCase()) && !selectedChildTests.some((s) => s.id === t.id)).length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No matching tests</p>}
                   </div>
+                )}
+                {compositeSearch.trim().length > 0 && catalogSearchResults.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground border border-border rounded-md">No matching tests</p>
                 )}
                 {selectedChildTests.length > 0 && (
                   <div className="space-y-1">
@@ -1555,13 +1610,16 @@ const Inventory = () => {
                         <span className="text-xs">{ct.name}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">₹{ct.price}</span>
-                          <button onClick={() => {
+                          <button type="button" onClick={() => {
                             const newList = selectedChildTests.filter((t) => t.id !== ct.id);
                             setSelectedChildTests(newList);
                             // If back to single, restore that test's details
                             if (newList.length === 1) {
                               const remaining = labTests.find((t) => t.id === newList[0].id);
                               if (remaining) setTestForm({ name: remaining.name, category: remaining.category, price: remaining.price, parameters: remaining.parameters.map((p) => p.name).join(", ") });
+                            }
+                            if (newList.length > 1) {
+                              setTestForm((prev) => ({ ...prev, price: newList.reduce((sum, test) => sum + test.price, 0) }));
                             }
                             if (newList.length === 0) setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
                           }} className="text-destructive hover:text-destructive/80">
@@ -1602,7 +1660,7 @@ const Inventory = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAddTest(false); setEditTest(null); }}>Cancel</Button>
+            <Button variant="outline" onClick={resetTestDialog}>Cancel</Button>
             <Button onClick={editTest ? handleSaveEditTest : handleAddTest}>{editTest ? "Save Changes" : "Add Test"}</Button>
           </DialogFooter>
         </DialogContent>
