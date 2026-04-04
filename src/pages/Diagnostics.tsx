@@ -362,7 +362,7 @@ const Diagnostics = () => {
     } else {
       createTestMutation.mutate({
         item: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
-        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange })),
+        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange, sex: (p as any).sex || "any", min_age: (p as any).minAge ?? null, max_age: (p as any).maxAge ?? null })),
       }, {
         onSuccess: () => { toast.success(`Test "${testForm.name}" added to catalog`); setShowAddTest(false); },
         onError: (err: any) => toast.error(err.message || "Failed to add test"),

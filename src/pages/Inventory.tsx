@@ -425,7 +425,7 @@ const Inventory = () => {
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim() }));
+    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim(), sex: p.sex || "any", min_age: p.minAge ?? null, max_age: p.maxAge ?? null }));
     updateTestMutation.mutate({
       id: editTest.id,
       updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
