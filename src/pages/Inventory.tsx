@@ -372,9 +372,8 @@ const Inventory = () => {
     const hasChildren = selectedChildTests.length > 0;
 
     // If sub-tests selected, aggregate their parameters automatically
-    let params: { name: string; unit: string; normal_range: string }[] = [];
+    let params: { name: string; unit: string; normal_range: string; sex: string; min_age: number | null; max_age: string | null }[] = [];
     if (hasChildren) {
-      // Fetch parameters from each selected child test
       for (const ct of selectedChildTests) {
         const catalogTest = labTests.find((t) => t.id === ct.id);
         if (catalogTest?.parameters) {
@@ -382,12 +381,14 @@ const Inventory = () => {
             name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
             unit: p.unit || "",
             normal_range: p.normalRange || "",
+            sex: (p as any).sex || "any",
+            min_age: (p as any).minAge ?? null,
+            max_age: (p as any).maxAge ?? null,
           })));
         }
       }
     } else {
-      // Manual parameters entry
-      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "", sex: "any", min_age: null, max_age: null }));
     }
 
     const totalPrice = hasChildren
