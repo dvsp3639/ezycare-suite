@@ -1612,7 +1612,7 @@ const Inventory = () => {
                     ))}
                   </div>
                 )}
-                {compositeSearch.trim().length > 0 && catalogSearchResults.length === 0 && (
+                {compositeSearch.trim().length >= 3 && catalogSearchResults.length === 0 && (
                   <p className="px-3 py-2 text-xs text-muted-foreground border border-border rounded-md">No matching tests</p>
                 )}
                 {selectedChildTests.length > 0 && (
