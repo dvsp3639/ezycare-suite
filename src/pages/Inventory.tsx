@@ -499,6 +499,7 @@ const Inventory = () => {
     setShowAddTest(false);
     setEditTest(null);
     setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
+    setEditParams([]);
     setSelectedChildTests([]);
     setCompositeSearch("");
   };
