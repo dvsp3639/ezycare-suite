@@ -226,10 +226,7 @@ const Inventory = () => {
       .filter((test) => {
         if (selectedChildTests.some((selected) => selected.id === test.id)) return false;
 
-        return (
-          test.name.toLowerCase().includes(query) ||
-          test.category.toLowerCase().includes(query)
-        );
+        return test.name.toLowerCase().includes(query);
       })
       .slice(0, 30);
   }, [compositeSearch, labTests, selectedChildTests]);
