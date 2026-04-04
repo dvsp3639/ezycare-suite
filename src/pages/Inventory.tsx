@@ -220,7 +220,7 @@ const Inventory = () => {
   const catalogSearchResults = useMemo(() => {
     const query = compositeSearch.trim().toLowerCase();
 
-    if (!query) return [];
+    if (query.length < 3) return [];
 
     return labTests
       .filter((test) => {
