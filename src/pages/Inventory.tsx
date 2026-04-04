@@ -1686,7 +1686,7 @@ const Inventory = () => {
               <div className="space-y-2">
                 <Label className="text-xs">Parameters</Label>
                 <p className="text-xs text-muted-foreground">No parameters defined.</p>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "" }])}>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Add Parameter
                 </Button>
               </div>
