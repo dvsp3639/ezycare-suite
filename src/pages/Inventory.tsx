@@ -1677,7 +1677,7 @@ const Inventory = () => {
                     </div>
                   ))}
                 </div>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "" }])}>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Add Parameter
                 </Button>
               </div>
