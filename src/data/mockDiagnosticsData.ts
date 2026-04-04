@@ -5,7 +5,7 @@ export interface LabTestDefinition {
   name: string;
   category: LabCategory;
   price: number;
-  parameters: { name: string; unit: string; normalRange: string }[];
+  parameters: { name: string; unit: string; normalRange: string; sex?: string; minAge?: number | null; maxAge?: string | null }[];
 }
 
 export const labTestCatalog: LabTestDefinition[] = [

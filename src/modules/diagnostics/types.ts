@@ -16,6 +16,9 @@ export interface LabTestParameter {
   name: string;
   unit: string;
   normal_range: string;
+  sex: string; // "any" | "male" | "female"
+  min_age: number | null;
+  max_age: string | null;
 }
 
 export interface LabOrder {

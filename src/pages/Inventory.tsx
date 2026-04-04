@@ -136,6 +136,7 @@ const Inventory = () => {
         price: t.price || 0,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
+          sex: p.sex || "any", minAge: p.minAge ?? null, maxAge: p.maxAge ?? null,
         })),
       })));
       // Sync custom categories from DB (including placeholder categories)
@@ -181,7 +182,7 @@ const Inventory = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
-  const [editParams, setEditParams] = useState<{ name: string; unit: string; normalRange: string }[]>([]);
+  const [editParams, setEditParams] = useState<{ name: string; unit: string; normalRange: string; sex: string; minAge: number | null; maxAge: string | null }[]>([]);
   const [compositeSearch, setCompositeSearch] = useState("");
   const [selectedChildTests, setSelectedChildTests] = useState<{ id: string; name: string; price: number }[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -372,9 +373,8 @@ const Inventory = () => {
     const hasChildren = selectedChildTests.length > 0;
 
     // If sub-tests selected, aggregate their parameters automatically
-    let params: { name: string; unit: string; normal_range: string }[] = [];
+    let params: { name: string; unit: string; normal_range: string; sex: string; min_age: number | null; max_age: string | null }[] = [];
     if (hasChildren) {
-      // Fetch parameters from each selected child test
       for (const ct of selectedChildTests) {
         const catalogTest = labTests.find((t) => t.id === ct.id);
         if (catalogTest?.parameters) {
@@ -382,12 +382,14 @@ const Inventory = () => {
             name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
             unit: p.unit || "",
             normal_range: p.normalRange || "",
+            sex: (p as any).sex || "any",
+            min_age: (p as any).minAge ?? null,
+            max_age: (p as any).maxAge ?? null,
           })));
         }
       }
     } else {
-      // Manual parameters entry
-      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "", sex: "any", min_age: null, max_age: null }));
     }
 
     const totalPrice = hasChildren
@@ -419,12 +421,12 @@ const Inventory = () => {
       price: test.price,
       parameters: "",
     });
-    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "" })));
+    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "", sex: (p as any).sex || "any", minAge: (p as any).minAge ?? null, maxAge: (p as any).maxAge ?? null })));
   };
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim() }));
+    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim(), sex: p.sex || "any", min_age: p.minAge ?? null, max_age: p.maxAge ?? null }));
     updateTestMutation.mutate({
       id: editTest.id,
       updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
@@ -896,6 +898,7 @@ const Inventory = () => {
                                     <span className="font-medium text-foreground/80">{p.name}</span>
                                     {p.unit && <span className="ml-1">({p.unit})</span>}
                                     {p.normalRange && <span className="ml-1 text-muted-foreground">Normal: {p.normalRange}</span>}
+                                    {(p as any).sex && (p as any).sex !== "any" && <span className="ml-1 text-xs text-primary/70">[{(p as any).sex}]</span>}
                                   </div>
                                 ))}
                               </div>
@@ -1663,20 +1666,25 @@ const Inventory = () => {
             {editTest && editParams.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs">Parameters</Label>
-                <div className="border border-border rounded-md overflow-hidden">
-                  <div className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground">
-                    <span>Name</span><span>Unit</span><span>Normal Range</span><span></span>
+                <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
+                  <div className="grid grid-cols-[1fr_70px_90px_70px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[420px]">
+                    <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span></span>
                   </div>
                   {editParams.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 border-t border-border">
+                    <div key={i} className="grid grid-cols-[1fr_70px_90px_70px_32px] gap-1 px-2 py-1 border-t border-border min-w-[420px]">
                       <Input className="h-7 text-xs" value={p.name} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
                       <Input className="h-7 text-xs" value={p.unit} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
                       <Input className="h-7 text-xs" value={p.normalRange} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
+                      <select className="h-7 text-xs border border-input rounded-md bg-background px-1" value={p.sex} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], sex: e.target.value }; setEditParams(next); }}>
+                        <option value="any">Any</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
                       <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
                     </div>
                   ))}
                 </div>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "" }])}>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Add Parameter
                 </Button>
               </div>
@@ -1685,7 +1693,7 @@ const Inventory = () => {
               <div className="space-y-2">
                 <Label className="text-xs">Parameters</Label>
                 <p className="text-xs text-muted-foreground">No parameters defined.</p>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "" }])}>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Add Parameter
                 </Button>
               </div>

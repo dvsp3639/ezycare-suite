@@ -1205,24 +1205,33 @@ export type Database = {
         Row: {
           hospital_id: string
           id: string
+          max_age: string | null
+          min_age: number | null
           name: string
           normal_range: string | null
+          sex: string
           test_id: string
           unit: string | null
         }
         Insert: {
           hospital_id: string
           id?: string
+          max_age?: string | null
+          min_age?: number | null
           name: string
           normal_range?: string | null
+          sex?: string
           test_id: string
           unit?: string | null
         }
         Update: {
           hospital_id?: string
           id?: string
+          max_age?: string | null
+          min_age?: number | null
           name?: string
           normal_range?: string | null
+          sex?: string
           test_id?: string
           unit?: string | null
         }

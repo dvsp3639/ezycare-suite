@@ -1,0 +1,4 @@
+ALTER TABLE public.lab_test_parameters
+  ADD COLUMN IF NOT EXISTS sex text NOT NULL DEFAULT 'any',
+  ADD COLUMN IF NOT EXISTS min_age integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS max_age text DEFAULT NULL;
