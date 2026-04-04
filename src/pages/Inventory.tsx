@@ -1667,7 +1667,7 @@ const Inventory = () => {
               <div className="space-y-2">
                 <Label className="text-xs">Parameters</Label>
                 <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_70px_90px_70px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[420px]">
+                  <div className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[520px]">
                     <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
                   </div>
                   {editParams.map((p, i) => (
