@@ -181,6 +181,7 @@ const Inventory = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
+  const [editParams, setEditParams] = useState<{ name: string; unit: string; normalRange: string }[]>([]);
   const [compositeSearch, setCompositeSearch] = useState("");
   const [selectedChildTests, setSelectedChildTests] = useState<{ id: string; name: string; price: number }[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -416,13 +417,14 @@ const Inventory = () => {
       name: test.name,
       category: test.category,
       price: test.price,
-      parameters: test.parameters.map((p) => p.name).join(", "),
+      parameters: "",
     });
+    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "" })));
   };
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim() }));
     updateTestMutation.mutate({
       id: editTest.id,
       updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
@@ -431,6 +433,7 @@ const Inventory = () => {
       onSuccess: () => {
         toast.success(`Test "${testForm.name}" updated`);
         setEditTest(null);
+        setEditParams([]);
         setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
       },
       onError: (err: any) => toast.error(err.message || "Failed to update test"),
@@ -496,6 +499,7 @@ const Inventory = () => {
     setShowAddTest(false);
     setEditTest(null);
     setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" });
+    setEditParams([]);
     setSelectedChildTests([]);
     setCompositeSearch("");
   };
@@ -1656,7 +1660,37 @@ const Inventory = () => {
             </div>
 
             {/* Parameters only for edit mode or when no sub-tests selected */}
-            {(editTest || selectedChildTests.length === 0) && (
+            {editTest && editParams.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Parameters</Label>
+                <div className="border border-border rounded-md overflow-hidden">
+                  <div className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground">
+                    <span>Name</span><span>Unit</span><span>Normal Range</span><span></span>
+                  </div>
+                  {editParams.map((p, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 border-t border-border">
+                      <Input className="h-7 text-xs" value={p.name} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
+                      <Input className="h-7 text-xs" value={p.unit} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
+                      <Input className="h-7 text-xs" value={p.normalRange} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
+                      <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
+                    </div>
+                  ))}
+                </div>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "" }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
+                </Button>
+              </div>
+            )}
+            {editTest && editParams.length === 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Parameters</Label>
+                <p className="text-xs text-muted-foreground">No parameters defined.</p>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "" }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
+                </Button>
+              </div>
+            )}
+            {!editTest && selectedChildTests.length === 0 && (
               <div>
                 <Label className="text-xs">Parameters (comma separated)</Label>
                 <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
