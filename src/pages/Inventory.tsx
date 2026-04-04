@@ -136,6 +136,7 @@ const Inventory = () => {
         price: t.price || 0,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
+          sex: p.sex || "any", minAge: p.minAge ?? null, maxAge: p.maxAge ?? null,
         })),
       })));
       // Sync custom categories from DB (including placeholder categories)
