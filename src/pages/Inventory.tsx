@@ -898,6 +898,7 @@ const Inventory = () => {
                                     <span className="font-medium text-foreground/80">{p.name}</span>
                                     {p.unit && <span className="ml-1">({p.unit})</span>}
                                     {p.normalRange && <span className="ml-1 text-muted-foreground">Normal: {p.normalRange}</span>}
+                                    {(p as any).sex && (p as any).sex !== "any" && <span className="ml-1 text-xs text-primary/70">[{(p as any).sex}]</span>}
                                   </div>
                                 ))}
                               </div>
