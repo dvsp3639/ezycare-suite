@@ -424,7 +424,7 @@ const Inventory = () => {
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "" }));
+    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim() }));
     updateTestMutation.mutate({
       id: editTest.id,
       updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
@@ -433,6 +433,7 @@ const Inventory = () => {
       onSuccess: () => {
         toast.success(`Test "${testForm.name}" updated`);
         setEditTest(null);
+        setEditParams([]);
         setTestForm({ name: "", category: "Blood", price: 0, parameters: "" });
       },
       onError: (err: any) => toast.error(err.message || "Failed to update test"),
