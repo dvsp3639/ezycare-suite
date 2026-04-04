@@ -226,10 +226,7 @@ const Inventory = () => {
       .filter((test) => {
         if (selectedChildTests.some((selected) => selected.id === test.id)) return false;
 
-        return (
-          test.name.toLowerCase().includes(query) ||
-          test.category.toLowerCase().includes(query)
-        );
+        return test.name.toLowerCase().includes(query);
       })
       .slice(0, 30);
   }, [compositeSearch, labTests, selectedChildTests]);
@@ -887,7 +884,19 @@ const Inventory = () => {
                       {tests.map((t) => (
                         <TableRow key={t.id}>
                           <TableCell className="font-medium text-sm">{t.name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{t.parameters.map((p) => p.name).join(", ")}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {t.parameters.length > 0 ? (
+                              <div className="space-y-0.5">
+                                {t.parameters.map((p, i) => (
+                                  <div key={i}>
+                                    <span className="font-medium text-foreground/80">{p.name}</span>
+                                    {p.unit && <span className="ml-1">({p.unit})</span>}
+                                    {p.normalRange && <span className="ml-1 text-muted-foreground">Normal: {p.normalRange}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : "—"}
+                          </TableCell>
                           <TableCell className="text-right text-sm">₹{t.price}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
