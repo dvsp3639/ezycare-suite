@@ -1664,15 +1664,20 @@ const Inventory = () => {
             {editTest && editParams.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs">Parameters</Label>
-                <div className="border border-border rounded-md overflow-hidden">
-                  <div className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground">
-                    <span>Name</span><span>Unit</span><span>Normal Range</span><span></span>
+                <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
+                  <div className="grid grid-cols-[1fr_70px_90px_70px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[420px]">
+                    <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span></span>
                   </div>
                   {editParams.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_80px_100px_32px] gap-1 px-2 py-1 border-t border-border">
+                    <div key={i} className="grid grid-cols-[1fr_70px_90px_70px_32px] gap-1 px-2 py-1 border-t border-border min-w-[420px]">
                       <Input className="h-7 text-xs" value={p.name} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
                       <Input className="h-7 text-xs" value={p.unit} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
                       <Input className="h-7 text-xs" value={p.normalRange} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
+                      <select className="h-7 text-xs border border-input rounded-md bg-background px-1" value={p.sex} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], sex: e.target.value }; setEditParams(next); }}>
+                        <option value="any">Any</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
                       <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
                     </div>
                   ))}
