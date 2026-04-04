@@ -420,7 +420,7 @@ const Inventory = () => {
       price: test.price,
       parameters: "",
     });
-    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "" })));
+    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "", sex: (p as any).sex || "any", minAge: (p as any).minAge ?? null, maxAge: (p as any).maxAge ?? null })));
   };
 
   const handleSaveEditTest = () => {
