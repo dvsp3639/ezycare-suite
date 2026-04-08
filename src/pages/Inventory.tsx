@@ -1582,7 +1582,7 @@ const Inventory = () => {
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editTest ? "Edit Diagnostic Test" : "Add Diagnostic Test"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {/* Step 1: Test Name first */}
