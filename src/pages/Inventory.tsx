@@ -99,6 +99,7 @@ const Inventory = () => {
   const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
+  const [labTestSearch, setLabTestSearch] = useState("");
 
   useEffect(() => {
     if (dbItems) {
@@ -888,10 +889,15 @@ const Inventory = () => {
           )}
 
           {allLabCategories.map((cat) => {
-            const tests = labTests.filter((t) => t.category === cat);
+            const searchLower = labTestSearch.toLowerCase().trim();
+            const tests = labTests.filter((t) => t.category === cat && (
+              !searchLower ||
+              t.name.toLowerCase().includes(searchLower) ||
+              t.parameters.some((p) => p.name.toLowerCase().includes(searchLower))
+            ));
             if (tests.length === 0) return null;
             return (
-              <div key={cat} className="mb-6">
+              <div key={cat} id={`lab-cat-${cat.replace(/\s+/g, "-")}`} className="mb-6 scroll-mt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                   {cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
                   {cat} Tests ({tests.length})
