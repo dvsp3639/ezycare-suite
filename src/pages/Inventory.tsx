@@ -443,11 +443,24 @@ const Inventory = () => {
     });
   };
 
-  const handleRemoveTest = (testId: string) => {
-    deleteTestMutation.mutate(testId, {
-      onSuccess: () => toast.success("Test removed"),
-      onError: (err: any) => toast.error(err.message || "Failed to delete test"),
-    });
+  const handleRemoveTest = async (testId: string) => {
+    const previousTests = labTests;
+    const previousSelectedTests = selectedChildTests;
+
+    setLabTests((prev) => prev.filter((t) => t.id !== testId));
+    setSelectedChildTests((prev) => prev.filter((t) => t.id !== testId));
+
+    try {
+      await deleteTestMutation.mutateAsync(testId);
+      if (editTest?.id === testId) {
+        resetTestDialog();
+      }
+      toast.success("Test removed");
+    } catch (err: any) {
+      setLabTests(previousTests);
+      setSelectedChildTests(previousSelectedTests);
+      toast.error(err.message || "Failed to delete test");
+    }
   };
 
   const handleAddCategory = () => {
