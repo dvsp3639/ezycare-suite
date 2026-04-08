@@ -37,8 +37,12 @@ export const diagnosticsService = {
   },
 
   async deleteTestCatalogItem(id: string): Promise<void> {
-    // Delete parameters first, then the test
-    await supabase.from("lab_test_parameters").delete().eq("test_id", id);
+    // Delete related records in parallel, then the test itself
+    await Promise.all([
+      supabase.from("lab_test_parameters").delete().eq("test_id", id),
+      supabase.from("composite_test_items").delete().eq("parent_test_id", id),
+      supabase.from("composite_test_items").delete().eq("child_test_id", id),
+    ]);
     const { error } = await supabase.from("lab_test_catalog").delete().eq("id", id);
     if (error) throw error;
   },

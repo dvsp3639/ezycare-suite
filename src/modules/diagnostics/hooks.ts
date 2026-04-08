@@ -11,10 +11,8 @@ export function useLabTestCatalog() {
   return useQuery({
     queryKey: KEYS.catalog,
     queryFn: diagnosticsService.getTestCatalog,
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 30000,
     refetchOnWindowFocus: true,
-    refetchInterval: 10000,
   });
 }
 
@@ -57,7 +55,14 @@ export function useDeleteTestCatalogItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => diagnosticsService.deleteTestCatalogItem(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.catalog }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: KEYS.catalog });
+      const prev = qc.getQueryData(KEYS.catalog);
+      qc.setQueryData(KEYS.catalog, (old: any) => old?.filter((t: any) => t.id !== id));
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => { if (ctx?.prev) qc.setQueryData(KEYS.catalog, ctx.prev); },
+    onSettled: () => qc.invalidateQueries({ queryKey: KEYS.catalog }),
   });
 }
 
