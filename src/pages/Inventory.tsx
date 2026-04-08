@@ -99,6 +99,7 @@ const Inventory = () => {
   const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
+  const [labTestSearch, setLabTestSearch] = useState("");
 
   useEffect(() => {
     if (dbItems) {
@@ -827,38 +828,58 @@ const Inventory = () => {
 
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
-              {labTests.length > 0 && <Badge variant="secondary" className="text-xs">{labTests.length} tests loaded</Badge>}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Category
-              </Button>
-              <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" }); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
-                <Plus className="h-4 w-4 mr-1" /> Add Test
-              </Button>
-            </div>
-          </div>
+           <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center gap-3">
+               <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
+               {labTests.length > 0 && <Badge variant="secondary" className="text-xs">{labTests.length} tests loaded</Badge>}
+             </div>
+             <div className="flex items-center gap-2">
+               <Button variant="outline" size="sm" onClick={() => setShowAddLabCategory(true)}>
+                 <Plus className="h-3.5 w-3.5 mr-1" /> Category
+               </Button>
+               <Button size="sm" onClick={() => { setEditTest(null); setTestForm({ name: "", category: allLabCategories[0] || "Blood", price: 0, parameters: "" }); setSelectedChildTests([]); setCompositeSearch(""); setShowAddTest(true); }}>
+                 <Plus className="h-4 w-4 mr-1" /> Add Test
+               </Button>
+             </div>
+           </div>
 
-          {/* Category management chips */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {allLabCategories.map((cat) => {
-              const isCustom = labCustomCategories.includes(cat);
-              return (
-                <Badge key={cat} variant="outline" className="text-xs py-1 px-2 gap-1.5">
-                  {cat} ({labTests.filter((t) => t.category === cat).length})
-                  {isCustom && (
-                    <>
-                      <button onClick={() => setEditLabCategory({ old: cat, new: cat })} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
-                      <button onClick={() => handleRemoveLabCategory(cat)} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
-                    </>
-                  )}
-                </Badge>
-              );
-            })}
-          </div>
+           {/* Search bar */}
+           <div className="relative mb-4">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+             <Input
+               placeholder="Search tests by name or parameter..."
+               value={labTestSearch}
+               onChange={(e) => setLabTestSearch(e.target.value)}
+               className="pl-9"
+             />
+           </div>
+
+           {/* Category management chips — clickable to scroll */}
+           <div className="flex flex-wrap gap-2 mb-4">
+             {allLabCategories.map((cat) => {
+               const isCustom = labCustomCategories.includes(cat);
+               const count = labTests.filter((t) => t.category === cat).length;
+               return (
+                 <Badge
+                   key={cat}
+                   variant="outline"
+                   className="text-xs py-1 px-2 gap-1.5 cursor-pointer hover:bg-accent transition-colors"
+                   onClick={() => {
+                     const el = document.getElementById(`lab-cat-${cat.replace(/\s+/g, "-")}`);
+                     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                   }}
+                 >
+                   {cat} ({count})
+                   {isCustom && (
+                     <>
+                       <button onClick={(e) => { e.stopPropagation(); setEditLabCategory({ old: cat, new: cat }); }} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
+                       <button onClick={(e) => { e.stopPropagation(); handleRemoveLabCategory(cat); }} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
+                     </>
+                   )}
+                 </Badge>
+               );
+             })}
+           </div>
 
           {labTests.length === 0 && !dbLabCatalog && (
             <p className="text-sm text-muted-foreground py-8 text-center">Loading lab test catalog...</p>
@@ -868,10 +889,15 @@ const Inventory = () => {
           )}
 
           {allLabCategories.map((cat) => {
-            const tests = labTests.filter((t) => t.category === cat);
+            const searchLower = labTestSearch.toLowerCase().trim();
+            const tests = labTests.filter((t) => t.category === cat && (
+              !searchLower ||
+              t.name.toLowerCase().includes(searchLower) ||
+              t.parameters.some((p) => p.name.toLowerCase().includes(searchLower))
+            ));
             if (tests.length === 0) return null;
             return (
-              <div key={cat} className="mb-6">
+              <div key={cat} id={`lab-cat-${cat.replace(/\s+/g, "-")}`} className="mb-6 scroll-mt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                   {cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
                   {cat} Tests ({tests.length})
