@@ -223,7 +223,10 @@ const Inventory = () => {
   const allLabCategories = useMemo(() => {
     const defaults = ["Blood", "Urine", "Radiology", "Serology"];
     const fromDb = labTests.map((t) => t.category);
-    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const cats = Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    // Add Favourites at the top if any exist
+    const hasFavourites = labTests.some((t) => t.isFavorite);
+    return hasFavourites ? ["Favourites", ...cats] : cats;
   }, [labCustomCategories, labTests]);
 
   const catalogSearchResults = useMemo(() => {
