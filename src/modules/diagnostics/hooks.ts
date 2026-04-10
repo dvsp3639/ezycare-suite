@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { diagnosticsService } from "./services";
-import type { LabTestCatalogItem, LabOrderInsert, LabResult, LabTestParameter } from "./types";
+import type { LabTestCatalogItem, LabOrderInsert, LabResult, ParameterSaveInput } from "./types";
 
 const KEYS = {
   catalog: ["diagnostics", "catalog"] as const,
@@ -20,14 +20,14 @@ export function useLabOrders(filters?: { status?: string; category?: string; app
   return useQuery({
     queryKey: KEYS.orders(filters),
     queryFn: () => diagnosticsService.getLabOrders(filters),
-    refetchInterval: 15000, // Auto-refresh every 15s for cross-module sync
+    refetchInterval: 15000,
   });
 }
 
 export function useCreateTestCatalogItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ item, parameters }: { item: Partial<LabTestCatalogItem>; parameters: Omit<LabTestParameter, "id" | "test_id" | "hospital_id">[] }) => {
+    mutationFn: async ({ item, parameters }: { item: Partial<LabTestCatalogItem>; parameters: ParameterSaveInput[] }) => {
       const created = await diagnosticsService.createTestCatalogItem(item);
       if (parameters.length > 0) {
         await diagnosticsService.saveTestParameters(created.id, parameters);
@@ -41,7 +41,7 @@ export function useCreateTestCatalogItem() {
 export function useUpdateTestCatalogItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates, parameters }: { id: string; updates: Partial<LabTestCatalogItem>; parameters?: Omit<LabTestParameter, "id" | "test_id" | "hospital_id">[] }) => {
+    mutationFn: async ({ id, updates, parameters }: { id: string; updates: Partial<LabTestCatalogItem>; parameters?: ParameterSaveInput[] }) => {
       await diagnosticsService.updateTestCatalogItem(id, updates);
       if (parameters) {
         await diagnosticsService.saveTestParameters(id, parameters);
