@@ -1727,72 +1727,54 @@ const Inventory = () => {
               <Input type="number" value={testForm.price} onChange={(e) => setTestForm((p) => ({ ...p, price: +e.target.value }))} />
             </div>
 
-            {/* Parameters only for edit mode or when no sub-tests selected */}
-            {editTest && editParams.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs">Parameters</Label>
-                <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[520px]">
-                    <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
-                  </div>
-                  {editParams.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 border-t border-border min-w-[520px]">
-                      <Input className="h-7 text-xs" value={p.name} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
-                      <Input className="h-7 text-xs" value={p.unit} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
-                      <Input className="h-7 text-xs" value={p.normalRange} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
-                      <select className="h-7 text-xs border border-input rounded-md bg-background px-1" value={p.sex} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], sex: e.target.value }; setEditParams(next); }}>
-                        <option value="any">Any</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                      </select>
-                      <Input className="h-7 text-xs" type="number" placeholder="Min" value={p.minAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], minAge: e.target.value ? Number(e.target.value) : null }; setEditParams(next); }} />
-                      <Input className="h-7 text-xs" placeholder="Max" value={p.maxAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], maxAge: e.target.value || null }; setEditParams(next); }} />
-                      <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
-                    </div>
-                  ))}
+            {/* Parameters editor — unified for add/edit */}
+            {(editTest || (!editTest && selectedChildTests.length === 0)) && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Parameters</Label>
+                  <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }])}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Parameter
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
-                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
-                </Button>
-              </div>
-            )}
-            {editTest && editParams.length === 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs">Parameters</Label>
-                <p className="text-xs text-muted-foreground">No parameters defined.</p>
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([{ name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
-                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
-                </Button>
-              </div>
-            )}
-            {!editTest && selectedChildTests.length === 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs">Parameters</Label>
-                {editParams.length > 0 && (
-                  <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
-                    <div className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[520px]">
-                      <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
+                {editParams.length === 0 && <p className="text-xs text-muted-foreground">No parameters defined.</p>}
+                {editParams.map((p, pi) => (
+                  <div key={pi} className="border border-border rounded-md p-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input className="h-7 text-xs flex-1" placeholder="Parameter name" value={p.name} onChange={(e) => { const next = [...editParams]; next[pi] = { ...next[pi], name: e.target.value }; setEditParams(next); }} />
+                      <Input className="h-7 text-xs w-20" placeholder="Unit" value={p.unit} onChange={(e) => { const next = [...editParams]; next[pi] = { ...next[pi], unit: e.target.value }; setEditParams(next); }} />
+                      <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== pi))} className="text-destructive hover:text-destructive/80"><XCircle className="h-3.5 w-3.5" /></button>
                     </div>
-                    {editParams.map((p, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 border-t border-border min-w-[520px]">
-                        <Input className="h-7 text-xs" value={p.name} placeholder="Name" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
-                        <Input className="h-7 text-xs" value={p.unit} placeholder="Unit" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
-                        <Input className="h-7 text-xs" value={p.normalRange} placeholder="Range" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
-                        <select className="h-7 text-xs border border-input rounded-md bg-background px-1" value={p.sex} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], sex: e.target.value }; setEditParams(next); }}>
-                          <option value="any">Any</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                        </select>
-                        <Input className="h-7 text-xs" type="number" placeholder="Min" value={p.minAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], minAge: e.target.value ? Number(e.target.value) : null }; setEditParams(next); }} />
-                        <Input className="h-7 text-xs" placeholder="Max" value={p.maxAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], maxAge: e.target.value || null }; setEditParams(next); }} />
-                        <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
+                    <div className="pl-2 border-l-2 border-primary/20 space-y-1">
+                      <div className="grid grid-cols-[1fr_70px_60px_60px_24px] gap-1 text-[10px] font-medium text-muted-foreground">
+                        <span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
                       </div>
-                    ))}
+                      {p.ranges.map((r, ri) => (
+                        <div key={ri} className="grid grid-cols-[1fr_70px_60px_60px_24px] gap-1 items-center">
+                          <Input className="h-6 text-xs" placeholder="e.g. 12-17" value={r.normalRange} onChange={(e) => {
+                            const next = [...editParams]; const ranges = [...next[pi].ranges]; ranges[ri] = { ...ranges[ri], normalRange: e.target.value }; next[pi] = { ...next[pi], ranges }; setEditParams(next);
+                          }} />
+                          <select className="h-6 text-xs border border-input rounded bg-background px-1" value={r.sex} onChange={(e) => {
+                            const next = [...editParams]; const ranges = [...next[pi].ranges]; ranges[ri] = { ...ranges[ri], sex: e.target.value }; next[pi] = { ...next[pi], ranges }; setEditParams(next);
+                          }}>
+                            <option value="any">Any</option><option value="male">Male</option><option value="female">Female</option>
+                          </select>
+                          <Input className="h-6 text-xs" type="number" placeholder="Min" value={r.minAge ?? ""} onChange={(e) => {
+                            const next = [...editParams]; const ranges = [...next[pi].ranges]; ranges[ri] = { ...ranges[ri], minAge: e.target.value ? Number(e.target.value) : null }; next[pi] = { ...next[pi], ranges }; setEditParams(next);
+                          }} />
+                          <Input className="h-6 text-xs" placeholder="Max" value={r.maxAge ?? ""} onChange={(e) => {
+                            const next = [...editParams]; const ranges = [...next[pi].ranges]; ranges[ri] = { ...ranges[ri], maxAge: e.target.value || null }; next[pi] = { ...next[pi], ranges }; setEditParams(next);
+                          }} />
+                          {p.ranges.length > 1 && (
+                            <button type="button" onClick={() => { const next = [...editParams]; next[pi] = { ...next[pi], ranges: next[pi].ranges.filter((_, j) => j !== ri) }; setEditParams(next); }} className="text-destructive/60 hover:text-destructive"><XCircle className="h-3 w-3" /></button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" className="text-[10px] text-primary hover:underline" onClick={() => {
+                        const next = [...editParams]; next[pi] = { ...next[pi], ranges: [...next[pi].ranges, { normalRange: "", sex: "any", minAge: null, maxAge: null }] }; setEditParams(next);
+                      }}>+ Add Range</button>
+                    </div>
                   </div>
-                )}
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
-                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
-                </Button>
+                ))}
               </div>
             )}
           </div>
