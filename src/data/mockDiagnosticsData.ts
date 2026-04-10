@@ -5,6 +5,7 @@ export interface LabTestDefinition {
   name: string;
   category: LabCategory;
   price: number;
+  isFavorite?: boolean;
   parameters: { name: string; unit: string; ranges: { normalRange: string; sex?: string; minAge?: number | null; maxAge?: string | null }[] }[];
 }
 
