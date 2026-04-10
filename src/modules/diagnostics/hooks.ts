@@ -51,6 +51,24 @@ export function useUpdateTestCatalogItem() {
   });
 }
 
+export function useToggleFavorite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isFavorite }: { id: string; isFavorite: boolean }) =>
+      diagnosticsService.toggleFavorite(id, isFavorite),
+    onMutate: async ({ id, isFavorite }) => {
+      await qc.cancelQueries({ queryKey: KEYS.catalog });
+      const prev = qc.getQueryData(KEYS.catalog);
+      qc.setQueryData(KEYS.catalog, (old: any) =>
+        old?.map((t: any) => (t.id === id ? { ...t, isFavorite } : t))
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(KEYS.catalog, ctx.prev); },
+    onSettled: () => qc.invalidateQueries({ queryKey: KEYS.catalog }),
+  });
+}
+
 export function useDeleteTestCatalogItem() {
   const qc = useQueryClient();
   return useMutation({

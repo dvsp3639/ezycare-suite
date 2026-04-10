@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import {
   Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3,
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
-  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble,
+  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble, Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +28,7 @@ import type { LabCategory } from "@/data/mockClinicData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
 import { useInventoryItems, useStockTransfers } from "@/modules/inventory/hooks";
 import {
-  useLabTestCatalog, useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem,
+  useLabTestCatalog, useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem, useToggleFavorite,
 } from "@/modules/diagnostics/hooks";
 
 // ──── Asset Types ────
@@ -93,6 +93,7 @@ const Inventory = () => {
   const createTestMutation = useCreateTestCatalogItem();
   const updateTestMutation = useUpdateTestCatalogItem();
   const deleteTestMutation = useDeleteTestCatalogItem();
+  const toggleFavoriteMutation = useToggleFavorite();
 
   const [activeTab, setActiveTab] = useState("stock");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -135,7 +136,7 @@ const Inventory = () => {
       const allTests = (dbLabCatalog as any[]).filter((t: any) => !t.name?.startsWith("__placeholder_"));
       setLabTests(allTests.map((t: any) => ({
         id: t.id, name: t.name, category: t.category || "Blood",
-        price: t.price || 0,
+        price: t.price || 0, isFavorite: t.isFavorite ?? false,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "",
           ranges: (p.ranges || []).map((r: any) => ({
@@ -222,7 +223,10 @@ const Inventory = () => {
   const allLabCategories = useMemo(() => {
     const defaults = ["Blood", "Urine", "Radiology", "Serology"];
     const fromDb = labTests.map((t) => t.category);
-    return Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const cats = Array.from(new Set([...defaults, ...labCustomCategories, ...fromDb])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    // Add Favourites at the top if any exist
+    const hasFavourites = labTests.some((t) => t.isFavorite);
+    return hasFavourites ? ["Favourites", ...cats] : cats;
   }, [labCustomCategories, labTests]);
 
   const catalogSearchResults = useMemo(() => {
@@ -887,9 +891,10 @@ const Inventory = () => {
 
            {/* Category management chips — clickable to scroll */}
            <div className="flex flex-wrap gap-2 mb-4">
-             {allLabCategories.map((cat) => {
-               const isCustom = labCustomCategories.includes(cat);
-               const count = labTests.filter((t) => t.category === cat).length;
+              {allLabCategories.map((cat) => {
+                const isCustom = labCustomCategories.includes(cat);
+                const isFavCat = cat === "Favourites";
+                const count = isFavCat ? labTests.filter((t) => t.isFavorite).length : labTests.filter((t) => t.category === cat).length;
                return (
                  <Badge
                    key={cat}
@@ -900,13 +905,14 @@ const Inventory = () => {
                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                    }}
                  >
-                   {cat} ({count})
-                   {isCustom && (
-                     <>
-                       <button onClick={(e) => { e.stopPropagation(); setEditLabCategory({ old: cat, new: cat }); }} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
-                       <button onClick={(e) => { e.stopPropagation(); handleRemoveLabCategory(cat); }} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
-                     </>
-                   )}
+                    {isFavCat && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                    {cat} ({count})
+                    {isCustom && !isFavCat && (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); setEditLabCategory({ old: cat, new: cat }); }} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleRemoveLabCategory(cat); }} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
+                      </>
+                    )}
                  </Badge>
                );
              })}
@@ -921,7 +927,8 @@ const Inventory = () => {
 
           {allLabCategories.map((cat) => {
             const searchLower = labTestSearch.toLowerCase().trim();
-            const tests = labTests.filter((t) => t.category === cat && (
+            const isFavCat = cat === "Favourites";
+            const tests = labTests.filter((t) => (isFavCat ? t.isFavorite : t.category === cat) && (
               !searchLower ||
               t.name.toLowerCase().includes(searchLower) ||
               t.parameters.some((p) => p.name.toLowerCase().includes(searchLower))
@@ -930,7 +937,7 @@ const Inventory = () => {
             return (
               <div key={cat} id={`lab-cat-${cat.replace(/\s+/g, "-")}`} className="mb-6 scroll-mt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  {cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
+                  {cat === "Favourites" && "⭐"}{cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
                   {cat} Tests ({tests.length})
                 </h3>
                 <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -974,6 +981,16 @@ const Inventory = () => {
                           <TableCell className="text-right text-sm">₹{t.price}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={() => {
+                                  const newVal = !t.isFavorite;
+                                  setLabTests((prev) => prev.map((x) => x.id === t.id ? { ...x, isFavorite: newVal } : x));
+                                  toggleFavoriteMutation.mutate({ id: t.id, isFavorite: newVal });
+                                }}
+                              >
+                                <Star className={cn("h-3.5 w-3.5", t.isFavorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTest(t)}>
                                 <Edit className="h-3.5 w-3.5" />
                               </Button>

@@ -49,6 +49,14 @@ export const diagnosticsService = {
     if (error) throw error;
   },
 
+  async toggleFavorite(id: string, isFavorite: boolean): Promise<void> {
+    const { error } = await supabase
+      .from("lab_test_catalog")
+      .update({ is_favorite: isFavorite } as any)
+      .eq("id", id);
+    if (error) throw error;
+  },
+
   async deleteTestCatalogItem(id: string): Promise<void> {
     // Delete parameters (cascades to ranges), composite items, then the test
     await Promise.all([
