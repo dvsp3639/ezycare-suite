@@ -898,17 +898,47 @@ const Diagnostics = () => {
                 <Label className="text-sm font-semibold">Parameters</Label>
                 <Button size="sm" variant="outline" onClick={addParamRow}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
               </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto">
                 {testParams.map((p, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
-                    <Input value={p.name} onChange={(e) => updateParamRow(idx, "name", e.target.value)} placeholder="Parameter name" className="text-sm" />
-                    <Input value={p.unit} onChange={(e) => updateParamRow(idx, "unit", e.target.value)} placeholder="Unit" className="text-sm" />
-                    <Input value={p.normalRange} onChange={(e) => updateParamRow(idx, "normalRange", e.target.value)} placeholder="Normal" className="text-sm" />
-                    {testParams.length > 1 && (
-                      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => removeParamRow(idx)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    )}
+                  <div key={idx} className="border border-border rounded-md p-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input value={p.name} onChange={(e) => updateParamRow(idx, "name", e.target.value)} placeholder="Parameter name" className="text-sm flex-1" />
+                      <Input value={p.unit} onChange={(e) => updateParamRow(idx, "unit", e.target.value)} placeholder="Unit" className="text-sm w-20" />
+                      {testParams.length > 1 && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeParamRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="pl-2 border-l-2 border-primary/20 space-y-1">
+                      <div className="grid grid-cols-[1fr_70px_55px_55px_24px] gap-1 text-[10px] font-medium text-muted-foreground">
+                        <span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
+                      </div>
+                      {p.ranges.map((r, ri) => (
+                        <div key={ri} className="grid grid-cols-[1fr_70px_55px_55px_24px] gap-1 items-center">
+                          <Input className="h-6 text-xs" placeholder="e.g. 12-17" value={r.normalRange} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], normalRange: e.target.value }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          <select className="h-6 text-xs border border-input rounded bg-background px-1" value={r.sex} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], sex: e.target.value }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }}>
+                            <option value="any">Any</option><option value="male">Male</option><option value="female">Female</option>
+                          </select>
+                          <Input className="h-6 text-xs" type="number" placeholder="Min" value={r.minAge ?? ""} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], minAge: e.target.value ? Number(e.target.value) : null }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          <Input className="h-6 text-xs" placeholder="Max" value={r.maxAge ?? ""} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], maxAge: e.target.value || null }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          {p.ranges.length > 1 && (
+                            <button type="button" onClick={() => { const next = [...testParams]; next[idx] = { ...next[idx], ranges: next[idx].ranges.filter((_, j) => j !== ri) }; setTestParams(next); }} className="text-destructive/60 hover:text-destructive"><X className="h-3 w-3" /></button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" className="text-[10px] text-primary hover:underline" onClick={() => {
+                        const next = [...testParams]; next[idx] = { ...next[idx], ranges: [...next[idx].ranges, { normalRange: "", sex: "any", minAge: null, maxAge: null }] }; setTestParams(next);
+                      }}>+ Add Range</button>
+                    </div>
                   </div>
                 ))}
               </div>
