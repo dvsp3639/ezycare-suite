@@ -1,5 +1,22 @@
 // Diagnostics Module Types
 
+export interface ParameterRange {
+  id?: string;
+  parameter_id?: string;
+  sex: string; // "any" | "male" | "female"
+  min_age: number | null;
+  max_age: string | null;
+  normal_range: string;
+}
+
+export interface LabTestParameter {
+  id: string;
+  test_id: string;
+  name: string;
+  unit: string;
+  ranges: ParameterRange[];
+}
+
 export interface LabTestCatalogItem {
   id: string;
   hospital_id: string;
@@ -8,17 +25,6 @@ export interface LabTestCatalogItem {
   price: number;
   created_at: string;
   parameters?: LabTestParameter[];
-}
-
-export interface LabTestParameter {
-  id: string;
-  test_id: string;
-  name: string;
-  unit: string;
-  normal_range: string;
-  sex: string; // "any" | "male" | "female"
-  min_age: number | null;
-  max_age: string | null;
 }
 
 export interface LabOrder {
@@ -57,3 +63,10 @@ export interface LabResult {
 export type LabOrderInsert = Omit<LabOrder, "id" | "created_at" | "hospital_id" | "results"> & {
   hospital_id?: string;
 };
+
+// Used when saving parameters (without id/test_id/hospital_id)
+export interface ParameterSaveInput {
+  name: string;
+  unit: string;
+  ranges: Omit<ParameterRange, "id" | "parameter_id">[];
+}

@@ -1201,37 +1201,73 @@ export type Database = {
           },
         ]
       }
-      lab_test_parameters: {
+      lab_test_parameter_ranges: {
         Row: {
+          created_at: string
           hospital_id: string
           id: string
           max_age: string | null
           min_age: number | null
-          name: string
           normal_range: string | null
+          parameter_id: string
           sex: string
+        }
+        Insert: {
+          created_at?: string
+          hospital_id: string
+          id?: string
+          max_age?: string | null
+          min_age?: number | null
+          normal_range?: string | null
+          parameter_id: string
+          sex?: string
+        }
+        Update: {
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          max_age?: string | null
+          min_age?: number | null
+          normal_range?: string | null
+          parameter_id?: string
+          sex?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_test_parameter_ranges_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_test_parameter_ranges_parameter_id_fkey"
+            columns: ["parameter_id"]
+            isOneToOne: false
+            referencedRelation: "lab_test_parameters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_test_parameters: {
+        Row: {
+          hospital_id: string
+          id: string
+          name: string
           test_id: string
           unit: string | null
         }
         Insert: {
           hospital_id: string
           id?: string
-          max_age?: string | null
-          min_age?: number | null
           name: string
-          normal_range?: string | null
-          sex?: string
           test_id: string
           unit?: string | null
         }
         Update: {
           hospital_id?: string
           id?: string
-          max_age?: string | null
-          min_age?: number | null
           name?: string
-          normal_range?: string | null
-          sex?: string
           test_id?: string
           unit?: string | null
         }

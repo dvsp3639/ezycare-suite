@@ -132,7 +132,7 @@ const Diagnostics = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestCatalogItem | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: "" });
-  const [testParams, setTestParams] = useState<{ name: string; unit: string; normalRange: string }[]>([]);
+  const [testParams, setTestParams] = useState<{ name: string; unit: string; ranges: { normalRange: string; sex: string; minAge: number | null; maxAge: string | null }[] }[]>([]);
 
   const pendingOrders = useMemo(() =>
     allLabOrders.filter((o) => o.status !== "Completed"), [allLabOrders]
@@ -323,7 +323,7 @@ const Diagnostics = () => {
 
   const openAddTest = () => {
     setTestForm({ name: "", category: "Blood", price: "" });
-    setTestParams([{ name: "", unit: "", normalRange: "" }]);
+    setTestParams([{ name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]);
     setEditTest(null);
     setShowAddTest(true);
   };
@@ -332,14 +332,19 @@ const Diagnostics = () => {
     setTestForm({ name: test.name, category: test.category, price: String(test.price) });
     setTestParams(
       (test.parameters || []).length > 0
-        ? (test.parameters || []).map((p: any) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || p.normal_range || "" }))
-        : [{ name: "", unit: "", normalRange: "" }]
+        ? (test.parameters || []).map((p: any) => ({
+            name: p.name, unit: p.unit || "",
+            ranges: (p.ranges || []).map((r: any) => ({
+              normalRange: r.normalRange || r.normal_range || "", sex: r.sex || "any", minAge: r.minAge ?? null, maxAge: r.maxAge ?? null,
+            })),
+          }))
+        : [{ name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]
     );
     setEditTest(test);
     setShowAddTest(true);
   };
 
-  const addParamRow = () => setTestParams((prev) => [...prev, { name: "", unit: "", normalRange: "" }]);
+  const addParamRow = () => setTestParams((prev) => [...prev, { name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]);
   const removeParamRow = (idx: number) => setTestParams((prev) => prev.filter((_, i) => i !== idx));
   const updateParamRow = (idx: number, field: string, value: string) => {
     setTestParams((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
@@ -349,12 +354,18 @@ const Diagnostics = () => {
     if (!testForm.name.trim()) { toast.error("Test name is required"); return; }
     if (!testForm.price || Number(testForm.price) <= 0) { toast.error("Valid price is required"); return; }
     const validParams = testParams.filter((p) => p.name.trim());
+    const paramsSave = validParams.map((p) => ({
+      name: p.name, unit: p.unit,
+      ranges: p.ranges.filter((r) => r.normalRange.trim()).map((r) => ({
+        normal_range: r.normalRange, sex: r.sex || "any", min_age: r.minAge ?? null, max_age: r.maxAge ?? null,
+      })),
+    }));
 
     if (editTest) {
       updateTestMutation.mutate({
         id: editTest.id,
         updates: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
-        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange, sex: (p as any).sex || "any", min_age: (p as any).minAge ?? null, max_age: (p as any).maxAge ?? null })),
+        parameters: paramsSave,
       }, {
         onSuccess: () => { toast.success(`Test "${testForm.name}" updated`); setShowAddTest(false); },
         onError: (err: any) => toast.error(err.message || "Failed to update test"),
@@ -362,7 +373,7 @@ const Diagnostics = () => {
     } else {
       createTestMutation.mutate({
         item: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
-        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange, sex: (p as any).sex || "any", min_age: (p as any).minAge ?? null, max_age: (p as any).maxAge ?? null })),
+        parameters: paramsSave,
       }, {
         onSuccess: () => { toast.success(`Test "${testForm.name}" added to catalog`); setShowAddTest(false); },
         onError: (err: any) => toast.error(err.message || "Failed to add test"),
@@ -887,17 +898,47 @@ const Diagnostics = () => {
                 <Label className="text-sm font-semibold">Parameters</Label>
                 <Button size="sm" variant="outline" onClick={addParamRow}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
               </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto">
                 {testParams.map((p, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
-                    <Input value={p.name} onChange={(e) => updateParamRow(idx, "name", e.target.value)} placeholder="Parameter name" className="text-sm" />
-                    <Input value={p.unit} onChange={(e) => updateParamRow(idx, "unit", e.target.value)} placeholder="Unit" className="text-sm" />
-                    <Input value={p.normalRange} onChange={(e) => updateParamRow(idx, "normalRange", e.target.value)} placeholder="Normal" className="text-sm" />
-                    {testParams.length > 1 && (
-                      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => removeParamRow(idx)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    )}
+                  <div key={idx} className="border border-border rounded-md p-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input value={p.name} onChange={(e) => updateParamRow(idx, "name", e.target.value)} placeholder="Parameter name" className="text-sm flex-1" />
+                      <Input value={p.unit} onChange={(e) => updateParamRow(idx, "unit", e.target.value)} placeholder="Unit" className="text-sm w-20" />
+                      {testParams.length > 1 && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeParamRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="pl-2 border-l-2 border-primary/20 space-y-1">
+                      <div className="grid grid-cols-[1fr_70px_55px_55px_24px] gap-1 text-[10px] font-medium text-muted-foreground">
+                        <span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
+                      </div>
+                      {p.ranges.map((r, ri) => (
+                        <div key={ri} className="grid grid-cols-[1fr_70px_55px_55px_24px] gap-1 items-center">
+                          <Input className="h-6 text-xs" placeholder="e.g. 12-17" value={r.normalRange} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], normalRange: e.target.value }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          <select className="h-6 text-xs border border-input rounded bg-background px-1" value={r.sex} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], sex: e.target.value }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }}>
+                            <option value="any">Any</option><option value="male">Male</option><option value="female">Female</option>
+                          </select>
+                          <Input className="h-6 text-xs" type="number" placeholder="Min" value={r.minAge ?? ""} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], minAge: e.target.value ? Number(e.target.value) : null }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          <Input className="h-6 text-xs" placeholder="Max" value={r.maxAge ?? ""} onChange={(e) => {
+                            const next = [...testParams]; const ranges = [...next[idx].ranges]; ranges[ri] = { ...ranges[ri], maxAge: e.target.value || null }; next[idx] = { ...next[idx], ranges }; setTestParams(next);
+                          }} />
+                          {p.ranges.length > 1 && (
+                            <button type="button" onClick={() => { const next = [...testParams]; next[idx] = { ...next[idx], ranges: next[idx].ranges.filter((_, j) => j !== ri) }; setTestParams(next); }} className="text-destructive/60 hover:text-destructive"><X className="h-3 w-3" /></button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" className="text-[10px] text-primary hover:underline" onClick={() => {
+                        const next = [...testParams]; next[idx] = { ...next[idx], ranges: [...next[idx].ranges, { normalRange: "", sex: "any", minAge: null, maxAge: null }] }; setTestParams(next);
+                      }}>+ Add Range</button>
+                    </div>
                   </div>
                 ))}
               </div>
