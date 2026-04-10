@@ -354,12 +354,18 @@ const Diagnostics = () => {
     if (!testForm.name.trim()) { toast.error("Test name is required"); return; }
     if (!testForm.price || Number(testForm.price) <= 0) { toast.error("Valid price is required"); return; }
     const validParams = testParams.filter((p) => p.name.trim());
+    const paramsSave = validParams.map((p) => ({
+      name: p.name, unit: p.unit,
+      ranges: p.ranges.filter((r) => r.normalRange.trim()).map((r) => ({
+        normal_range: r.normalRange, sex: r.sex || "any", min_age: r.minAge ?? null, max_age: r.maxAge ?? null,
+      })),
+    }));
 
     if (editTest) {
       updateTestMutation.mutate({
         id: editTest.id,
         updates: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
-        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange, sex: (p as any).sex || "any", min_age: (p as any).minAge ?? null, max_age: (p as any).maxAge ?? null })),
+        parameters: paramsSave,
       }, {
         onSuccess: () => { toast.success(`Test "${testForm.name}" updated`); setShowAddTest(false); },
         onError: (err: any) => toast.error(err.message || "Failed to update test"),
@@ -367,7 +373,7 @@ const Diagnostics = () => {
     } else {
       createTestMutation.mutate({
         item: { name: testForm.name, category: testForm.category as any, price: Number(testForm.price) },
-        parameters: validParams.map((p) => ({ name: p.name, unit: p.unit, normal_range: p.normalRange, sex: (p as any).sex || "any", min_age: (p as any).minAge ?? null, max_age: (p as any).maxAge ?? null })),
+        parameters: paramsSave,
       }, {
         onSuccess: () => { toast.success(`Test "${testForm.name}" added to catalog`); setShowAddTest(false); },
         onError: (err: any) => toast.error(err.message || "Failed to add test"),
