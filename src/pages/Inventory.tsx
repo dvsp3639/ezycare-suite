@@ -424,18 +424,26 @@ const Inventory = () => {
 
   const handleEditTest = (test: LabTestDefinition) => {
     setEditTest(test);
-    setTestForm({
-      name: test.name,
-      category: test.category,
-      price: test.price,
-      parameters: "",
-    });
-    setEditParams(test.parameters.map((p) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || "", sex: (p as any).sex || "any", minAge: (p as any).minAge ?? null, maxAge: (p as any).maxAge ?? null })));
+    setTestForm({ name: test.name, category: test.category, price: test.price, parameters: "" });
+    setEditParams(test.parameters.map((p) => ({
+      name: p.name, unit: p.unit || "",
+      ranges: (p.ranges || []).map((r) => ({
+        normalRange: r.normalRange || "", sex: r.sex || "any", minAge: r.minAge ?? null, maxAge: r.maxAge ?? null,
+      })),
+    })));
+    if (!test.parameters.length) {
+      setEditParams([{ name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]);
+    }
   };
 
   const handleSaveEditTest = () => {
     if (!editTest || !testForm.name) { toast.error("Test name required"); return; }
-    const params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim(), sex: p.sex || "any", min_age: p.minAge ?? null, max_age: p.maxAge ?? null }));
+    const params = editParams.filter((p) => p.name.trim()).map((p) => ({
+      name: p.name.trim(), unit: p.unit.trim(),
+      ranges: p.ranges.filter((r) => r.normalRange.trim()).map((r) => ({
+        normal_range: r.normalRange.trim(), sex: r.sex || "any", min_age: r.minAge ?? null, max_age: r.maxAge ?? null,
+      })),
+    }));
     updateTestMutation.mutate({
       id: editTest.id,
       updates: { name: testForm.name, category: testForm.category as any, price: testForm.price },
