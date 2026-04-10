@@ -372,12 +372,11 @@ const Inventory = () => {
   };
 
   // Lab test handlers — persisted to DB
-  const handleAddTest = async () => {
+   const handleAddTest = async () => {
     if (!testForm.name.trim()) { toast.error("Test name required"); return; }
     const hasChildren = selectedChildTests.length > 0;
 
-    // If sub-tests selected, aggregate their parameters automatically
-    let params: { name: string; unit: string; normal_range: string; sex: string; min_age: number | null; max_age: string | null }[] = [];
+    let params: { name: string; unit: string; ranges: { normal_range: string; sex: string; min_age: number | null; max_age: string | null }[] }[] = [];
     if (hasChildren) {
       for (const ct of selectedChildTests) {
         const catalogTest = labTests.find((t) => t.id === ct.id);
@@ -385,15 +384,22 @@ const Inventory = () => {
           params.push(...catalogTest.parameters.map((p) => ({
             name: selectedChildTests.length > 1 ? `${ct.name} - ${p.name}` : p.name,
             unit: p.unit || "",
-            normal_range: p.normalRange || "",
-            sex: (p as any).sex || "any",
-            min_age: (p as any).minAge ?? null,
-            max_age: (p as any).maxAge ?? null,
+            ranges: (p.ranges || []).map((r) => ({
+              normal_range: r.normalRange || "",
+              sex: r.sex || "any",
+              min_age: r.minAge ?? null,
+              max_age: r.maxAge ?? null,
+            })),
           })));
         }
       }
     } else {
-      params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim(), sex: p.sex || "any", min_age: p.minAge ?? null, max_age: p.maxAge ?? null }));
+      params = editParams.filter((p) => p.name.trim()).map((p) => ({
+        name: p.name.trim(), unit: p.unit.trim(),
+        ranges: p.ranges.filter((r) => r.normalRange.trim()).map((r) => ({
+          normal_range: r.normalRange.trim(), sex: r.sex || "any", min_age: r.minAge ?? null, max_age: r.maxAge ?? null,
+        })),
+      }));
     }
 
     const totalPrice = hasChildren
@@ -405,7 +411,6 @@ const Inventory = () => {
       parameters: params,
     }, {
       onSuccess: async (created: any) => {
-        // Save composite_test_items if multiple sub-tests
         if (hasChildren && created?.id) {
           const rows = selectedChildTests.map((ct) => ({ parent_test_id: created.id, child_test_id: ct.id }));
           await supabase.from("composite_test_items" as any).insert(rows);
