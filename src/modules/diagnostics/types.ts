@@ -23,6 +23,7 @@ export interface LabTestCatalogItem {
   name: string;
   category: "Blood" | "Urine" | "Radiology" | "Serology";
   price: number;
+  isFavorite?: boolean;
   created_at: string;
   parameters?: LabTestParameter[];
 }
