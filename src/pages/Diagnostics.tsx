@@ -323,7 +323,7 @@ const Diagnostics = () => {
 
   const openAddTest = () => {
     setTestForm({ name: "", category: "Blood", price: "" });
-    setTestParams([{ name: "", unit: "", normalRange: "" }]);
+    setTestParams([{ name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]);
     setEditTest(null);
     setShowAddTest(true);
   };
@@ -332,14 +332,19 @@ const Diagnostics = () => {
     setTestForm({ name: test.name, category: test.category, price: String(test.price) });
     setTestParams(
       (test.parameters || []).length > 0
-        ? (test.parameters || []).map((p: any) => ({ name: p.name, unit: p.unit || "", normalRange: p.normalRange || p.normal_range || "" }))
-        : [{ name: "", unit: "", normalRange: "" }]
+        ? (test.parameters || []).map((p: any) => ({
+            name: p.name, unit: p.unit || "",
+            ranges: (p.ranges || []).map((r: any) => ({
+              normalRange: r.normalRange || r.normal_range || "", sex: r.sex || "any", minAge: r.minAge ?? null, maxAge: r.maxAge ?? null,
+            })),
+          }))
+        : [{ name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]
     );
     setEditTest(test);
     setShowAddTest(true);
   };
 
-  const addParamRow = () => setTestParams((prev) => [...prev, { name: "", unit: "", normalRange: "" }]);
+  const addParamRow = () => setTestParams((prev) => [...prev, { name: "", unit: "", ranges: [{ normalRange: "", sex: "any", minAge: null, maxAge: null }] }]);
   const removeParamRow = (idx: number) => setTestParams((prev) => prev.filter((_, i) => i !== idx));
   const updateParamRow = (idx: number, field: string, value: string) => {
     setTestParams((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
