@@ -390,7 +390,7 @@ const Inventory = () => {
         }
       }
     } else {
-      params = testForm.parameters.split(",").map((p) => p.trim()).filter(Boolean).map((p) => ({ name: p, unit: "", normal_range: "", sex: "any", min_age: null, max_age: null }));
+      params = editParams.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), unit: p.unit.trim(), normal_range: p.normalRange.trim(), sex: p.sex || "any", min_age: p.minAge ?? null, max_age: p.maxAge ?? null }));
     }
 
     const totalPrice = hasChildren
@@ -1740,9 +1740,33 @@ const Inventory = () => {
               </div>
             )}
             {!editTest && selectedChildTests.length === 0 && (
-              <div>
-                <Label className="text-xs">Parameters (comma separated)</Label>
-                <Input value={testForm.parameters} onChange={(e) => setTestForm((p) => ({ ...p, parameters: e.target.value }))} placeholder="e.g. Hemoglobin, WBC, Platelets" />
+              <div className="space-y-2">
+                <Label className="text-xs">Parameters</Label>
+                {editParams.length > 0 && (
+                  <div className="border border-border rounded-md overflow-hidden overflow-x-auto">
+                    <div className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 bg-muted/50 text-[10px] font-medium text-muted-foreground min-w-[520px]">
+                      <span>Name</span><span>Unit</span><span>Normal Range</span><span>Sex</span><span>Min Age</span><span>Max Age</span><span></span>
+                    </div>
+                    {editParams.map((p, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_70px_90px_70px_60px_60px_32px] gap-1 px-2 py-1 border-t border-border min-w-[520px]">
+                        <Input className="h-7 text-xs" value={p.name} placeholder="Name" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], name: e.target.value }; setEditParams(next); }} />
+                        <Input className="h-7 text-xs" value={p.unit} placeholder="Unit" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], unit: e.target.value }; setEditParams(next); }} />
+                        <Input className="h-7 text-xs" value={p.normalRange} placeholder="Range" onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], normalRange: e.target.value }; setEditParams(next); }} />
+                        <select className="h-7 text-xs border border-input rounded-md bg-background px-1" value={p.sex} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], sex: e.target.value }; setEditParams(next); }}>
+                          <option value="any">Any</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                        <Input className="h-7 text-xs" type="number" placeholder="Min" value={p.minAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], minAge: e.target.value ? Number(e.target.value) : null }; setEditParams(next); }} />
+                        <Input className="h-7 text-xs" placeholder="Max" value={p.maxAge ?? ""} onChange={(e) => { const next = [...editParams]; next[i] = { ...next[i], maxAge: e.target.value || null }; setEditParams(next); }} />
+                        <button type="button" onClick={() => setEditParams(editParams.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex items-center justify-center"><XCircle className="h-3.5 w-3.5" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setEditParams([...editParams, { name: "", unit: "", normalRange: "", sex: "any", minAge: null, maxAge: null }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Parameter
+                </Button>
               </div>
             )}
           </div>
