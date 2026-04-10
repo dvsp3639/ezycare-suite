@@ -1,18 +1,31 @@
 import { supabase } from "@/integrations/supabase/client";
 import { snakeToCamel, camelToSnake } from "@/lib/caseConverter";
-import type { LabTestCatalogItem, LabOrder, LabResult, LabOrderInsert, LabTestParameter } from "./types";
+import type { LabTestCatalogItem, LabOrder, LabResult, LabOrderInsert, LabTestParameter, ParameterRange, ParameterSaveInput } from "./types";
 
 export const diagnosticsService = {
   // ─── Test Catalog ───
   async getTestCatalog(): Promise<LabTestCatalogItem[]> {
     const { data, error } = await supabase
       .from("lab_test_catalog")
-      .select("*, lab_test_parameters(*)")
+      .select("*, lab_test_parameters(*, lab_test_parameter_ranges(*))")
       .order("name");
     if (error) throw error;
     return (data || []).map((d: any) => ({
       ...snakeToCamel(d),
-      parameters: (d.lab_test_parameters || []).map((p: any) => snakeToCamel(p)),
+      parameters: (d.lab_test_parameters || []).map((p: any) => ({
+        id: p.id,
+        testId: p.test_id,
+        name: p.name,
+        unit: p.unit || "",
+        ranges: (p.lab_test_parameter_ranges || []).map((r: any) => ({
+          id: r.id,
+          parameterId: r.parameter_id,
+          sex: r.sex || "any",
+          minAge: r.min_age,
+          maxAge: r.max_age,
+          normalRange: r.normal_range || "",
+        })),
+      })),
     })) as LabTestCatalogItem[];
   },
 
@@ -37,7 +50,7 @@ export const diagnosticsService = {
   },
 
   async deleteTestCatalogItem(id: string): Promise<void> {
-    // Delete related records in parallel, then the test itself
+    // Delete parameters (cascades to ranges), composite items, then the test
     await Promise.all([
       supabase.from("lab_test_parameters").delete().eq("test_id", id),
       supabase.from("composite_test_items").delete().eq("parent_test_id", id),
@@ -47,13 +60,35 @@ export const diagnosticsService = {
     if (error) throw error;
   },
 
-  // ─── Test Parameters ───
-  async saveTestParameters(testId: string, params: Omit<LabTestParameter, "id" | "test_id" | "hospital_id">[]): Promise<void> {
+  // ─── Test Parameters with Ranges ───
+  async saveTestParameters(testId: string, params: ParameterSaveInput[]): Promise<void> {
+    // Delete existing parameters (cascades to ranges)
     await supabase.from("lab_test_parameters").delete().eq("test_id", testId);
-    if (params.length > 0) {
-      const rows = params.map((p) => ({ ...camelToSnake(p), test_id: testId }));
-      const { error } = await supabase.from("lab_test_parameters").insert(rows as any);
-      if (error) throw error;
+    if (params.length === 0) return;
+
+    // Insert parameters one at a time to get IDs back for ranges
+    for (const p of params) {
+      const { data: paramData, error: paramError } = await supabase
+        .from("lab_test_parameters")
+        .insert({ test_id: testId, name: p.name, unit: p.unit || "" } as any)
+        .select()
+        .single();
+      if (paramError) throw paramError;
+
+      // Insert ranges for this parameter
+      if (p.ranges.length > 0) {
+        const rangeRows = p.ranges.map((r) => ({
+          parameter_id: paramData.id,
+          sex: r.sex || "any",
+          min_age: r.min_age ?? null,
+          max_age: r.max_age ?? null,
+          normal_range: r.normal_range || "",
+        }));
+        const { error: rangeError } = await supabase
+          .from("lab_test_parameter_ranges")
+          .insert(rangeRows as any);
+        if (rangeError) throw rangeError;
+      }
     }
   },
 
@@ -107,7 +142,6 @@ export const diagnosticsService = {
       const { error } = await supabase.from("lab_results").insert(rows as any);
       if (error) throw error;
     }
-    // Always mark as Completed when saving results
     const updateData: any = {
       report_notes: reportNotes ?? "",
       status: "Completed",
