@@ -1172,6 +1172,7 @@ export type Database = {
           created_at: string
           hospital_id: string
           id: string
+          is_favorite: boolean
           name: string
           price: number
         }
@@ -1180,6 +1181,7 @@ export type Database = {
           created_at?: string
           hospital_id: string
           id?: string
+          is_favorite?: boolean
           name: string
           price?: number
         }
@@ -1188,6 +1190,7 @@ export type Database = {
           created_at?: string
           hospital_id?: string
           id?: string
+          is_favorite?: boolean
           name?: string
           price?: number
         }
