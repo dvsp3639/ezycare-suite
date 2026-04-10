@@ -927,7 +927,8 @@ const Inventory = () => {
 
           {allLabCategories.map((cat) => {
             const searchLower = labTestSearch.toLowerCase().trim();
-            const tests = labTests.filter((t) => t.category === cat && (
+            const isFavCat = cat === "Favourites";
+            const tests = labTests.filter((t) => (isFavCat ? t.isFavorite : t.category === cat) && (
               !searchLower ||
               t.name.toLowerCase().includes(searchLower) ||
               t.parameters.some((p) => p.name.toLowerCase().includes(searchLower))
