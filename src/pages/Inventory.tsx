@@ -136,8 +136,11 @@ const Inventory = () => {
         id: t.id, name: t.name, category: t.category || "Blood",
         price: t.price || 0,
         parameters: (t.parameters || []).map((p: any) => ({
-          name: p.name, unit: p.unit || "", normalRange: p.normalRange || "",
-          sex: p.sex || "any", minAge: p.minAge ?? null, maxAge: p.maxAge ?? null,
+          name: p.name, unit: p.unit || "",
+          ranges: (p.ranges || []).map((r: any) => ({
+            normalRange: r.normalRange || r.normal_range || "",
+            sex: r.sex || "any", minAge: r.minAge ?? r.min_age ?? null, maxAge: r.maxAge ?? r.max_age ?? null,
+          })),
         })),
       })));
       // Sync custom categories from DB (including placeholder categories)
@@ -183,7 +186,7 @@ const Inventory = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestDefinition | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: 0, parameters: "" });
-  const [editParams, setEditParams] = useState<{ name: string; unit: string; normalRange: string; sex: string; minAge: number | null; maxAge: string | null }[]>([]);
+  const [editParams, setEditParams] = useState<{ name: string; unit: string; ranges: { normalRange: string; sex: string; minAge: number | null; maxAge: string | null }[] }[]>([]);
   const [compositeSearch, setCompositeSearch] = useState("");
   const [selectedChildTests, setSelectedChildTests] = useState<{ id: string; name: string; price: number }[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
