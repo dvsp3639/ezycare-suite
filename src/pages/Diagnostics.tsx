@@ -132,7 +132,7 @@ const Diagnostics = () => {
   const [showAddTest, setShowAddTest] = useState(false);
   const [editTest, setEditTest] = useState<LabTestCatalogItem | null>(null);
   const [testForm, setTestForm] = useState({ name: "", category: "Blood" as string, price: "" });
-  const [testParams, setTestParams] = useState<{ name: string; unit: string; normalRange: string }[]>([]);
+  const [testParams, setTestParams] = useState<{ name: string; unit: string; ranges: { normalRange: string; sex: string; minAge: number | null; maxAge: string | null }[] }[]>([]);
 
   const pendingOrders = useMemo(() =>
     allLabOrders.filter((o) => o.status !== "Completed"), [allLabOrders]
