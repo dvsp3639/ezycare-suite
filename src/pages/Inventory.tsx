@@ -891,9 +891,10 @@ const Inventory = () => {
 
            {/* Category management chips — clickable to scroll */}
            <div className="flex flex-wrap gap-2 mb-4">
-             {allLabCategories.map((cat) => {
-               const isCustom = labCustomCategories.includes(cat);
-               const count = labTests.filter((t) => t.category === cat).length;
+              {allLabCategories.map((cat) => {
+                const isCustom = labCustomCategories.includes(cat);
+                const isFavCat = cat === "Favourites";
+                const count = isFavCat ? labTests.filter((t) => t.isFavorite).length : labTests.filter((t) => t.category === cat).length;
                return (
                  <Badge
                    key={cat}
@@ -904,13 +905,14 @@ const Inventory = () => {
                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                    }}
                  >
-                   {cat} ({count})
-                   {isCustom && (
-                     <>
-                       <button onClick={(e) => { e.stopPropagation(); setEditLabCategory({ old: cat, new: cat }); }} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
-                       <button onClick={(e) => { e.stopPropagation(); handleRemoveLabCategory(cat); }} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
-                     </>
-                   )}
+                    {isFavCat && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                    {cat} ({count})
+                    {isCustom && !isFavCat && (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); setEditLabCategory({ old: cat, new: cat }); }} className="hover:text-primary"><Edit className="h-3 w-3" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleRemoveLabCategory(cat); }} className="hover:text-destructive"><XCircle className="h-3 w-3" /></button>
+                      </>
+                    )}
                  </Badge>
                );
              })}
