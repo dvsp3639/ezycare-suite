@@ -937,7 +937,7 @@ const Inventory = () => {
             return (
               <div key={cat} id={`lab-cat-${cat.replace(/\s+/g, "-")}`} className="mb-6 scroll-mt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  {cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
+                  {cat === "Favourites" && "⭐"}{cat === "Blood" && "🩸"}{cat === "Urine" && "🧪"}{cat === "Radiology" && "📷"}{cat === "Serology" && "🔬"}
                   {cat} Tests ({tests.length})
                 </h3>
                 <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -981,6 +981,16 @@ const Inventory = () => {
                           <TableCell className="text-right text-sm">₹{t.price}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={() => {
+                                  const newVal = !t.isFavorite;
+                                  setLabTests((prev) => prev.map((x) => x.id === t.id ? { ...x, isFavorite: newVal } : x));
+                                  toggleFavoriteMutation.mutate({ id: t.id, isFavorite: newVal });
+                                }}
+                              >
+                                <Star className={cn("h-3.5 w-3.5", t.isFavorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTest(t)}>
                                 <Edit className="h-3.5 w-3.5" />
                               </Button>
