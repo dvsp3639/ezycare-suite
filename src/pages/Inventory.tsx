@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import {
   Package, Search, Plus, Edit, Trash2, ArrowLeftRight, BarChart3,
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
-  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble,
+  Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble, Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +28,7 @@ import type { LabCategory } from "@/data/mockClinicData";
 import { useWardsBeds } from "@/contexts/WardsBedContext";
 import { useInventoryItems, useStockTransfers } from "@/modules/inventory/hooks";
 import {
-  useLabTestCatalog, useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem,
+  useLabTestCatalog, useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem, useToggleFavorite,
 } from "@/modules/diagnostics/hooks";
 
 // ──── Asset Types ────
@@ -93,6 +93,7 @@ const Inventory = () => {
   const createTestMutation = useCreateTestCatalogItem();
   const updateTestMutation = useUpdateTestCatalogItem();
   const deleteTestMutation = useDeleteTestCatalogItem();
+  const toggleFavoriteMutation = useToggleFavorite();
 
   const [activeTab, setActiveTab] = useState("stock");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -135,7 +136,7 @@ const Inventory = () => {
       const allTests = (dbLabCatalog as any[]).filter((t: any) => !t.name?.startsWith("__placeholder_"));
       setLabTests(allTests.map((t: any) => ({
         id: t.id, name: t.name, category: t.category || "Blood",
-        price: t.price || 0,
+        price: t.price || 0, isFavorite: t.isFavorite ?? false,
         parameters: (t.parameters || []).map((p: any) => ({
           name: p.name, unit: p.unit || "",
           ranges: (p.ranges || []).map((r: any) => ({
