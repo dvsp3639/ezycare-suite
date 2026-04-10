@@ -952,8 +952,18 @@ const Inventory = () => {
                                   <div key={i}>
                                     <span className="font-medium text-foreground/80">{p.name}</span>
                                     {p.unit && <span className="ml-1">({p.unit})</span>}
-                                    {p.normalRange && <span className="ml-1 text-muted-foreground">Normal: {p.normalRange}</span>}
-                                    {(p as any).sex && (p as any).sex !== "any" && <span className="ml-1 text-xs text-primary/70">[{(p as any).sex}]</span>}
+                                    {p.ranges && p.ranges.length > 0 && (
+                                      <span className="ml-1 text-muted-foreground">
+                                        {p.ranges.map((r, ri) => (
+                                          <span key={ri}>
+                                            {ri > 0 && " | "}
+                                            {r.normalRange}
+                                            {r.sex && r.sex !== "any" && <span className="text-xs text-primary/70"> [{r.sex}]</span>}
+                                            {(r.minAge != null || r.maxAge != null) && <span className="text-xs text-muted-foreground/70"> ({r.minAge ?? 0}-{r.maxAge ?? "∞"}y)</span>}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                               </div>
