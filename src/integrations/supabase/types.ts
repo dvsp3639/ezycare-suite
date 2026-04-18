@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           appointment_date: string
           check_in_time: string | null
+          consultation_fee: number | null
           created_at: string
           diagnosis: string | null
           doctor_name: string
@@ -28,6 +29,8 @@ export type Database = {
           opd_type: string
           patient_id: string | null
           patient_name: string
+          payment_mode: string | null
+          payment_status: string | null
           registration_number: string
           status: string
           time_slot: string | null
@@ -37,6 +40,7 @@ export type Database = {
         Insert: {
           appointment_date?: string
           check_in_time?: string | null
+          consultation_fee?: number | null
           created_at?: string
           diagnosis?: string | null
           doctor_name: string
@@ -47,6 +51,8 @@ export type Database = {
           opd_type?: string
           patient_id?: string | null
           patient_name: string
+          payment_mode?: string | null
+          payment_status?: string | null
           registration_number: string
           status?: string
           time_slot?: string | null
@@ -56,6 +62,7 @@ export type Database = {
         Update: {
           appointment_date?: string
           check_in_time?: string | null
+          consultation_fee?: number | null
           created_at?: string
           diagnosis?: string | null
           doctor_name?: string
@@ -66,6 +73,8 @@ export type Database = {
           opd_type?: string
           patient_id?: string | null
           patient_name?: string
+          payment_mode?: string | null
+          payment_status?: string | null
           registration_number?: string
           status?: string
           time_slot?: string | null
@@ -1533,6 +1542,62 @@ export type Database = {
           },
         ]
       }
+      operating_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          expense_date: string
+          hospital_id: string
+          id: string
+          notes: string | null
+          payment_mode: string | null
+          reference_no: string | null
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          expense_date?: string
+          hospital_id: string
+          id?: string
+          notes?: string | null
+          payment_mode?: string | null
+          reference_no?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          expense_date?: string
+          hospital_id?: string
+          id?: string
+          notes?: string | null
+          payment_mode?: string | null
+          reference_no?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operating_expenses_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null
@@ -1801,6 +1866,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      purchase_bills: {
+        Row: {
+          bill_date: string
+          bill_type: string
+          created_at: string
+          discount: number | null
+          gst_amount: number | null
+          hospital_id: string
+          id: string
+          invoice_no: string | null
+          notes: string | null
+          payment_mode: string | null
+          payment_status: string | null
+          subtotal: number | null
+          total_amount: number
+          updated_at: string
+          vendor: string
+        }
+        Insert: {
+          bill_date?: string
+          bill_type?: string
+          created_at?: string
+          discount?: number | null
+          gst_amount?: number | null
+          hospital_id: string
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          payment_mode?: string | null
+          payment_status?: string | null
+          subtotal?: number | null
+          total_amount?: number
+          updated_at?: string
+          vendor?: string
+        }
+        Update: {
+          bill_date?: string
+          bill_type?: string
+          created_at?: string
+          discount?: number | null
+          gst_amount?: number | null
+          hospital_id?: string
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          payment_mode?: string | null
+          payment_status?: string | null
+          subtotal?: number | null
+          total_amount?: number
+          updated_at?: string
+          vendor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_bills_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       registration_counters: {
         Row: {
