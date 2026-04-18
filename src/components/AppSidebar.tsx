@@ -46,40 +46,46 @@ export function AppSidebar() {
         )}
       </div>
 
-      <SidebarContent>
-        <SidebarGroup>
+      <SidebarContent className="flex flex-col flex-1 overflow-hidden">
+        <SidebarGroup className="py-2">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => navigate("/dashboard")}
-                  className={`${isActive("/dashboard") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"}`}
+                  className={`rounded-lg transition-colors ${isActive("/dashboard") ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-sidebar-accent/60"}`}
                 >
                   <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
-                  {!collapsed && <span>Dashboard</span>}
+                  {!collapsed && <span className="text-sm">Dashboard</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-muted text-[10px] uppercase tracking-wider">
+        <SidebarGroup className="flex-1 flex flex-col min-h-0 pb-2">
+          <SidebarGroupLabel className="text-sidebar-muted text-[10px] uppercase tracking-wider px-3 flex-shrink-0">
             {!collapsed ? "Modules" : ""}
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleModules.map((mod) => (
-                <SidebarMenuItem key={mod.id}>
-                  <SidebarMenuButton
-                    onClick={() => navigate(mod.route)}
-                    className={`${isActive(mod.route) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"}`}
-                  >
-                    <mod.icon className="h-4 w-4 flex-shrink-0" />
-                    {!collapsed && <span className="text-sm">{mod.title}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+          <SidebarGroupContent className="flex-1 flex flex-col min-h-0">
+            <SidebarMenu className="flex-1 flex flex-col justify-evenly gap-0.5 overflow-y-auto">
+              {visibleModules.map((mod) => {
+                const active = isActive(mod.route);
+                return (
+                  <SidebarMenuItem key={mod.id}>
+                    <SidebarMenuButton
+                      onClick={() => navigate(mod.route)}
+                      className={`rounded-lg transition-all duration-150 group relative ${active ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm" : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:translate-x-0.5"}`}
+                    >
+                      {active && !collapsed && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 bg-sidebar-primary rounded-r-full" />
+                      )}
+                      <mod.icon className="h-4 w-4 flex-shrink-0" />
+                      {!collapsed && <span className="text-sm truncate">{mod.title}</span>}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
