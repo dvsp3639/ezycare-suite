@@ -46,14 +46,16 @@ export function AppSidebar() {
         )}
       </div>
 
-      <SidebarContent className="flex flex-col flex-1 overflow-hidden">
-        <SidebarGroup className="py-2">
+      <SidebarContent className="flex flex-col flex-1 overflow-hidden gap-0">
+        <SidebarGroup className="py-2 px-2">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => navigate("/dashboard")}
-                  className={`rounded-lg transition-colors ${isActive("/dashboard") ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-sidebar-accent/60"}`}
+                  tooltip={collapsed ? "Dashboard" : undefined}
+                  isActive={isActive("/dashboard")}
+                  className="h-9 rounded-lg text-sidebar-foreground/90 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium data-[active=true]:shadow-sm transition-colors"
                 >
                   <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
                   {!collapsed && <span className="text-sm">Dashboard</span>}
@@ -63,22 +65,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="flex-1 flex flex-col min-h-0 pb-2">
-          <SidebarGroupLabel className="text-sidebar-muted text-[10px] uppercase tracking-wider px-3 flex-shrink-0">
-            {!collapsed ? "Modules" : ""}
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 flex flex-col min-h-0">
-            <SidebarMenu className="flex-1 flex flex-col justify-evenly gap-0.5 overflow-y-auto">
+        <SidebarGroup className="flex-1 flex flex-col min-h-0 px-2 pb-2">
+          {!collapsed && (
+            <SidebarGroupLabel className="text-sidebar-muted text-[10px] uppercase tracking-wider px-2 mb-1 flex-shrink-0">
+              Modules
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto">
+            <SidebarMenu className="gap-0.5">
               {visibleModules.map((mod) => {
                 const active = isActive(mod.route);
                 return (
                   <SidebarMenuItem key={mod.id}>
                     <SidebarMenuButton
                       onClick={() => navigate(mod.route)}
-                      className={`rounded-lg transition-all duration-150 group relative ${active ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm" : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:translate-x-0.5"}`}
+                      tooltip={collapsed ? mod.title : undefined}
+                      isActive={active}
+                      className="h-9 rounded-lg relative text-sidebar-foreground/90 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium data-[active=true]:shadow-sm transition-colors"
                     >
                       {active && !collapsed && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 bg-sidebar-primary rounded-r-full" />
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] bg-sidebar-primary rounded-r-full" />
                       )}
                       <mod.icon className="h-4 w-4 flex-shrink-0" />
                       {!collapsed && <span className="text-sm truncate">{mod.title}</span>}
