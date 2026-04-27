@@ -626,8 +626,8 @@ const Pharmacy = () => {
               <div className="space-y-4">
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Patient</span>
-                    <span className="font-medium text-foreground">{selectedPatient.name}</span>
+                    <span className="text-muted-foreground">{isDirectSale ? "Customer" : "Patient"}</span>
+                    <span className="font-medium text-foreground">{activeCustomerName}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Items</span>
@@ -653,8 +653,8 @@ const Pharmacy = () => {
                   </div>
                 </div>
 
-                {/* Payment Mode — only IP gets Cash/Credit choice */}
-                {isIP ? (
+                {/* Payment Mode */}
+                {isIP || isDirectSale ? (
                   <div>
                     <Label className="text-sm mb-2 block">Payment Mode</Label>
                     <div className="grid grid-cols-2 gap-3">
@@ -704,7 +704,7 @@ const Pharmacy = () => {
       )}
 
       {/* Order Completed */}
-      {orderCompleted && selectedPatient && (
+      {orderCompleted && (selectedPatient || isDirectSale) && (
         <div className="bg-card rounded-xl border border-border p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="h-8 w-8 text-success" />
@@ -713,11 +713,11 @@ const Pharmacy = () => {
             {isReturn ? "Return Processed" : "Payment Successful"}
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            {issueType} for {selectedPatient.name} ({selectedPatient.registrationNumber})
+            {issueType} for {activeCustomerName} ({activeRegistration})
           </p>
           <div className="inline-block bg-muted/50 rounded-lg px-6 py-3 mb-6">
             <p className="text-2xl font-bold text-primary">₹{netAmount.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">{isIP ? paymentMode : "Cash"} · {orderItems.length} items</p>
+            <p className="text-xs text-muted-foreground">{isIP || isDirectSale ? paymentMode : "Cash"} · {orderItems.length} items</p>
           </div>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={handlePrintReceipt} className="gap-2">
