@@ -210,6 +210,10 @@ const Pharmacy = () => {
   };
 
   const handleProceedToPayment = () => {
+    if (isDirectSale && !directCustomer.name.trim()) {
+      toast.error("Please enter customer name");
+      return;
+    }
     if (orderItems.length === 0) {
       toast.error("Add at least one medicine");
       return;
@@ -218,12 +222,16 @@ const Pharmacy = () => {
   };
 
   const handleCompleteOrder = async () => {
+    if (isDirectSale && !directCustomer.name.trim()) {
+      toast.error("Please enter customer name");
+      return;
+    }
     if ((isIP || isDirectSale) && !paymentMode) {
       toast.error("Please select a payment mode");
       return;
     }
     const finalPaymentMode = isIP || isDirectSale ? paymentMode : "Cash";
-    const customerName = isDirectSale ? directCustomer.name.trim() || "Walk-in Customer" : selectedPatient?.name || "";
+    const customerName = isDirectSale ? directCustomer.name.trim() : selectedPatient?.name || "";
     try {
       await pharmacyService.completeSale(
         {
@@ -358,7 +366,7 @@ const Pharmacy = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm mb-2 block">Customer Name</Label>
-              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Enter customer name (optional)" />
+              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Enter customer name" required maxLength={100} />
             </div>
             <div>
               <Label className="text-sm mb-2 block">Mobile (optional)</Label>
