@@ -313,28 +313,32 @@ const Pharmacy = () => {
       </div>
 
       {/* Issue Type Selector */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {(["IP Sale", "IP Return", "OP Sale", "OP Return"] as IssueType[]).map((type) => {
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        {(["Direct Sale", "IP Sale", "IP Return", "OP Sale", "OP Return"] as IssueType[]).map((type) => {
           const isActive = issueType === type;
           const isReturnType = type.includes("Return");
+          const isDirectType = type === "Direct Sale";
           return (
             <button
               key={type}
-              onClick={() => { setIssueType(type); handleNewTransaction(); }}
+              onClick={() => { setIssueType(type); type === "Direct Sale" ? handleStartDirectSale() : handleNewTransaction(); }}
               className={cn(
-                "rounded-xl border-2 p-4 text-center transition-all font-medium text-sm",
+                "rounded-xl border-2 p-4 text-center transition-all font-medium text-sm min-h-28",
                 isActive
-                  ? isReturnType
+                  ? isDirectType
+                    ? "border-success bg-success/5 text-success"
+                    : isReturnType
                     ? "border-destructive bg-destructive/5 text-destructive"
                     : "border-primary bg-primary/5 text-primary"
                   : "border-border bg-card text-muted-foreground hover:border-muted-foreground/40"
               )}
             >
               <div className="flex items-center justify-center gap-2 mb-1">
-                {isReturnType ? <Package className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                {isReturnType ? <Package className="h-4 w-4" /> : isDirectType ? <Banknote className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                 {type}
               </div>
               <p className="text-xs opacity-70">
+                {type === "Direct Sale" && "Walk-in pharmacy counter sale"}
                 {type === "IP Sale" && "In-Patient Medicine Issue"}
                 {type === "IP Return" && "In-Patient Medicine Return"}
                 {type === "OP Sale" && "Out-Patient Medicine Issue"}
