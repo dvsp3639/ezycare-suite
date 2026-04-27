@@ -106,6 +106,9 @@ const Pharmacy = () => {
   const isReturn = issueType.includes("Return");
   const isIP = issueType.startsWith("IP");
   const isDirectSale = issueType === "Direct Sale";
+  const activeCustomerName = isDirectSale ? directCustomer.name.trim() || "Walk-in Customer" : selectedPatient?.name || "";
+  const activeCustomerMobile = isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "";
+  const activeRegistration = isDirectSale ? "Direct Sale" : selectedPatient?.registrationNumber || "";
 
   const subtotal = orderItems.reduce((s, i) => s + i.amount, 0);
   const gstAmount = orderItems.reduce(
@@ -259,10 +262,10 @@ const Pharmacy = () => {
     setPaymentMode("");
     setSearchQuery("");
     setGlobalDiscount(0);
+    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
   };
 
   const handlePrintReceipt = () => {
-    if (!selectedPatient) return;
     const pw = window.open("", "_blank");
     if (!pw) return;
     pw.document.write(`
@@ -281,8 +284,8 @@ const Pharmacy = () => {
       </style></head><body>
       <div class="header"><h1>EzyOp Pharmacy</h1><p>${issueType} Receipt</p></div>
       <div class="info-row">
-        <div><strong>Patient:</strong> ${selectedPatient.name}<br/><strong>Reg No:</strong> ${selectedPatient.registrationNumber}<br/><strong>Mobile:</strong> ${selectedPatient.mobile}</div>
-        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${selectedPatient.doctor}<br/><strong>Age/Gender:</strong> ${selectedPatient.age}/${selectedPatient.gender}</div>
+        <div><strong>Customer:</strong> ${activeCustomerName}<br/><strong>Ref:</strong> ${activeRegistration}<br/><strong>Mobile:</strong> ${activeCustomerMobile || "—"}</div>
+        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${selectedPatient?.doctor || "—"}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${selectedPatient.age}/${selectedPatient.gender}` : "—"}</div>
       </div>
       <table><thead><tr><th>#</th><th>Medicine</th><th>Batch</th><th>Qty</th><th>MRP (₹)</th><th>GST%</th><th>Amount (₹)</th></tr></thead>
       <tbody>${orderItems.map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.medicineName}</td><td>${i.batchNo}</td><td>${i.quantity}</td><td>${i.mrp.toFixed(2)}</td><td>${i.gstPercent}%</td><td>${i.amount.toFixed(2)}</td></tr>`).join("")}</tbody></table>
@@ -291,7 +294,7 @@ const Pharmacy = () => {
         <p>GST: ₹${gstAmount.toFixed(2)}</p>
         ${globalDiscount > 0 ? `<p>Discount (${globalDiscount}%): -₹${discountAmount.toFixed(2)}</p>` : ""}
         <p><strong>Net Amount: ₹${netAmount.toFixed(2)}</strong></p>
-        <p>Payment: ${isIP ? paymentMode : "Cash"}</p>
+        <p>Payment: ${isIP || isDirectSale ? paymentMode : "Cash"}</p>
       </div>
       <div class="footer"><p>Thank you – Get well soon!</p></div>
       </body></html>
