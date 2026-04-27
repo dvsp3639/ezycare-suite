@@ -349,8 +349,27 @@ const Pharmacy = () => {
         })}
       </div>
 
+      {isDirectSale && !orderCompleted && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Banknote className="h-4 w-4 text-success" />
+            <h2 className="font-semibold text-sm text-foreground">Direct Counter Sale</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm mb-2 block">Customer Name</Label>
+              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Walk-in Customer" />
+            </div>
+            <div>
+              <Label className="text-sm mb-2 block">Mobile (optional)</Label>
+              <Input value={directCustomer.mobile} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, mobile: e.target.value }))} placeholder="Customer mobile" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Patient Search */}
-      {!selectedPatient && (
+      {!selectedPatient && !isDirectSale && (
         <div className="bg-card rounded-xl border border-border p-6 mb-6">
           <Label className="text-sm font-medium text-foreground mb-2 block">Search Patient</Label>
           <div className="relative">
@@ -389,9 +408,9 @@ const Pharmacy = () => {
       )}
 
       {/* Patient Header */}
-      {selectedPatient && !orderCompleted && (
+      {(selectedPatient || isDirectSale) && !orderCompleted && (
         <>
-          <div className="bg-card rounded-xl border border-border p-4 mb-6">
+          {selectedPatient && <div className="bg-card rounded-xl border border-border p-4 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
@@ -415,7 +434,7 @@ const Pharmacy = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Order Source Selection */}
           {orderSource === null && (
