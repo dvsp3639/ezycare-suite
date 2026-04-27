@@ -21,7 +21,11 @@ export interface Medicine {
 export interface PharmacyOrder {
   id: string;
   hospitalId: string;
-  issueType: "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
+  issueType: "IP Sale" | "IP Return" | "OP Sale" | "OP Return" | "Direct Sale";
+  saleChannel: "Patient" | "Direct";
+  invoiceNo: string;
+  customerName: string;
+  customerMobile: string;
   patientName: string;
   registrationNumber: string;
   mobile: string;
@@ -35,6 +39,7 @@ export interface PharmacyOrder {
   netAmount: number;
   paymentMode: string;
   status: "Draft" | "Completed";
+  completedAt: string | null;
   createdAt: string;
   items?: PharmacyOrderItem[];
 }
