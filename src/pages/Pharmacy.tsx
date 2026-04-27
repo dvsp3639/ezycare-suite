@@ -30,7 +30,7 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 
-type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
+type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
@@ -68,6 +68,7 @@ const Pharmacy = () => {
   const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit" | "">("");
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [directCustomer, setDirectCustomer] = useState({ name: "Walk-in Customer", mobile: "" });
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -104,6 +105,7 @@ const Pharmacy = () => {
   // Calculations
   const isReturn = issueType.includes("Return");
   const isIP = issueType.startsWith("IP");
+  const isDirectSale = issueType === "Direct Sale";
 
   const subtotal = orderItems.reduce((s, i) => s + i.amount, 0);
   const gstAmount = orderItems.reduce(
