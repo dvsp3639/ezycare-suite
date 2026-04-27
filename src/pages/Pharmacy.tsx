@@ -151,6 +151,18 @@ const Pharmacy = () => {
     setOrderSource("manual");
   };
 
+  const handleStartDirectSale = () => {
+    setSelectedPatient(null);
+    setSearchQuery("");
+    setOrderItems([]);
+    setOrderSource("manual");
+    setShowPayment(false);
+    setOrderCompleted(false);
+    setPaymentMode("Cash");
+    setGlobalDiscount(0);
+    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
+  };
+
   const addMedicine = (med: Medicine) => {
     const existing = orderItems.find((i) => i.medicineId === med.id);
     if (existing) {
@@ -203,17 +215,20 @@ const Pharmacy = () => {
   };
 
   const handleCompleteOrder = async () => {
-    if (isIP && !paymentMode) {
+    if ((isIP || isDirectSale) && !paymentMode) {
       toast.error("Please select a payment mode");
       return;
     }
-    const finalPaymentMode = isIP ? paymentMode : "Cash";
+    const finalPaymentMode = isIP || isDirectSale ? paymentMode : "Cash";
+    const customerName = isDirectSale ? directCustomer.name.trim() || "Walk-in Customer" : selectedPatient?.name || "";
     try {
-      await pharmacyService.createOrder(
+      await pharmacyService.completeSale(
         {
-          patient_name: selectedPatient?.name || "", registration_number: selectedPatient?.registrationNumber || "",
-          doctor_name: doctorPrescription?.doctorName || "", issue_type: issueType, issue_date: new Date().toISOString().split("T")[0],
-          age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: selectedPatient?.mobile || "",
+          patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
+          customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
+          sale_channel: isDirectSale ? "Direct" : "Patient",
+          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: new Date().toISOString().split("T")[0],
+          age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           total_amount: subtotal, discount: discountAmount, gst_amount: gstAmount, net_amount: netAmount,
           payment_mode: finalPaymentMode, status: "Completed",
         } as any,
@@ -223,19 +238,12 @@ const Pharmacy = () => {
           hospital_id: hospitalId,
         } as any))
       );
-      // Deduct stock
-      for (const item of orderItems) {
-        if (item.medicineId) {
-          const stockChange = isReturn ? item.quantity : -item.quantity;
-          await pharmacyService.updateMedicineStock(item.medicineId, stockChange).catch(console.error);
-        }
-      }
       await refetchMedicines();
       setOrderCompleted(true);
       toast.success(
         isReturn
           ? `${issueType} processed — ₹${netAmount.toFixed(2)} refunded`
-          : `${issueType} completed — ₹${netAmount.toFixed(2)} ${isIP ? `(${paymentMode})` : "(Cash)"}`
+          : `${issueType} completed — ₹${netAmount.toFixed(2)} (${finalPaymentMode})`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to complete order");
