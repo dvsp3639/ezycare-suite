@@ -77,6 +77,15 @@ export const pharmacyService = {
     return snakeToCamel(orderData) as PharmacyOrder;
   },
 
+  async completeSale(order: Partial<PharmacyOrder>, items: Omit<PharmacyOrderItem, "id" | "orderId">[]): Promise<PharmacyOrder> {
+    const { data, error } = await supabase.rpc("create_pharmacy_sale" as any, {
+      _order: camelToSnake(order),
+      _items: items.map((item) => camelToSnake(item)),
+    });
+    if (error) throw error;
+    return snakeToCamel(data) as PharmacyOrder;
+  },
+
   async updateOrder(id: string, updates: Partial<PharmacyOrder>): Promise<void> {
     const { error } = await supabase
       .from("pharmacy_orders")
