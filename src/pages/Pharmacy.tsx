@@ -68,7 +68,7 @@ const Pharmacy = () => {
   const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit" | "">("");
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
-  const [directCustomer, setDirectCustomer] = useState({ name: "Walk-in Customer", mobile: "" });
+  const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -163,7 +163,7 @@ const Pharmacy = () => {
     setOrderCompleted(false);
     setPaymentMode("Cash");
     setGlobalDiscount(0);
-    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
+    setDirectCustomer({ name: "", mobile: "" });
   };
 
   const addMedicine = (med: Medicine) => {
@@ -262,7 +262,7 @@ const Pharmacy = () => {
     setPaymentMode("");
     setSearchQuery("");
     setGlobalDiscount(0);
-    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
+    setDirectCustomer({ name: "", mobile: "" });
   };
 
   const handlePrintReceipt = () => {
@@ -358,7 +358,7 @@ const Pharmacy = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm mb-2 block">Customer Name</Label>
-              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Walk-in Customer" />
+              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Enter customer name (optional)" />
             </div>
             <div>
               <Label className="text-sm mb-2 block">Mobile (optional)</Label>
