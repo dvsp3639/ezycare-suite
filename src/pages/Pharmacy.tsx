@@ -30,7 +30,7 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 
-type IssueType = "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
+type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
@@ -68,6 +68,7 @@ const Pharmacy = () => {
   const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit" | "">("");
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [directCustomer, setDirectCustomer] = useState({ name: "Walk-in Customer", mobile: "" });
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -104,6 +105,10 @@ const Pharmacy = () => {
   // Calculations
   const isReturn = issueType.includes("Return");
   const isIP = issueType.startsWith("IP");
+  const isDirectSale = issueType === "Direct Sale";
+  const activeCustomerName = isDirectSale ? directCustomer.name.trim() || "Walk-in Customer" : selectedPatient?.name || "";
+  const activeCustomerMobile = isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "";
+  const activeRegistration = isDirectSale ? "Direct Sale" : selectedPatient?.registrationNumber || "";
 
   const subtotal = orderItems.reduce((s, i) => s + i.amount, 0);
   const gstAmount = orderItems.reduce(
@@ -147,6 +152,18 @@ const Pharmacy = () => {
   const handleNewOrder = () => {
     setOrderItems([]);
     setOrderSource("manual");
+  };
+
+  const handleStartDirectSale = () => {
+    setSelectedPatient(null);
+    setSearchQuery("");
+    setOrderItems([]);
+    setOrderSource("manual");
+    setShowPayment(false);
+    setOrderCompleted(false);
+    setPaymentMode("Cash");
+    setGlobalDiscount(0);
+    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
   };
 
   const addMedicine = (med: Medicine) => {
@@ -201,17 +218,20 @@ const Pharmacy = () => {
   };
 
   const handleCompleteOrder = async () => {
-    if (isIP && !paymentMode) {
+    if ((isIP || isDirectSale) && !paymentMode) {
       toast.error("Please select a payment mode");
       return;
     }
-    const finalPaymentMode = isIP ? paymentMode : "Cash";
+    const finalPaymentMode = isIP || isDirectSale ? paymentMode : "Cash";
+    const customerName = isDirectSale ? directCustomer.name.trim() || "Walk-in Customer" : selectedPatient?.name || "";
     try {
-      await pharmacyService.createOrder(
+      await pharmacyService.completeSale(
         {
-          patient_name: selectedPatient?.name || "", registration_number: selectedPatient?.registrationNumber || "",
-          doctor_name: doctorPrescription?.doctorName || "", issue_type: issueType, issue_date: new Date().toISOString().split("T")[0],
-          age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: selectedPatient?.mobile || "",
+          patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
+          customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
+          sale_channel: isDirectSale ? "Direct" : "Patient",
+          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: new Date().toISOString().split("T")[0],
+          age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           total_amount: subtotal, discount: discountAmount, gst_amount: gstAmount, net_amount: netAmount,
           payment_mode: finalPaymentMode, status: "Completed",
         } as any,
@@ -221,19 +241,12 @@ const Pharmacy = () => {
           hospital_id: hospitalId,
         } as any))
       );
-      // Deduct stock
-      for (const item of orderItems) {
-        if (item.medicineId) {
-          const stockChange = isReturn ? item.quantity : -item.quantity;
-          await pharmacyService.updateMedicineStock(item.medicineId, stockChange).catch(console.error);
-        }
-      }
       await refetchMedicines();
       setOrderCompleted(true);
       toast.success(
         isReturn
           ? `${issueType} processed — ₹${netAmount.toFixed(2)} refunded`
-          : `${issueType} completed — ₹${netAmount.toFixed(2)} ${isIP ? `(${paymentMode})` : "(Cash)"}`
+          : `${issueType} completed — ₹${netAmount.toFixed(2)} (${finalPaymentMode})`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to complete order");
@@ -249,10 +262,10 @@ const Pharmacy = () => {
     setPaymentMode("");
     setSearchQuery("");
     setGlobalDiscount(0);
+    setDirectCustomer({ name: "Walk-in Customer", mobile: "" });
   };
 
   const handlePrintReceipt = () => {
-    if (!selectedPatient) return;
     const pw = window.open("", "_blank");
     if (!pw) return;
     pw.document.write(`
@@ -271,8 +284,8 @@ const Pharmacy = () => {
       </style></head><body>
       <div class="header"><h1>EzyOp Pharmacy</h1><p>${issueType} Receipt</p></div>
       <div class="info-row">
-        <div><strong>Patient:</strong> ${selectedPatient.name}<br/><strong>Reg No:</strong> ${selectedPatient.registrationNumber}<br/><strong>Mobile:</strong> ${selectedPatient.mobile}</div>
-        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${selectedPatient.doctor}<br/><strong>Age/Gender:</strong> ${selectedPatient.age}/${selectedPatient.gender}</div>
+        <div><strong>Customer:</strong> ${activeCustomerName}<br/><strong>Ref:</strong> ${activeRegistration}<br/><strong>Mobile:</strong> ${activeCustomerMobile || "—"}</div>
+        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${selectedPatient?.doctor || "—"}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${selectedPatient.age}/${selectedPatient.gender}` : "—"}</div>
       </div>
       <table><thead><tr><th>#</th><th>Medicine</th><th>Batch</th><th>Qty</th><th>MRP (₹)</th><th>GST%</th><th>Amount (₹)</th></tr></thead>
       <tbody>${orderItems.map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.medicineName}</td><td>${i.batchNo}</td><td>${i.quantity}</td><td>${i.mrp.toFixed(2)}</td><td>${i.gstPercent}%</td><td>${i.amount.toFixed(2)}</td></tr>`).join("")}</tbody></table>
@@ -281,7 +294,7 @@ const Pharmacy = () => {
         <p>GST: ₹${gstAmount.toFixed(2)}</p>
         ${globalDiscount > 0 ? `<p>Discount (${globalDiscount}%): -₹${discountAmount.toFixed(2)}</p>` : ""}
         <p><strong>Net Amount: ₹${netAmount.toFixed(2)}</strong></p>
-        <p>Payment: ${isIP ? paymentMode : "Cash"}</p>
+        <p>Payment: ${isIP || isDirectSale ? paymentMode : "Cash"}</p>
       </div>
       <div class="footer"><p>Thank you – Get well soon!</p></div>
       </body></html>
@@ -300,28 +313,32 @@ const Pharmacy = () => {
       </div>
 
       {/* Issue Type Selector */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {(["IP Sale", "IP Return", "OP Sale", "OP Return"] as IssueType[]).map((type) => {
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        {(["Direct Sale", "IP Sale", "IP Return", "OP Sale", "OP Return"] as IssueType[]).map((type) => {
           const isActive = issueType === type;
           const isReturnType = type.includes("Return");
+          const isDirectType = type === "Direct Sale";
           return (
             <button
               key={type}
-              onClick={() => { setIssueType(type); handleNewTransaction(); }}
+              onClick={() => { setIssueType(type); type === "Direct Sale" ? handleStartDirectSale() : handleNewTransaction(); }}
               className={cn(
-                "rounded-xl border-2 p-4 text-center transition-all font-medium text-sm",
+                "rounded-xl border-2 p-4 text-center transition-all font-medium text-sm min-h-28",
                 isActive
-                  ? isReturnType
+                  ? isDirectType
+                    ? "border-success bg-success/5 text-success"
+                    : isReturnType
                     ? "border-destructive bg-destructive/5 text-destructive"
                     : "border-primary bg-primary/5 text-primary"
                   : "border-border bg-card text-muted-foreground hover:border-muted-foreground/40"
               )}
             >
               <div className="flex items-center justify-center gap-2 mb-1">
-                {isReturnType ? <Package className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                {isReturnType ? <Package className="h-4 w-4" /> : isDirectType ? <Banknote className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                 {type}
               </div>
               <p className="text-xs opacity-70">
+                {type === "Direct Sale" && "Walk-in pharmacy counter sale"}
                 {type === "IP Sale" && "In-Patient Medicine Issue"}
                 {type === "IP Return" && "In-Patient Medicine Return"}
                 {type === "OP Sale" && "Out-Patient Medicine Issue"}
@@ -332,8 +349,27 @@ const Pharmacy = () => {
         })}
       </div>
 
+      {isDirectSale && !orderCompleted && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Banknote className="h-4 w-4 text-success" />
+            <h2 className="font-semibold text-sm text-foreground">Direct Counter Sale</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm mb-2 block">Customer Name</Label>
+              <Input value={directCustomer.name} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, name: e.target.value }))} placeholder="Walk-in Customer" />
+            </div>
+            <div>
+              <Label className="text-sm mb-2 block">Mobile (optional)</Label>
+              <Input value={directCustomer.mobile} onChange={(e) => setDirectCustomer((prev) => ({ ...prev, mobile: e.target.value }))} placeholder="Customer mobile" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Patient Search */}
-      {!selectedPatient && (
+      {!selectedPatient && !isDirectSale && (
         <div className="bg-card rounded-xl border border-border p-6 mb-6">
           <Label className="text-sm font-medium text-foreground mb-2 block">Search Patient</Label>
           <div className="relative">
@@ -372,9 +408,9 @@ const Pharmacy = () => {
       )}
 
       {/* Patient Header */}
-      {selectedPatient && !orderCompleted && (
+      {(selectedPatient || isDirectSale) && !orderCompleted && (
         <>
-          <div className="bg-card rounded-xl border border-border p-4 mb-6">
+          {selectedPatient && <div className="bg-card rounded-xl border border-border p-4 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
@@ -398,7 +434,7 @@ const Pharmacy = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Order Source Selection */}
           {orderSource === null && (
@@ -590,8 +626,8 @@ const Pharmacy = () => {
               <div className="space-y-4">
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Patient</span>
-                    <span className="font-medium text-foreground">{selectedPatient.name}</span>
+                    <span className="text-muted-foreground">{isDirectSale ? "Customer" : "Patient"}</span>
+                    <span className="font-medium text-foreground">{activeCustomerName}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Items</span>
@@ -617,8 +653,8 @@ const Pharmacy = () => {
                   </div>
                 </div>
 
-                {/* Payment Mode — only IP gets Cash/Credit choice */}
-                {isIP ? (
+                {/* Payment Mode */}
+                {isIP || isDirectSale ? (
                   <div>
                     <Label className="text-sm mb-2 block">Payment Mode</Label>
                     <div className="grid grid-cols-2 gap-3">
@@ -668,7 +704,7 @@ const Pharmacy = () => {
       )}
 
       {/* Order Completed */}
-      {orderCompleted && selectedPatient && (
+      {orderCompleted && (selectedPatient || isDirectSale) && (
         <div className="bg-card rounded-xl border border-border p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="h-8 w-8 text-success" />
@@ -677,11 +713,11 @@ const Pharmacy = () => {
             {isReturn ? "Return Processed" : "Payment Successful"}
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            {issueType} for {selectedPatient.name} ({selectedPatient.registrationNumber})
+            {issueType} for {activeCustomerName} ({activeRegistration})
           </p>
           <div className="inline-block bg-muted/50 rounded-lg px-6 py-3 mb-6">
             <p className="text-2xl font-bold text-primary">₹{netAmount.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">{isIP ? paymentMode : "Cash"} · {orderItems.length} items</p>
+            <p className="text-xs text-muted-foreground">{isIP || isDirectSale ? paymentMode : "Cash"} · {orderItems.length} items</p>
           </div>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={handlePrintReceipt} className="gap-2">

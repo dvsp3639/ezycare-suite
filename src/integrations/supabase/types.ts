@@ -1721,13 +1721,17 @@ export type Database = {
       pharmacy_orders: {
         Row: {
           age: number | null
+          completed_at: string | null
           created_at: string
+          customer_mobile: string
+          customer_name: string
           discount: number | null
           doctor_name: string | null
           gender: string | null
           gst_amount: number | null
           hospital_id: string
           id: string
+          invoice_no: string
           issue_date: string
           issue_type: string
           mobile: string | null
@@ -1735,18 +1739,23 @@ export type Database = {
           patient_name: string
           payment_mode: string | null
           registration_number: string | null
+          sale_channel: string
           status: string
           total_amount: number | null
         }
         Insert: {
           age?: number | null
+          completed_at?: string | null
           created_at?: string
+          customer_mobile?: string
+          customer_name?: string
           discount?: number | null
           doctor_name?: string | null
           gender?: string | null
           gst_amount?: number | null
           hospital_id: string
           id?: string
+          invoice_no?: string
           issue_date?: string
           issue_type?: string
           mobile?: string | null
@@ -1754,18 +1763,23 @@ export type Database = {
           patient_name: string
           payment_mode?: string | null
           registration_number?: string | null
+          sale_channel?: string
           status?: string
           total_amount?: number | null
         }
         Update: {
           age?: number | null
+          completed_at?: string | null
           created_at?: string
+          customer_mobile?: string
+          customer_name?: string
           discount?: number | null
           doctor_name?: string | null
           gender?: string | null
           gst_amount?: number | null
           hospital_id?: string
           id?: string
+          invoice_no?: string
           issue_date?: string
           issue_type?: string
           mobile?: string | null
@@ -1773,6 +1787,7 @@ export type Database = {
           patient_name?: string
           payment_mode?: string | null
           registration_number?: string | null
+          sale_channel?: string
           status?: string
           total_amount?: number | null
         }
@@ -2552,6 +2567,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_pharmacy_sale: {
+        Args: { _items: Json; _order: Json }
+        Returns: Json
+      }
       get_user_hospital_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -2559,6 +2578,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      next_pharmacy_invoice_no: {
+        Args: { _hospital_id: string }
+        Returns: string
       }
       next_registration_number: {
         Args: { _hospital_id: string }

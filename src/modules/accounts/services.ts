@@ -68,7 +68,7 @@ export const accountsService = {
         .lte("appointment_date", to),
       supabase
         .from("pharmacy_orders")
-        .select("id, issue_date, patient_name, registration_number, net_amount, gst_amount, payment_mode, status, issue_type")
+        .select("id, issue_date, patient_name, registration_number, net_amount, gst_amount, payment_mode, status, issue_type, sale_channel")
         .gte("issue_date", from)
         .lte("issue_date", to)
         .eq("status", "Completed"),
@@ -123,7 +123,7 @@ export const accountsService = {
         gst: Number(p.gst_amount) || 0,
         paymentMode: p.payment_mode || "Cash",
         paymentStatus: "Paid",
-        department: p.issue_type,
+        department: p.sale_channel === "Direct" ? "Direct Sale" : p.issue_type,
       });
     });
 
