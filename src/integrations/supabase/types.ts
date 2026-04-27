@@ -2567,6 +2567,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_pharmacy_sale: {
+        Args: { _items: Json; _order: Json }
+        Returns: Json
+      }
       get_user_hospital_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
