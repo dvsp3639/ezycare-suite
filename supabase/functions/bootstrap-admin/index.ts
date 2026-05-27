@@ -13,6 +13,23 @@ serve(async (req) => {
   }
 
   try {
+    // Require a shared secret header so this endpoint cannot be invoked
+    // by anyone who discovers the URL during the pre-setup window.
+    const expectedSecret = Deno.env.get("BOOTSTRAP_SECRET");
+    if (!expectedSecret) {
+      return new Response(
+        JSON.stringify({ error: "Bootstrap endpoint is disabled. Configure BOOTSTRAP_SECRET to enable." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const providedSecret = req.headers.get("x-bootstrap-secret") ?? "";
+    if (providedSecret !== expectedSecret) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
