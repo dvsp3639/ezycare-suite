@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
@@ -1136,9 +1137,20 @@ const ClinicManagement = () => {
                                 <PopoverContent className="w-80 max-h-60 overflow-y-auto" align="end">
                                   <h4 className="text-sm font-semibold mb-2">{lab.testName} Report</h4>
                                   {lab.reportFileUrl && (
-                                    <a href={lab.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline mb-2">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          const url = await resolveLabReportUrl(lab.reportFileUrl!);
+                                          if (url) window.open(url, "_blank", "noopener,noreferrer");
+                                        } catch (err: any) {
+                                          toast.error(err.message || "Unable to open report");
+                                        }
+                                      }}
+                                      className="flex items-center gap-2 text-sm text-primary hover:underline mb-2"
+                                    >
                                       <Download className="h-4 w-4" /> {lab.reportFileName || "Download Report"}
-                                    </a>
+                                    </button>
                                   )}
                                   {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
                                 </PopoverContent>
