@@ -19,6 +19,8 @@ import {
   CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { escapeHtml } from "@/lib/escapeHtml";
+import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
@@ -521,8 +523,9 @@ const ClinicManagement = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow || !consultPatient) return;
     const rxLines = consultPrescriptions.filter((p) => p.medicine.trim());
+    const e = escapeHtml;
     printWindow.document.write(`
-      <html><head><title>Prescription – ${consultPatient.patientName}</title>
+      <html><head><title>Prescription – ${e(consultPatient.patientName)}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: auto; }
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
@@ -542,17 +545,17 @@ const ClinicManagement = () => {
         <p>Medical Prescription</p>
       </div>
       <div class="patient-info">
-        <div><strong>Patient:</strong> ${consultPatient.patientName}<br/><strong>Reg No:</strong> ${consultPatient.registrationNumber}</div>
-        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}<br/><strong>Doctor:</strong> ${consultPatient.doctorName}</div>
+        <div><strong>Patient:</strong> ${e(consultPatient.patientName)}<br/><strong>Reg No:</strong> ${e(consultPatient.registrationNumber)}</div>
+        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}<br/><strong>Doctor:</strong> ${e(consultPatient.doctorName)}</div>
       </div>
-      ${consultVitals.bp ? `<div class="section"><h3>Vitals</h3><p>BP: ${consultVitals.bp} | Temp: ${consultVitals.temperature}°F | Wt: ${consultVitals.weight}kg | SpO2: ${consultVitals.spo2}% | Pulse: ${consultVitals.pulse}/min</p></div>` : ""}
-      <div class="section"><h3>Diagnosis</h3><p>${consultDiagnosis}</p></div>
+      ${consultVitals.bp ? `<div class="section"><h3>Vitals</h3><p>BP: ${e(consultVitals.bp)} | Temp: ${e(consultVitals.temperature)}°F | Wt: ${e(consultVitals.weight)}kg | SpO2: ${e(consultVitals.spo2)}% | Pulse: ${e(consultVitals.pulse)}/min</p></div>` : ""}
+      <div class="section"><h3>Diagnosis</h3><p>${e(consultDiagnosis)}</p></div>
       <div class="section"><h3>Prescription</h3>
       <table><thead><tr><th>#</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead>
-      <tbody>${rxLines.map((r, i) => `<tr><td>${i + 1}</td><td>${r.medicine}</td><td>${r.dosage}</td><td>${r.frequency}</td><td>${r.duration}</td><td>${r.instructions}</td></tr>`).join("")}</tbody></table></div>
-      ${consultLabOrders.length > 0 ? `<div class="section"><h3>Lab Orders</h3><ul>${consultLabOrders.map((l) => `<li>${l.testName} (${l.priority})</li>`).join("")}</ul></div>` : ""}
+      <tbody>${rxLines.map((r, i) => `<tr><td>${i + 1}</td><td>${e(r.medicine)}</td><td>${e(r.dosage)}</td><td>${e(r.frequency)}</td><td>${e(r.duration)}</td><td>${e(r.instructions)}</td></tr>`).join("")}</tbody></table></div>
+      ${consultLabOrders.length > 0 ? `<div class="section"><h3>Lab Orders</h3><ul>${consultLabOrders.map((l) => `<li>${e(l.testName)} (${e(l.priority)})</li>`).join("")}</ul></div>` : ""}
       ${consultFollowUp ? `<div class="section"><h3>Follow-up</h3><p>${format(consultFollowUp, "dd/MM/yyyy")}</p></div>` : ""}
-      ${consultNotes ? `<div class="section"><h3>Doctor's Notes</h3><p>${consultNotes}</p></div>` : ""}
+      ${consultNotes ? `<div class="section"><h3>Doctor's Notes</h3><p>${e(consultNotes)}</p></div>` : ""}
       <div class="footer"><span>Signature: ___________________</span><span>Date: ${format(new Date(), "dd/MM/yyyy")}</span></div>
       </body></html>
     `);
@@ -1134,9 +1137,20 @@ const ClinicManagement = () => {
                                 <PopoverContent className="w-80 max-h-60 overflow-y-auto" align="end">
                                   <h4 className="text-sm font-semibold mb-2">{lab.testName} Report</h4>
                                   {lab.reportFileUrl && (
-                                    <a href={lab.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline mb-2">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          const url = await resolveLabReportUrl(lab.reportFileUrl!);
+                                          if (url) window.open(url, "_blank", "noopener,noreferrer");
+                                        } catch (err: any) {
+                                          toast.error(err.message || "Unable to open report");
+                                        }
+                                      }}
+                                      className="flex items-center gap-2 text-sm text-primary hover:underline mb-2"
+                                    >
                                       <Download className="h-4 w-4" /> {lab.reportFileName || "Download Report"}
-                                    </a>
+                                    </button>
                                   )}
                                   {lab.reportNotes && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">{lab.reportNotes}</p>}
                                 </PopoverContent>

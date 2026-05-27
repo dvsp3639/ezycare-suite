@@ -20,6 +20,7 @@ import {
   Banknote, FileText, User, Package, Printer, CheckCircle2, ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { escapeHtml } from "@/lib/escapeHtml";
 import { type ClinicPatient } from "@/data/mockClinicData";
 import {
   sampleDoctorPrescriptions,
@@ -276,8 +277,9 @@ const Pharmacy = () => {
   const handlePrintReceipt = () => {
     const pw = window.open("", "_blank");
     if (!pw) return;
+    const e = escapeHtml;
     pw.document.write(`
-      <html><head><title>${issueType} Receipt – ${selectedPatient.name}</title>
+      <html><head><title>${e(issueType)} Receipt – ${e(selectedPatient?.name)}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 32px; max-width: 700px; margin: auto; font-size: 13px; }
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 16px; }
@@ -290,19 +292,19 @@ const Pharmacy = () => {
         .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #888; }
         @media print { body { padding: 16px; } }
       </style></head><body>
-      <div class="header"><h1>EzyOp Pharmacy</h1><p>${issueType} Receipt</p></div>
+      <div class="header"><h1>EzyOp Pharmacy</h1><p>${e(issueType)} Receipt</p></div>
       <div class="info-row">
-        <div><strong>Customer:</strong> ${activeCustomerName}<br/><strong>Ref:</strong> ${activeRegistration}<br/><strong>Mobile:</strong> ${activeCustomerMobile || "—"}</div>
-        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${selectedPatient?.doctor || "—"}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${selectedPatient.age}/${selectedPatient.gender}` : "—"}</div>
+        <div><strong>Customer:</strong> ${e(activeCustomerName)}<br/><strong>Ref:</strong> ${e(activeRegistration)}<br/><strong>Mobile:</strong> ${e(activeCustomerMobile || "—")}</div>
+        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${e(selectedPatient?.doctor || "—")}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${e(selectedPatient.age)}/${e(selectedPatient.gender)}` : "—"}</div>
       </div>
       <table><thead><tr><th>#</th><th>Medicine</th><th>Batch</th><th>Qty</th><th>MRP (₹)</th><th>GST%</th><th>Amount (₹)</th></tr></thead>
-      <tbody>${orderItems.map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.medicineName}</td><td>${i.batchNo}</td><td>${i.quantity}</td><td>${i.mrp.toFixed(2)}</td><td>${i.gstPercent}%</td><td>${i.amount.toFixed(2)}</td></tr>`).join("")}</tbody></table>
+      <tbody>${orderItems.map((i, idx) => `<tr><td>${idx + 1}</td><td>${e(i.medicineName)}</td><td>${e(i.batchNo)}</td><td>${i.quantity}</td><td>${i.mrp.toFixed(2)}</td><td>${i.gstPercent}%</td><td>${i.amount.toFixed(2)}</td></tr>`).join("")}</tbody></table>
       <div class="totals">
         <p>Subtotal: ₹${subtotal.toFixed(2)}</p>
         <p>GST: ₹${gstAmount.toFixed(2)}</p>
         ${globalDiscount > 0 ? `<p>Discount (${globalDiscount}%): -₹${discountAmount.toFixed(2)}</p>` : ""}
         <p><strong>Net Amount: ₹${netAmount.toFixed(2)}</strong></p>
-        <p>Payment: ${isIP || isDirectSale ? paymentMode : "Cash"}</p>
+        <p>Payment: ${e(isIP || isDirectSale ? paymentMode : "Cash")}</p>
       </div>
       <div class="footer"><p>Thank you – Get well soon!</p></div>
       </body></html>

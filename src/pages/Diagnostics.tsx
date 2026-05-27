@@ -18,6 +18,8 @@ import {
   Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { escapeHtml } from "@/lib/escapeHtml";
+import { resolveLabReportUrl } from "@/lib/labReports";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import {
   useLabTestCatalog, useLabOrders,
@@ -212,23 +214,22 @@ const Diagnostics = () => {
     }
     setUploading(true);
     try {
-      // Upload file to storage
-      const filePath = `${resultOrder.id}/${Date.now()}-${reportFile.name}`;
+      // Upload to private storage; path begins with lab order id so the
+      // storage RLS policy can join lab_orders to enforce hospital isolation.
+      const safeName = reportFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `${resultOrder.id}/${Date.now()}-${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("lab-reports")
         .upload(filePath, reportFile);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("lab-reports")
-        .getPublicUrl(filePath);
-
-      // Save results with file URL
+      // Persist the storage path (not a public URL); viewers create
+      // short-lived signed URLs on demand.
       saveResultsMutation.mutate({
         labOrderId: resultOrder.id,
         results: [],
         reportNotes: reportNotes ?? "",
-        reportFileUrl: urlData.publicUrl,
+        reportFileUrl: filePath,
         reportFileName: reportFile.name,
       }, {
         onSuccess: () => {
@@ -247,8 +248,9 @@ const Diagnostics = () => {
   const handlePrintReport = (order: DisplayLabOrder) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow || !order.results) return;
+    const e = escapeHtml;
     printWindow.document.write(`
-      <html><head><title>Lab Report – ${order.patientName}</title>
+      <html><head><title>Lab Report – ${e(order.patientName)}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: auto; }
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
@@ -269,16 +271,16 @@ const Diagnostics = () => {
         <p>Laboratory Report</p>
       </div>
       <div class="patient-info">
-        <div><strong>Patient:</strong> ${order.patientName}</div>
-        <div><strong>Reg No:</strong> ${order.patientRegNo}</div>
-        <div><strong>Test:</strong> ${order.testName}</div>
-        <div><strong>Category:</strong> ${order.category}</div>
-        <div><strong>Ordered By:</strong> ${order.orderedBy}</div>
-        <div><strong>Priority:</strong> ${order.priority}</div>
-        <div><strong>Ordered At:</strong> ${order.orderedAt}</div>
-        <div><strong>Completed At:</strong> ${order.completedAt || "—"}</div>
-        <div><strong>Amount:</strong> ₹${order.price}</div>
-        <div><strong>Payment:</strong> ${order.paymentStatus || "—"} ${order.paymentMode ? `(${order.paymentMode})` : ""}</div>
+        <div><strong>Patient:</strong> ${e(order.patientName)}</div>
+        <div><strong>Reg No:</strong> ${e(order.patientRegNo)}</div>
+        <div><strong>Test:</strong> ${e(order.testName)}</div>
+        <div><strong>Category:</strong> ${e(order.category)}</div>
+        <div><strong>Ordered By:</strong> ${e(order.orderedBy)}</div>
+        <div><strong>Priority:</strong> ${e(order.priority)}</div>
+        <div><strong>Ordered At:</strong> ${e(order.orderedAt)}</div>
+        <div><strong>Completed At:</strong> ${e(order.completedAt || "—")}</div>
+        <div><strong>Amount:</strong> ₹${e(order.price)}</div>
+        <div><strong>Payment:</strong> ${e(order.paymentStatus || "—")} ${order.paymentMode ? `(${e(order.paymentMode)})` : ""}</div>
       </div>
       <div class="section">
         <h3>Test Results</h3>
@@ -287,18 +289,18 @@ const Diagnostics = () => {
           <tbody>
             ${order.results.map((r) => `
               <tr>
-                <td>${r.parameter}</td>
-                <td class="${r.isAbnormal ? "abnormal" : ""}">${r.value}</td>
-                <td>${r.unit}</td>
-                <td>${r.normalRange}</td>
+                <td>${e(r.parameter)}</td>
+                <td class="${r.isAbnormal ? "abnormal" : ""}">${e(r.value)}</td>
+                <td>${e(r.unit)}</td>
+                <td>${e(r.normalRange)}</td>
                 <td class="${r.isAbnormal ? "abnormal" : ""}">${r.isAbnormal ? "ABNORMAL" : "Normal"}</td>
               </tr>
             `).join("")}
           </tbody>
         </table>
       </div>
-      ${order.reportNotes ? `<div class="section"><h3>Remarks</h3><p>${order.reportNotes}</p></div>` : ""}
-      ${order.clinicalNotes ? `<div class="section"><h3>Clinical Notes (by Doctor)</h3><p>${order.clinicalNotes}</p></div>` : ""}
+      ${order.reportNotes ? `<div class="section"><h3>Remarks</h3><p>${e(order.reportNotes)}</p></div>` : ""}
+      ${order.clinicalNotes ? `<div class="section"><h3>Clinical Notes (by Doctor)</h3><p>${e(order.clinicalNotes)}</p></div>` : ""}
       <div class="footer">
         <span>Lab Technician: ___________________</span>
         <span>Date: ${format(new Date(), "dd/MM/yyyy")}</span>
@@ -832,9 +834,20 @@ const Diagnostics = () => {
               {viewOrder.reportFileUrl && (
                 <div className="border border-border rounded-lg p-3 bg-card">
                   <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
-                  <a href={viewOrder.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const url = await resolveLabReportUrl(viewOrder.reportFileUrl!);
+                        if (url) window.open(url, "_blank", "noopener,noreferrer");
+                      } catch (err: any) {
+                        toast.error(err.message || "Unable to open report");
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
                     <Download className="h-4 w-4" /> {viewOrder.reportFileName || "Download Report"}
-                  </a>
+                  </button>
                 </div>
               )}
 
