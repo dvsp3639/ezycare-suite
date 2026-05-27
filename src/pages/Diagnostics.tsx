@@ -213,23 +213,22 @@ const Diagnostics = () => {
     }
     setUploading(true);
     try {
-      // Upload file to storage
-      const filePath = `${resultOrder.id}/${Date.now()}-${reportFile.name}`;
+      // Upload to private storage; path begins with lab order id so the
+      // storage RLS policy can join lab_orders to enforce hospital isolation.
+      const safeName = reportFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `${resultOrder.id}/${Date.now()}-${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("lab-reports")
         .upload(filePath, reportFile);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("lab-reports")
-        .getPublicUrl(filePath);
-
-      // Save results with file URL
+      // Persist the storage path (not a public URL); viewers create
+      // short-lived signed URLs on demand.
       saveResultsMutation.mutate({
         labOrderId: resultOrder.id,
         results: [],
         reportNotes: reportNotes ?? "",
-        reportFileUrl: urlData.publicUrl,
+        reportFileUrl: filePath,
         reportFileName: reportFile.name,
       }, {
         onSuccess: () => {
