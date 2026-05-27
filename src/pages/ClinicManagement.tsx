@@ -19,6 +19,7 @@ import {
   CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { escapeHtml } from "@/lib/escapeHtml";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
