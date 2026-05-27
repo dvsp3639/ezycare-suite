@@ -18,6 +18,7 @@ import {
   Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { escapeHtml } from "@/lib/escapeHtml";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import {
   useLabTestCatalog, useLabOrders,
