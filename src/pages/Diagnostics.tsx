@@ -833,9 +833,20 @@ const Diagnostics = () => {
               {viewOrder.reportFileUrl && (
                 <div className="border border-border rounded-lg p-3 bg-card">
                   <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
-                  <a href={viewOrder.reportFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const url = await resolveLabReportUrl(viewOrder.reportFileUrl!);
+                        if (url) window.open(url, "_blank", "noopener,noreferrer");
+                      } catch (err: any) {
+                        toast.error(err.message || "Unable to open report");
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
                     <Download className="h-4 w-4" /> {viewOrder.reportFileName || "Download Report"}
-                  </a>
+                  </button>
                 </div>
               )}
 
