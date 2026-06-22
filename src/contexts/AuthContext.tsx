@@ -36,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(true);
 
   const fetchUserData = useCallback(async (accessToken: string) => {
     try {
@@ -49,6 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error("Failed to fetch user data:", err);
+    } finally {
+      setRolesLoading(false);
     }
   }, []);
 
@@ -60,12 +63,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newSession?.user ?? null);
 
         if (newSession?.access_token) {
+          setRolesLoading(true);
           // Defer data fetch to avoid deadlock
           setTimeout(() => fetchUserData(newSession.access_token), 0);
         } else {
         setProfile(null);
         setRoles([]);
         setAllowedModules([]);
+        setRolesLoading(false);
       }
         setLoading(false);
       }
@@ -76,7 +81,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(existingSession);
       setUser(existingSession?.user ?? null);
       if (existingSession?.access_token) {
+        setRolesLoading(true);
         fetchUserData(existingSession.access_token);
+      } else {
+        setRolesLoading(false);
       }
       setLoading(false);
     });
@@ -115,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isSuperAdmin,
         isHospitalAdmin,
-        loading,
+        loading: loading || (!!user && rolesLoading),
       }}
     >
       {children}
