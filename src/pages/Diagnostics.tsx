@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -128,6 +128,7 @@ const Diagnostics = () => {
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
+  const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
@@ -320,79 +321,28 @@ const Diagnostics = () => {
     }
   };
 
-  const printBlobInCurrentPage = (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const frame = document.createElement("iframe");
-    frame.title = "Diagnostics report print preview";
-    frame.style.position = "fixed";
-    frame.style.right = "0";
-    frame.style.bottom = "0";
-    frame.style.width = "1px";
-    frame.style.height = "1px";
-    frame.style.opacity = "0";
-    frame.style.pointerEvents = "none";
-    frame.src = url;
+  useEffect(() => {
+    if (!printOrder) return;
 
-    const cleanup = () => {
-      setTimeout(() => {
-        frame.remove();
-        URL.revokeObjectURL(url);
-      }, 1000);
+    const clearPrintOrder = () => setPrintOrder(null);
+    window.addEventListener("afterprint", clearPrintOrder, { once: true });
+
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", clearPrintOrder);
     };
+  }, [printOrder]);
 
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      } catch (err) {
-        console.error("Print preview failed", err);
-        toast.error("Unable to open print preview");
-        cleanup();
-      }
-    };
-
-    window.addEventListener("afterprint", cleanup, { once: true });
-    document.body.appendChild(frame);
-  };
-
-  const handlePrintReport = async (order: DisplayLabOrder) => {
-    try {
-      // If a stored report exists, load it as a blob and print it from this page.
-      if (order.reportFileUrl) {
-        const url = await resolveLabReportUrl(order.reportFileUrl);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Unable to load report file");
-        const blob = await response.blob();
-        printBlobInCurrentPage(blob);
-        return;
-      }
-      if (!order.results || order.results.length === 0) {
-        toast.error("No results available to print");
-        return;
-      }
-      // Generate PDF on the fly and open the browser print preview in-place.
-      const blob = generateLabReportPdf({
-        testName: order.testName,
-        category: order.category,
-        patientName: order.patientName,
-        patientRegNo: order.patientRegNo,
-        orderedBy: order.orderedBy,
-        priority: order.priority,
-        orderedAt: order.orderedAt,
-        completedAt: order.completedAt || undefined,
-        price: order.price,
-        paymentStatus: order.paymentStatus,
-        paymentMode: order.paymentMode,
-        reportNotes: order.reportNotes,
-        clinicalNotes: order.clinicalNotes,
-        results: order.results,
-        autoPrint: true,
-      });
-      printBlobInCurrentPage(blob);
-    } catch (err) {
-      console.error("Print report failed", err);
-      toast.error(err instanceof Error ? err.message : "Unable to print report");
+  const handlePrintReport = (order: DisplayLabOrder) => {
+    if ((!order.results || order.results.length === 0) && !order.reportNotes) {
+      toast.error("No printable lab results available");
+      return;
     }
+    setPrintOrder(order);
   };
 
   const getFileIcon = (type: string) => {
