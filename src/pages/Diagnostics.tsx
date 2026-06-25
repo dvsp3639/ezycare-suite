@@ -831,7 +831,7 @@ const Diagnostics = () => {
               <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
-                    <Upload className="h-4 w-4" /> Upload Report File
+                    <Upload className="h-4 w-4" /> {resultOrder.category === "Radiology" ? "Upload Report File" : "Upload Report File (optional)"}
                   </Label>
                   <label className="cursor-pointer">
                     <input
@@ -858,6 +858,89 @@ const Diagnostics = () => {
                   </div>
                 )}
               </div>
+
+              {/* Manual parameter entry (skipped for Radiology) */}
+              {resultOrder.category !== "Radiology" && (
+                <div className="space-y-2 border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                      <Beaker className="h-4 w-4" /> Test Parameters
+                    </Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setResultValues((prev) => [
+                          ...prev,
+                          { parameter: "", value: "", unit: "", normalRange: "", isAbnormal: false },
+                        ])
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Enter values manually — a PDF report will be generated automatically on save.
+                  </p>
+                  <div className="grid grid-cols-[1fr_90px_70px_110px_70px_24px] gap-1.5 text-[10px] font-medium text-muted-foreground px-1">
+                    <span>Parameter</span><span>Value</span><span>Unit</span><span>Normal Range</span><span>Abnormal</span><span></span>
+                  </div>
+                  <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+                    {resultValues.map((r, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_90px_70px_110px_70px_24px] gap-1.5 items-center">
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Parameter"
+                          value={r.parameter}
+                          onChange={(e) =>
+                            setResultValues((prev) => prev.map((p, i) => (i === idx ? { ...p, parameter: e.target.value } : p)))
+                          }
+                        />
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Value"
+                          value={r.value}
+                          onChange={(e) =>
+                            setResultValues((prev) => prev.map((p, i) => (i === idx ? { ...p, value: e.target.value } : p)))
+                          }
+                        />
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Unit"
+                          value={r.unit}
+                          onChange={(e) =>
+                            setResultValues((prev) => prev.map((p, i) => (i === idx ? { ...p, unit: e.target.value } : p)))
+                          }
+                        />
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="e.g. 12-17"
+                          value={r.normalRange}
+                          onChange={(e) =>
+                            setResultValues((prev) => prev.map((p, i) => (i === idx ? { ...p, normalRange: e.target.value } : p)))
+                          }
+                        />
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={r.isAbnormal}
+                            onCheckedChange={(v) =>
+                              setResultValues((prev) => prev.map((p, i) => (i === idx ? { ...p, isAbnormal: v } : p)))
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setResultValues((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-destructive/60 hover:text-destructive"
+                          aria-label="Remove parameter"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Report Remarks (optional)</Label>
