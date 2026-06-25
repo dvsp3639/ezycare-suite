@@ -290,9 +290,19 @@ const Diagnostics = () => {
 
       // Persist the storage path (not a public URL); viewers create
       // short-lived signed URLs on demand.
+      const resultRows = isRadiology
+        ? []
+        : filledResults.map((r) => ({
+            parameter: r.parameter,
+            value: r.value,
+            unit: r.unit,
+            normal_range: r.normalRange,
+            is_abnormal: r.isAbnormal,
+          }));
+
       saveResultsMutation.mutate({
         labOrderId: resultOrder.id,
-        results: isRadiology ? [] : filledResults,
+        results: resultRows as any,
         reportNotes: reportNotes ?? "",
         reportFileUrl: filePath,
         reportFileName: fileLabel,
