@@ -320,32 +320,57 @@ const Diagnostics = () => {
     }
   };
 
-  const openInNewTab = (url: string) => {
-    // Use a synthetic anchor click so the preview iframe doesn't navigate
-    // the parent frame (window.open inside the Lovable preview can trigger
-    // a reload of the host page).
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener,noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const printBlobInCurrentPage = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const frame = document.createElement("iframe");
+    frame.title = "Diagnostics report print preview";
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "1px";
+    frame.style.height = "1px";
+    frame.style.opacity = "0";
+    frame.style.pointerEvents = "none";
+    frame.src = url;
+
+    const cleanup = () => {
+      setTimeout(() => {
+        frame.remove();
+        URL.revokeObjectURL(url);
+      }, 1000);
+    };
+
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch (err) {
+        console.error("Print preview failed", err);
+        toast.error("Unable to open print preview");
+        cleanup();
+      }
+    };
+
+    window.addEventListener("afterprint", cleanup, { once: true });
+    document.body.appendChild(frame);
   };
 
   const handlePrintReport = async (order: DisplayLabOrder) => {
     try {
-      // If a stored report PDF exists, open it directly in a new tab.
+      // If a stored report exists, load it as a blob and print it from this page.
       if (order.reportFileUrl) {
         const url = await resolveLabReportUrl(order.reportFileUrl);
-        openInNewTab(url);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Unable to load report file");
+        const blob = await response.blob();
+        printBlobInCurrentPage(blob);
         return;
       }
       if (!order.results || order.results.length === 0) {
         toast.error("No results available to print");
         return;
       }
-      // Generate PDF on the fly and open it — auto-triggers the print dialog.
+      // Generate PDF on the fly and open the browser print preview in-place.
       const blob = generateLabReportPdf({
         testName: order.testName,
         category: order.category,
@@ -363,9 +388,7 @@ const Diagnostics = () => {
         results: order.results,
         autoPrint: true,
       });
-      const url = URL.createObjectURL(blob);
-      openInNewTab(url);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      printBlobInCurrentPage(blob);
     } catch (err) {
       console.error("Print report failed", err);
       toast.error(err instanceof Error ? err.message : "Unable to print report");
