@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +17,6 @@ import {
   Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { generateLabReportPdf } from "@/lib/labReportPdf";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
@@ -437,6 +435,8 @@ const Diagnostics = () => {
   }
 
   return (
+    <>
+    {printOrder && <PrintableLabReport order={printOrder} />}
     <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-display font-bold text-foreground">Diagnostics</h1>
@@ -1084,6 +1084,7 @@ const Diagnostics = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 };
 
@@ -1109,6 +1110,72 @@ const StepIndicator = ({ label, active, done }: { label: string; active: boolean
     </div>
     <span className={cn("text-[9px]", active || done ? "text-foreground font-medium" : "text-muted-foreground")}>{label}</span>
   </div>
+);
+
+const PrintableLabReport = ({ order }: { order: DisplayLabOrder }) => (
+  <section className="diagnostics-print-root" aria-hidden="true">
+    <header className="diagnostics-print-header">
+      <h1>EzyOp Diagnostics</h1>
+      <p>Laboratory Report</p>
+    </header>
+
+    <div className="diagnostics-print-meta">
+      <div><span>Patient</span><strong>{order.patientName}</strong></div>
+      <div><span>Reg No</span><strong>{order.patientRegNo}</strong></div>
+      <div><span>Test</span><strong>{order.testName}</strong></div>
+      <div><span>Category</span><strong>{order.category}</strong></div>
+      <div><span>Ordered By</span><strong>{order.orderedBy}</strong></div>
+      <div><span>Priority</span><strong>{order.priority}</strong></div>
+      <div><span>Ordered At</span><strong>{order.orderedAt || "—"}</strong></div>
+      <div><span>Completed At</span><strong>{order.completedAt || "—"}</strong></div>
+      <div><span>Amount</span><strong>₹{order.price}</strong></div>
+      <div><span>Payment</span><strong>{order.paymentStatus || "—"}{order.paymentMode ? ` (${order.paymentMode})` : ""}</strong></div>
+    </div>
+
+    {order.results && order.results.length > 0 && (
+      <table className="diagnostics-print-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Unit</th>
+            <th>Normal Range</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.results.map((result, index) => (
+            <tr key={`${result.parameter}-${index}`}>
+              <td>{result.parameter}</td>
+              <td className={result.isAbnormal ? "diagnostics-print-abnormal" : undefined}>{result.value}</td>
+              <td>{result.unit || "—"}</td>
+              <td>{result.normalRange || "—"}</td>
+              <td className={result.isAbnormal ? "diagnostics-print-abnormal" : undefined}>{result.isAbnormal ? "ABNORMAL" : "Normal"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+
+    {order.reportNotes && (
+      <div className="diagnostics-print-note">
+        <h2>Remarks</h2>
+        <p>{order.reportNotes}</p>
+      </div>
+    )}
+
+    {order.clinicalNotes && (
+      <div className="diagnostics-print-note">
+        <h2>Clinical Notes</h2>
+        <p>{order.clinicalNotes}</p>
+      </div>
+    )}
+
+    <footer className="diagnostics-print-footer">
+      <span>Lab Technician: ___________________</span>
+      <span>Date: {new Date().toLocaleDateString("en-GB")}</span>
+    </footer>
+  </section>
 );
 
 export default Diagnostics;
