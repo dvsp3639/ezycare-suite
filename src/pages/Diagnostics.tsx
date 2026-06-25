@@ -320,19 +320,32 @@ const Diagnostics = () => {
     }
   };
 
+  const openInNewTab = (url: string) => {
+    // Use a synthetic anchor click so the preview iframe doesn't navigate
+    // the parent frame (window.open inside the Lovable preview can trigger
+    // a reload of the host page).
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener,noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const handlePrintReport = async (order: DisplayLabOrder) => {
     try {
       // If a stored report PDF exists, open it directly in a new tab.
       if (order.reportFileUrl) {
         const url = await resolveLabReportUrl(order.reportFileUrl);
-        window.open(url, "_blank", "noopener,noreferrer");
+        openInNewTab(url);
         return;
       }
       if (!order.results || order.results.length === 0) {
         toast.error("No results available to print");
         return;
       }
-      // Generate PDF on the fly and open it — avoids popup/print() hangs.
+      // Generate PDF on the fly and open it — auto-triggers the print dialog.
       const blob = generateLabReportPdf({
         testName: order.testName,
         category: order.category,
@@ -348,9 +361,10 @@ const Diagnostics = () => {
         reportNotes: order.reportNotes,
         clinicalNotes: order.clinicalNotes,
         results: order.results,
+        autoPrint: true,
       });
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
+      openInNewTab(url);
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       console.error("Print report failed", err);
