@@ -112,3 +112,113 @@
     background: linear-gradient(135deg, hsl(200 30% 92%), hsl(180 25% 88%));
   }
 }
+
+.diagnostics-print-root {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .diagnostics-print-root,
+  .diagnostics-print-root * {
+    visibility: visible;
+  }
+
+  .diagnostics-print-root {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 24pt;
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+    font-family: Inter, sans-serif;
+  }
+
+  .diagnostics-print-header {
+    text-align: center;
+    border-bottom: 1px solid hsl(var(--border));
+    padding-bottom: 10pt;
+    margin-bottom: 14pt;
+  }
+
+  .diagnostics-print-header h1 {
+    margin: 0;
+    font-size: 18pt;
+    font-weight: 700;
+  }
+
+  .diagnostics-print-header p {
+    margin: 4pt 0 0;
+    font-size: 10pt;
+  }
+
+  .diagnostics-print-meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8pt 18pt;
+    margin-bottom: 16pt;
+    font-size: 10pt;
+  }
+
+  .diagnostics-print-meta div {
+    display: grid;
+    grid-template-columns: 82pt 1fr;
+    gap: 8pt;
+  }
+
+  .diagnostics-print-meta span {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .diagnostics-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+    margin-top: 8pt;
+  }
+
+  .diagnostics-print-table th,
+  .diagnostics-print-table td {
+    border: 1px solid hsl(var(--border));
+    padding: 7pt;
+    text-align: left;
+  }
+
+  .diagnostics-print-table th {
+    background: hsl(var(--muted));
+    font-weight: 700;
+  }
+
+  .diagnostics-print-abnormal {
+    color: hsl(var(--destructive));
+    font-weight: 700;
+  }
+
+  .diagnostics-print-note {
+    margin-top: 14pt;
+    font-size: 10pt;
+  }
+
+  .diagnostics-print-note h2 {
+    margin: 0 0 5pt;
+    font-size: 11pt;
+  }
+
+  .diagnostics-print-note p {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+
+  .diagnostics-print-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 32pt;
+    padding-top: 10pt;
+    border-top: 1px solid hsl(var(--border));
+    font-size: 10pt;
+  }
+}

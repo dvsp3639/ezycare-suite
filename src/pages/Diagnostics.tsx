@@ -1,5 +1,4 @@
-import { useState, useMemo } from "react";
-import { format } from "date-fns";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +17,6 @@ import {
   Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { generateLabReportPdf } from "@/lib/labReportPdf";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
@@ -128,6 +126,7 @@ const Diagnostics = () => {
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
+  const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
@@ -320,79 +319,28 @@ const Diagnostics = () => {
     }
   };
 
-  const printBlobInCurrentPage = (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const frame = document.createElement("iframe");
-    frame.title = "Diagnostics report print preview";
-    frame.style.position = "fixed";
-    frame.style.right = "0";
-    frame.style.bottom = "0";
-    frame.style.width = "1px";
-    frame.style.height = "1px";
-    frame.style.opacity = "0";
-    frame.style.pointerEvents = "none";
-    frame.src = url;
+  useEffect(() => {
+    if (!printOrder) return;
 
-    const cleanup = () => {
-      setTimeout(() => {
-        frame.remove();
-        URL.revokeObjectURL(url);
-      }, 1000);
+    const clearPrintOrder = () => setPrintOrder(null);
+    window.addEventListener("afterprint", clearPrintOrder, { once: true });
+
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", clearPrintOrder);
     };
+  }, [printOrder]);
 
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      } catch (err) {
-        console.error("Print preview failed", err);
-        toast.error("Unable to open print preview");
-        cleanup();
-      }
-    };
-
-    window.addEventListener("afterprint", cleanup, { once: true });
-    document.body.appendChild(frame);
-  };
-
-  const handlePrintReport = async (order: DisplayLabOrder) => {
-    try {
-      // If a stored report exists, load it as a blob and print it from this page.
-      if (order.reportFileUrl) {
-        const url = await resolveLabReportUrl(order.reportFileUrl);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Unable to load report file");
-        const blob = await response.blob();
-        printBlobInCurrentPage(blob);
-        return;
-      }
-      if (!order.results || order.results.length === 0) {
-        toast.error("No results available to print");
-        return;
-      }
-      // Generate PDF on the fly and open the browser print preview in-place.
-      const blob = generateLabReportPdf({
-        testName: order.testName,
-        category: order.category,
-        patientName: order.patientName,
-        patientRegNo: order.patientRegNo,
-        orderedBy: order.orderedBy,
-        priority: order.priority,
-        orderedAt: order.orderedAt,
-        completedAt: order.completedAt || undefined,
-        price: order.price,
-        paymentStatus: order.paymentStatus,
-        paymentMode: order.paymentMode,
-        reportNotes: order.reportNotes,
-        clinicalNotes: order.clinicalNotes,
-        results: order.results,
-        autoPrint: true,
-      });
-      printBlobInCurrentPage(blob);
-    } catch (err) {
-      console.error("Print report failed", err);
-      toast.error(err instanceof Error ? err.message : "Unable to print report");
+  const handlePrintReport = (order: DisplayLabOrder) => {
+    if ((!order.results || order.results.length === 0) && !order.reportNotes) {
+      toast.error("No printable lab results available");
+      return;
     }
+    setPrintOrder(order);
   };
 
   const getFileIcon = (type: string) => {
@@ -487,6 +435,8 @@ const Diagnostics = () => {
   }
 
   return (
+    <>
+    {printOrder && <PrintableLabReport order={printOrder} />}
     <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-display font-bold text-foreground">Diagnostics</h1>
@@ -1134,6 +1084,7 @@ const Diagnostics = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 };
 
@@ -1159,6 +1110,72 @@ const StepIndicator = ({ label, active, done }: { label: string; active: boolean
     </div>
     <span className={cn("text-[9px]", active || done ? "text-foreground font-medium" : "text-muted-foreground")}>{label}</span>
   </div>
+);
+
+const PrintableLabReport = ({ order }: { order: DisplayLabOrder }) => (
+  <section className="diagnostics-print-root" aria-hidden="true">
+    <header className="diagnostics-print-header">
+      <h1>EzyOp Diagnostics</h1>
+      <p>Laboratory Report</p>
+    </header>
+
+    <div className="diagnostics-print-meta">
+      <div><span>Patient</span><strong>{order.patientName}</strong></div>
+      <div><span>Reg No</span><strong>{order.patientRegNo}</strong></div>
+      <div><span>Test</span><strong>{order.testName}</strong></div>
+      <div><span>Category</span><strong>{order.category}</strong></div>
+      <div><span>Ordered By</span><strong>{order.orderedBy}</strong></div>
+      <div><span>Priority</span><strong>{order.priority}</strong></div>
+      <div><span>Ordered At</span><strong>{order.orderedAt || "—"}</strong></div>
+      <div><span>Completed At</span><strong>{order.completedAt || "—"}</strong></div>
+      <div><span>Amount</span><strong>₹{order.price}</strong></div>
+      <div><span>Payment</span><strong>{order.paymentStatus || "—"}{order.paymentMode ? ` (${order.paymentMode})` : ""}</strong></div>
+    </div>
+
+    {order.results && order.results.length > 0 && (
+      <table className="diagnostics-print-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Unit</th>
+            <th>Normal Range</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.results.map((result, index) => (
+            <tr key={`${result.parameter}-${index}`}>
+              <td>{result.parameter}</td>
+              <td className={result.isAbnormal ? "diagnostics-print-abnormal" : undefined}>{result.value}</td>
+              <td>{result.unit || "—"}</td>
+              <td>{result.normalRange || "—"}</td>
+              <td className={result.isAbnormal ? "diagnostics-print-abnormal" : undefined}>{result.isAbnormal ? "ABNORMAL" : "Normal"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+
+    {order.reportNotes && (
+      <div className="diagnostics-print-note">
+        <h2>Remarks</h2>
+        <p>{order.reportNotes}</p>
+      </div>
+    )}
+
+    {order.clinicalNotes && (
+      <div className="diagnostics-print-note">
+        <h2>Clinical Notes</h2>
+        <p>{order.clinicalNotes}</p>
+      </div>
+    )}
+
+    <footer className="diagnostics-print-footer">
+      <span>Lab Technician: ___________________</span>
+      <span>Date: {new Date().toLocaleDateString("en-GB")}</span>
+    </footer>
+  </section>
 );
 
 export default Diagnostics;
