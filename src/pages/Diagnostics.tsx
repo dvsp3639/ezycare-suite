@@ -320,70 +320,42 @@ const Diagnostics = () => {
     }
   };
 
-  const handlePrintReport = (order: DisplayLabOrder) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow || !order.results) return;
-    const e = escapeHtml;
-    printWindow.document.write(`
-      <html><head><title>Lab Report – ${e(order.patientName)}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: auto; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
-        .header h1 { font-size: 20px; margin: 0; }
-        .header p { margin: 4px 0; font-size: 12px; color: #666; }
-        .patient-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; font-size: 13px; background: #f5f5f5; padding: 12px; border-radius: 6px; }
-        .section { margin-bottom: 16px; }
-        .section h3 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f5f5f5; }
-        .abnormal { color: #dc2626; font-weight: bold; }
-        .footer { margin-top: 48px; display: flex; justify-content: space-between; font-size: 12px; }
-        @media print { body { padding: 20px; } }
-      </style></head><body>
-      <div class="header">
-        <h1>EzyOp Diagnostics</h1>
-        <p>Laboratory Report</p>
-      </div>
-      <div class="patient-info">
-        <div><strong>Patient:</strong> ${e(order.patientName)}</div>
-        <div><strong>Reg No:</strong> ${e(order.patientRegNo)}</div>
-        <div><strong>Test:</strong> ${e(order.testName)}</div>
-        <div><strong>Category:</strong> ${e(order.category)}</div>
-        <div><strong>Ordered By:</strong> ${e(order.orderedBy)}</div>
-        <div><strong>Priority:</strong> ${e(order.priority)}</div>
-        <div><strong>Ordered At:</strong> ${e(order.orderedAt)}</div>
-        <div><strong>Completed At:</strong> ${e(order.completedAt || "—")}</div>
-        <div><strong>Amount:</strong> ₹${e(order.price)}</div>
-        <div><strong>Payment:</strong> ${e(order.paymentStatus || "—")} ${order.paymentMode ? `(${e(order.paymentMode)})` : ""}</div>
-      </div>
-      <div class="section">
-        <h3>Test Results</h3>
-        <table>
-          <thead><tr><th>Parameter</th><th>Value</th><th>Unit</th><th>Normal Range</th><th>Status</th></tr></thead>
-          <tbody>
-            ${order.results.map((r) => `
-              <tr>
-                <td>${e(r.parameter)}</td>
-                <td class="${r.isAbnormal ? "abnormal" : ""}">${e(r.value)}</td>
-                <td>${e(r.unit)}</td>
-                <td>${e(r.normalRange)}</td>
-                <td class="${r.isAbnormal ? "abnormal" : ""}">${r.isAbnormal ? "ABNORMAL" : "Normal"}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
-      ${order.reportNotes ? `<div class="section"><h3>Remarks</h3><p>${e(order.reportNotes)}</p></div>` : ""}
-      ${order.clinicalNotes ? `<div class="section"><h3>Clinical Notes (by Doctor)</h3><p>${e(order.clinicalNotes)}</p></div>` : ""}
-      <div class="footer">
-        <span>Lab Technician: ___________________</span>
-        <span>Date: ${format(new Date(), "dd/MM/yyyy")}</span>
-      </div>
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+  const handlePrintReport = async (order: DisplayLabOrder) => {
+    try {
+      // If a stored report PDF exists, open it directly in a new tab.
+      if (order.reportFileUrl) {
+        const url = await resolveLabReportUrl(order.reportFileUrl);
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      if (!order.results || order.results.length === 0) {
+        toast.error("No results available to print");
+        return;
+      }
+      // Generate PDF on the fly and open it — avoids popup/print() hangs.
+      const blob = generateLabReportPdf({
+        testName: order.testName,
+        category: order.category,
+        patientName: order.patientName,
+        patientRegNo: order.patientRegNo,
+        orderedBy: order.orderedBy,
+        priority: order.priority,
+        orderedAt: order.orderedAt,
+        completedAt: order.completedAt || undefined,
+        price: order.price,
+        paymentStatus: order.paymentStatus,
+        paymentMode: order.paymentMode,
+        reportNotes: order.reportNotes,
+        clinicalNotes: order.clinicalNotes,
+        results: order.results,
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      console.error("Print report failed", err);
+      toast.error(err instanceof Error ? err.message : "Unable to print report");
+    }
   };
 
   const getFileIcon = (type: string) => {
