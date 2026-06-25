@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
+import { generateLabReportPdf } from "@/lib/labReportPdf";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import {
   useLabTestCatalog, useLabOrders,
@@ -120,6 +121,10 @@ const Diagnostics = () => {
   const [reportNotes, setReportNotes] = useState("");
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Manual parameter values entered by the lab technician (non-radiology)
+  const [resultValues, setResultValues] = useState<
+    { parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[]
+  >([]);
 
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
@@ -198,6 +203,26 @@ const Diagnostics = () => {
     setResultOrder(order);
     setReportNotes("");
     setReportFile(null);
+    // Pre-fill parameter rows from the test catalog (skip for Radiology — file upload only)
+    if (order.category !== "Radiology") {
+      const match = (labTestCatalog as any[]).find(
+        (t) => t.name?.toLowerCase() === order.testName.toLowerCase()
+      );
+      const params = (match?.parameters || []) as any[];
+      setResultValues(
+        params.length
+          ? params.map((p) => ({
+              parameter: p.name,
+              value: "",
+              unit: p.unit || "",
+              normalRange: p.ranges?.[0]?.normalRange || p.ranges?.[0]?.normal_range || "",
+              isAbnormal: false,
+            }))
+          : [{ parameter: "", value: "", unit: "", normalRange: "", isAbnormal: false }]
+      );
+    } else {
+      setResultValues([]);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,29 +233,69 @@ const Diagnostics = () => {
 
   const handleSaveResults = async () => {
     if (!resultOrder) return;
-    if (!reportFile) {
+    const isRadiology = resultOrder.category === "Radiology";
+
+    if (isRadiology && !reportFile) {
       toast.error("Please upload a report file");
       return;
     }
+
+    const filledResults = resultValues.filter((r) => r.parameter.trim() && r.value.trim());
+    if (!isRadiology && filledResults.length === 0 && !reportFile) {
+      toast.error("Enter at least one parameter value or upload a report file");
+      return;
+    }
+
     setUploading(true);
     try {
       // Upload to private storage; path begins with lab order id so the
       // storage RLS policy can join lab_orders to enforce hospital isolation.
-      const safeName = reportFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const filePath = `${resultOrder.id}/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("lab-reports")
-        .upload(filePath, reportFile);
-      if (uploadError) throw uploadError;
+      let filePath: string | undefined;
+      let fileLabel: string | undefined;
+
+      if (reportFile) {
+        const safeName = reportFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        filePath = `${resultOrder.id}/${Date.now()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("lab-reports")
+          .upload(filePath, reportFile);
+        if (uploadError) throw uploadError;
+        fileLabel = reportFile.name;
+      } else if (!isRadiology && filledResults.length > 0) {
+        // Auto-generate a PDF report from the entered parameter values
+        const pdfBlob = generateLabReportPdf({
+          testName: resultOrder.testName,
+          category: resultOrder.category,
+          patientName: resultOrder.patientName,
+          patientRegNo: resultOrder.patientRegNo,
+          orderedBy: resultOrder.orderedBy,
+          priority: resultOrder.priority,
+          orderedAt: resultOrder.orderedAt,
+          completedAt: new Date().toLocaleString(),
+          price: resultOrder.price,
+          paymentStatus: resultOrder.paymentStatus,
+          paymentMode: resultOrder.paymentMode,
+          reportNotes,
+          clinicalNotes: resultOrder.clinicalNotes,
+          results: filledResults,
+        });
+        const fileName = `lab-report-${resultOrder.patientRegNo || resultOrder.id}-${Date.now()}.pdf`;
+        filePath = `${resultOrder.id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("lab-reports")
+          .upload(filePath, pdfBlob, { contentType: "application/pdf" });
+        if (uploadError) throw uploadError;
+        fileLabel = fileName;
+      }
 
       // Persist the storage path (not a public URL); viewers create
       // short-lived signed URLs on demand.
       saveResultsMutation.mutate({
         labOrderId: resultOrder.id,
-        results: [],
+        results: isRadiology ? [] : filledResults,
         reportNotes: reportNotes ?? "",
         reportFileUrl: filePath,
-        reportFileName: reportFile.name,
+        reportFileName: fileLabel,
       }, {
         onSuccess: () => {
           toast.success(`Report completed for ${resultOrder.testName} — ${resultOrder.patientName}`);
