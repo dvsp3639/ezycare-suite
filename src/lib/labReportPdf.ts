@@ -18,6 +18,7 @@ export interface LabReportPdfInput {
   reportNotes?: string;
   clinicalNotes?: string;
   results: { parameter: string; value: string; unit: string; normalRange: string; isAbnormal: boolean }[];
+  autoPrint?: boolean;
 }
 
 /**
@@ -128,5 +129,8 @@ export function generateLabReportPdf(input: LabReportPdfInput): Blob {
   doc.text("Lab Technician: ___________________", 40, footerY);
   doc.text(`Date: ${format(new Date(), "dd/MM/yyyy")}`, pageWidth - 40, footerY, { align: "right" });
 
+  if (input.autoPrint) {
+    doc.autoPrint();
+  }
   return doc.output("blob");
 }
