@@ -30,6 +30,8 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
+import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
+import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
 type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
@@ -192,6 +194,11 @@ const Pharmacy = () => {
         },
       ]);
     }
+  };
+
+  const addMedicineFromSmart = (m: DbMedicine) => {
+    const local = allMedicines.find((x) => x.id === m.id);
+    if (local) addMedicine(local);
   };
 
   const updateItemQty = (medId: string, delta: number) => {
