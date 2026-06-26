@@ -1420,55 +1420,123 @@ export type Database = {
           },
         ]
       }
+      medicine_search_usage: {
+        Row: {
+          created_at: string
+          hospital_id: string
+          id: string
+          last_used_at: string
+          medicine_id: string
+          picks: number
+          query: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hospital_id: string
+          id?: string
+          last_used_at?: string
+          medicine_id: string
+          picks?: number
+          query?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          last_used_at?: string
+          medicine_id?: string
+          picks?: number
+          query?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicine_search_usage_medicine_id_fkey"
+            columns: ["medicine_id"]
+            isOneToOne: false
+            referencedRelation: "medicines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medicines: {
         Row: {
+          barcode: string | null
           batch_no: string | null
+          brand_name: string | null
           category: string | null
           created_at: string
+          dosage_form: string | null
           expiry_date: string | null
           generic_name: string | null
           gst_percent: number | null
           hospital_id: string
           hsn_code: string | null
           id: string
+          is_active: boolean | null
           manufacturer: string | null
+          min_stock: number | null
           mrp: number
           name: string
+          rack_location: string | null
+          salt_name: string | null
+          selling_price: number | null
           stock: number
+          strength: string | null
           unit: string | null
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           batch_no?: string | null
+          brand_name?: string | null
           category?: string | null
           created_at?: string
+          dosage_form?: string | null
           expiry_date?: string | null
           generic_name?: string | null
           gst_percent?: number | null
           hospital_id: string
           hsn_code?: string | null
           id?: string
+          is_active?: boolean | null
           manufacturer?: string | null
+          min_stock?: number | null
           mrp?: number
           name: string
+          rack_location?: string | null
+          salt_name?: string | null
+          selling_price?: number | null
           stock?: number
+          strength?: string | null
           unit?: string | null
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           batch_no?: string | null
+          brand_name?: string | null
           category?: string | null
           created_at?: string
+          dosage_form?: string | null
           expiry_date?: string | null
           generic_name?: string | null
           gst_percent?: number | null
           hospital_id?: string
           hsn_code?: string | null
           id?: string
+          is_active?: boolean | null
           manufacturer?: string | null
+          min_stock?: number | null
           mrp?: number
           name?: string
+          rack_location?: string | null
+          salt_name?: string | null
+          selling_price?: number | null
           stock?: number
+          strength?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -2587,6 +2655,12 @@ export type Database = {
         Args: { _hospital_id: string }
         Returns: string
       }
+      record_medicine_pick: {
+        Args: { _medicine_id: string; _query?: string }
+        Returns: undefined
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role:
