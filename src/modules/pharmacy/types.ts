@@ -16,6 +16,15 @@ export interface Medicine {
   gstPercent: number;
   createdAt: string;
   updatedAt: string;
+  brandName?: string | null;
+  saltName?: string | null;
+  strength?: string | null;
+  dosageForm?: string | null;
+  rackLocation?: string | null;
+  barcode?: string | null;
+  sellingPrice?: number | null;
+  minStock?: number | null;
+  isActive?: boolean | null;
 }
 
 export interface PharmacyOrder {
