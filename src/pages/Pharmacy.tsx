@@ -30,6 +30,8 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
+import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
+import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
 type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
 type OrderSource = "doctor" | "manual" | null;
@@ -192,6 +194,11 @@ const Pharmacy = () => {
         },
       ]);
     }
+  };
+
+  const addMedicineFromSmart = (m: DbMedicine) => {
+    const local = allMedicines.find((x) => x.id === m.id);
+    if (local) addMedicine(local);
   };
 
   const updateItemQty = (medId: string, delta: number) => {
@@ -493,47 +500,22 @@ const Pharmacy = () => {
                   )}
                 </div>
                 <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search medicines by name, generic name, or category..."
-                    value={medicineSearch}
-                    onChange={(e) => setMedicineSearch(e.target.value)}
-                    className="pl-10"
+                  <SmartMedicineSearch
+                    placeholder="Search medicines — name, salt, brand, strength, barcode…"
+                    onSelect={(m, action) => {
+                      if (action === "issue") {
+                        addMedicineFromSmart(m);
+                        toast.success(`${m.name} added`);
+                      } else if (action === "details") {
+                        toast.info(`${m.name} · ${m.genericName || ""} · Batch ${m.batchNo || "—"}`);
+                      } else if (action === "alternatives") {
+                        toast.info(`Alternatives for ${m.genericName || m.name} — coming soon`);
+                      } else if (action === "stock") {
+                        toast.info(`Stock: ${m.stock} ${m.unit || ""} · Rack ${m.rackLocation || "—"}`);
+                      }
+                    }}
                   />
                 </div>
-                {medicineSearch.trim() && (
-                  <div className="border border-border rounded-lg max-h-48 overflow-y-auto">
-                    {filteredMedicines.map((med) => {
-                      const inCart = orderItems.find((i) => i.medicineId === med.id);
-                      return (
-                        <button
-                          key={med.id}
-                          onClick={() => addMedicine(med)}
-                          className="w-full flex items-center justify-between p-2.5 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0"
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{med.name}</p>
-                            <p className="text-xs text-muted-foreground">{med.genericName} · {med.category} · Batch: {med.batchNo}</p>
-                          </div>
-                          <div className="text-right flex items-center gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">₹{med.mrp}</p>
-                              <p className="text-xs text-muted-foreground">Stock: {med.stock}</p>
-                            </div>
-                            {inCart ? (
-                              <Badge className="bg-primary/10 text-primary border-primary/20">{inCart.quantity} added</Badge>
-                            ) : (
-                              <Plus className="h-4 w-4 text-primary" />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {filteredMedicines.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">No medicines found</p>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Cart Table */}
