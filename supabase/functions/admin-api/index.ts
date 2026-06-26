@@ -32,16 +32,16 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsResult, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsResult?.claims) {
+    const { data: userResult, error: userError } = await userClient.auth.getUser();
+    if (userError || !userResult?.user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsResult.claims.sub as string;
+    const userId = userResult.user.id;
+    const userEmail = userResult.user.email;
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check caller's role
@@ -80,7 +80,7 @@ serve(async (req) => {
       const allowed_modules = (modulePerms || []).map((m: any) => m.module_id);
 
       return new Response(
-        JSON.stringify({ user: { id: userId, email: claimsResult.claims.email }, profile, roles, allowed_modules }),
+        JSON.stringify({ user: { id: userId, email: userEmail }, profile, roles, allowed_modules }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -533,8 +533,28 @@ serve(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Admin API error:", message);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 400,
+    const lower = message.toLowerCase();
+    let safe = "An internal error occurred.";
+    let status = 400;
+    if (lower.includes("forbidden") || lower.includes("access denied")) {
+      safe = "Access denied.";
+      status = 403;
+    } else if (lower.includes("not found")) {
+      safe = "Resource not found.";
+      status = 404;
+    } else if (lower.includes("unauthorized") || lower.includes("invalid token")) {
+      safe = "Unauthorized.";
+      status = 401;
+    } else if (lower.includes("duplicate") || lower.includes("already exists") || lower.includes("unique")) {
+      safe = "A record with those details already exists.";
+    } else if (lower.includes("required") || lower.includes("must be") || lower.includes("invalid")) {
+      // Validation errors raised explicitly by this function are safe to surface.
+      safe = message;
+    } else if (lower.includes("violates") || lower.includes("constraint")) {
+      safe = "Operation not allowed due to a constraint.";
+    }
+    return new Response(JSON.stringify({ error: safe }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
