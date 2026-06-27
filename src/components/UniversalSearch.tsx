@@ -12,6 +12,7 @@ import { modules } from "@/data/modules";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { UniversalScanner } from "@/components/UniversalScanner";
 
 type Kind = "module" | "medicine" | "patient" | "ai" | "recent";
 interface Result {
