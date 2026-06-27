@@ -972,88 +972,59 @@ const Diagnostics = () => {
 
       {/* Report View Dialog */}
       <Dialog open={!!viewOrder} onOpenChange={(v) => !v && setViewOrder(null)}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-[95vw] w-[95vw] h-[95vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Lab Report Preview</DialogTitle>
+          </DialogHeader>
           {viewOrder && (
             <>
-              <DialogHeader>
-                <DialogTitle className="font-display flex items-center gap-2">
-                  <FileCheck className="h-5 w-5 text-success" /> Lab Report
-                </DialogTitle>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  <Badge variant="outline" className="text-xs">{viewOrder.testName}</Badge>
-                  <Badge variant="outline" className={cn("text-xs", labCategoryColors[viewOrder.category])}>{viewOrder.category}</Badge>
-                </div>
-              </DialogHeader>
-
-              <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-2 gap-3 text-xs">
-                <div><span className="text-muted-foreground">Patient:</span> <strong className="text-foreground">{viewOrder.patientName}</strong></div>
-                <div><span className="text-muted-foreground">Reg No:</span> <strong className="text-foreground font-mono">{viewOrder.patientRegNo}</strong></div>
-                <div><span className="text-muted-foreground">Ordered By:</span> <strong className="text-foreground">{viewOrder.orderedBy}</strong></div>
-                <div><span className="text-muted-foreground">Priority:</span> <strong className={viewOrder.priority === "Urgent" ? "text-destructive" : "text-foreground"}>{viewOrder.priority}</strong></div>
-                <div><span className="text-muted-foreground">Ordered:</span> <strong className="text-foreground">{viewOrder.orderedAt}</strong></div>
-                <div><span className="text-muted-foreground">Completed:</span> <strong className="text-foreground">{viewOrder.completedAt}</strong></div>
-                <div><span className="text-muted-foreground">Amount:</span> <strong className="text-foreground">₹{viewOrder.price}</strong></div>
-                <div><span className="text-muted-foreground">Payment:</span> <strong className="text-success">{viewOrder.paymentStatus} ({viewOrder.paymentMode})</strong></div>
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                {reportPreview && (
+                  <a
+                    href={reportPreview.url}
+                    download={reportPreview.fileName}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium shadow hover:opacity-90"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 px-3 text-xs shadow"
+                  onClick={() => setViewOrder(null)}
+                >
+                  Close
+                </Button>
               </div>
 
-              {viewOrder.reportFileUrl && (
-                <div className="border border-border rounded-lg p-3 bg-card">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <p className="text-xs font-semibold text-foreground flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
-                    {reportPreview && (
-                      <a
-                        href={reportPreview.url}
-                        download={reportPreview.fileName}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                      >
-                        <Download className="h-3.5 w-3.5" /> Download
-                      </a>
-                    )}
+              <div className="flex-1 overflow-auto bg-muted/30">
+                {reportPreviewLoading ? (
+                  <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                    Loading report preview...
                   </div>
-
-                  {reportPreviewLoading ? (
-                    <div className="h-40 rounded-md border border-border bg-muted/40 grid place-items-center text-xs text-muted-foreground">
-                      Loading report preview...
-                    </div>
-                  ) : reportPreview ? (
-                    reportPreview.mimeType.includes("pdf") || reportPreview.fileName.toLowerCase().endsWith(".pdf") ? (
-                      <PdfBlobPreview blob={reportPreview.blob} />
-                    ) : reportPreview.mimeType.startsWith("image/") ? (
-                      <img
-                        src={reportPreview.url}
-                        alt="Lab report preview"
-                        className="max-h-[420px] w-full rounded-md border border-border object-contain bg-background"
-                      />
-                    ) : (
-                      <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                        Preview is not available for this file type. Use Download to save the report.
-                      </div>
-                    )
+                ) : reportPreview ? (
+                  reportPreview.mimeType.includes("pdf") || reportPreview.fileName.toLowerCase().endsWith(".pdf") ? (
+                    <PdfBlobPreview blob={reportPreview.blob} />
+                  ) : reportPreview.mimeType.startsWith("image/") ? (
+                    <img
+                      src={reportPreview.url}
+                      alt="Lab report preview"
+                      className="mx-auto max-h-full object-contain"
+                    />
                   ) : (
-                    <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                      Report preview is unavailable.
+                    <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                      Preview is not available for this file type. Use Download to save the report.
                     </div>
-                  )}
-                </div>
-              )}
-
-              {viewOrder.reportNotes && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-0.5">Report Remarks</p>
-                  <p className="text-sm text-foreground">{viewOrder.reportNotes}</p>
-                </div>
-              )}
-
-              {viewOrder.clinicalNotes && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-0.5">Doctor's Clinical Notes</p>
-                  <p className="text-sm text-foreground">{viewOrder.clinicalNotes}</p>
-                </div>
-              )}
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setViewOrder(null)}>Close</Button>
-              </DialogFooter>
+                  )
+                ) : (
+                  <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                    Report preview is unavailable.
+                  </div>
+                )}
+              </div>
             </>
           )}
         </DialogContent>
