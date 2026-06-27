@@ -19,6 +19,26 @@ import {
 import { cn } from "@/lib/utils";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+
+/**
+ * Reliable PDF "open + print" inside the Lovable preview (sandboxed iframe):
+ * - Try opening the blob URL in a new tab so the browser shows native print preview.
+ * - If the popup is blocked (or window.open returns null), fall back to a forced download
+ *   via an anchor click — that always works.
+ */
+function openOrDownloadPdf(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 import { loadLabReportConfig } from "@/lib/labReportConfig";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
