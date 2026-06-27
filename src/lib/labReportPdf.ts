@@ -333,7 +333,38 @@ function buildDoc(input: LabReportPdfInput, logoDataUrl: string | null, qrDataUr
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 80);
-  doc.text("Lab Technician", M, cursorY + 36);
+
+  // Digital signature for the logged-in user (Prepared By)
+  const signerName = (input.signedByName || "").trim();
+  if (signerName) {
+    doc.setFont("times", "italic");
+    doc.setFontSize(16);
+    doc.setTextColor(20, 40, 90);
+    doc.text(signerName, M, cursorY + 18);
+    // subtle signature underline
+    const sigW = doc.getTextWidth(signerName);
+    doc.setDrawColor(180, 195, 220);
+    doc.line(M, cursorY + 22, M + sigW + 6, cursorY + 22);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(80, 80, 80);
+    doc.text(signerName, M, cursorY + 34);
+    doc.text(input.signedByRole || "Lab Technician", M, cursorY + 44);
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+      `Digitally signed on ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+      M,
+      cursorY + 54
+    );
+  } else {
+    doc.text("Lab Technician", M, cursorY + 36);
+  }
+
+  // Verified By (Pathologist) column
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(80, 80, 80);
   doc.text(config.pathologistName || "Consultant Pathologist", M + sigColW, cursorY + 24);
   if (config.pathologistReg) {
     doc.text(`Reg No: ${config.pathologistReg}`, M + sigColW, cursorY + 36);
