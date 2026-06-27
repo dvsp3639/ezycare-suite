@@ -1213,7 +1213,7 @@ const PdfBlobPreview = ({ blob }: { blob: Blob }) => {
           canvas.width = Math.ceil(viewport.width);
           canvas.height = Math.ceil(viewport.height);
 
-          await page.render({ canvasContext: context, viewport }).promise;
+          await page.render({ canvas, canvasContext: context, viewport }).promise;
 
           const imageBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
           if (!imageBlob) throw new Error("Unable to render report preview");
