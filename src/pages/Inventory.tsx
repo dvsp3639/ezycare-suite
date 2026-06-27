@@ -868,7 +868,11 @@ const Inventory = () => {
         <TabsContent value="diagnostics">
         </TabsContent>
 
-        {/* placeholder gets replaced */}
+        {/* ════════ PURCHASE INVOICES TAB ════════ */}
+        <TabsContent value="purchases">
+          <PurchaseInvoiceRepository openBillId={openBillId} onOpenedBillId={() => setOpenBillId(null)} />
+        </TabsContent>
+
         <TabsContent value="diagnostics_dummy">
            <div className="flex items-center justify-between mb-4">
              <div className="flex items-center gap-3">
