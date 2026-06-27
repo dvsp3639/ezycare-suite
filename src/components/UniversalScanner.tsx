@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading";
+type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
 type Field = { value: any; confidence: number; corrected?: boolean };
 type MedicineExtract = Record<string, Field>;
 
@@ -169,6 +169,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const [acknowledgedWarnings, setAcknowledgedWarnings] = useState(false);
   const [employeeId, setEmployeeId] = useState<string>("");
   const [approverName, setApproverName] = useState<string>("");
+  const [successInfo, setSuccessInfo] = useState<{ billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -181,6 +182,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setExcelRows([]); setExcelCols([]);
     setInvoiceStep(1); setSourceFiles([]); setLines([]); setCorrections([]);
     setWarnings([]); setAcknowledgedWarnings(false); setApproverName("");
+    setSuccessInfo(null);
     setSupplier({ name: "", gst: "", address: "", contact: "" });
     setInvoiceMeta({ invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0 });
   }, []);
