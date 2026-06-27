@@ -341,7 +341,102 @@ export function UniversalSearch() {
 
   const recent = useMemo(() => getRecent(), [open]);
 
-  const placeholder = "Search medicines, speak naturally or scan…";
+  const placeholder = inPharmacy
+    ? "Search medicines, patients, prescriptions…"
+    : "Search medicines, speak naturally or scan…";
+
+  // Group results into sections for faster scanning
+  const grouped = useMemo(() => {
+    const meds = results.filter((r) => r.kind === "medicine");
+    const pats = results.filter((r) => r.kind === "patient");
+    const mods = results.filter((r) => r.kind === "module");
+    return { meds, pats, mods };
+  }, [results]);
+
+  const renderRow = (r: Result, idx: number) => {
+    const active = idx === highlight;
+    const Icon = r.kind === "medicine" ? Pill : r.kind === "patient" ? User : LayoutGrid;
+    return (
+      <li
+        key={r.id}
+        role="option"
+        aria-selected={active}
+        onMouseEnter={() => setHighlight(idx)}
+        onClick={() => choose(r)}
+        className={cn(
+          "flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors rounded-lg",
+          active ? "bg-accent" : "hover:bg-accent/50",
+        )}
+      >
+        <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+          r.kind === "medicine" ? "bg-info/10 text-info" :
+          r.kind === "patient" ? "bg-primary/10 text-primary" :
+          "bg-muted text-foreground")}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-medium text-foreground truncate">{r.title}</p>
+          {r.subtitle && <p className="text-xs text-muted-foreground truncate">{r.subtitle}</p>}
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      </li>
+    );
+  };
+
+  const SectionHeader = ({ label }: { label: string }) => (
+    <p className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
+  );
+
+  const Panel = (
+    <>
+      {q.trim().length < 2 && recent.length > 0 && (
+        <div className="px-2 pt-2 pb-1">
+          <SectionHeader label="Recent" />
+          <div className="flex flex-wrap gap-1.5 px-1 pb-1">
+            {recent.slice(0, 6).map((r) => (
+              <button key={r} onClick={() => { setQ(r); runAi(r); }} className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full bg-muted hover:bg-accent">
+                <Clock className="h-3 w-3" /> {r}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <ul role="listbox" className="px-1 pb-2">
+        {grouped.meds.length > 0 && <SectionHeader label="Medicines" />}
+        {grouped.meds.map((r) => renderRow(r, results.indexOf(r)))}
+        {grouped.pats.length > 0 && <SectionHeader label="Patients" />}
+        {grouped.pats.map((r) => renderRow(r, results.indexOf(r)))}
+        {grouped.mods.length > 0 && <SectionHeader label="Modules" />}
+        {grouped.mods.map((r) => renderRow(r, results.indexOf(r)))}
+
+        {q.trim() && (
+          <li
+            role="option"
+            onMouseEnter={() => setHighlight(results.length)}
+            onClick={() => runAi(q)}
+            className={cn(
+              "mt-2 mx-1 flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 to-transparent",
+              highlight === results.length && "ring-2 ring-primary/30",
+            )}
+          >
+            <div className="h-9 w-9 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
+              {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Ask AI: "{q}"</p>
+              <p className="text-xs text-muted-foreground">English · Hindi · Telugu · Hinglish</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </li>
+        )}
+        {results.length === 0 && !q.trim() && (
+          <li className="px-3 py-8 text-center text-xs text-muted-foreground">
+            {inPharmacy ? "Type a medicine or patient · Tap mic to speak · Tap scan for barcode" : "Start typing or press the mic to speak"}
+          </li>
+        )}
+      </ul>
+    </>
+  );
 
   return (
     <>
@@ -428,77 +523,117 @@ export function UniversalSearch() {
         </div>
       </div>
 
-      {open && (
+      {open && !isMobile && (
         <div className="absolute z-50 mt-2 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden animate-fade-in">
-          {q.trim().length < 2 && recent.length > 0 && (
-            <div className="p-2 border-b border-border">
-              <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Recent</p>
-              <div className="flex flex-wrap gap-1.5 px-1 pb-1">
-                {recent.slice(0, 6).map((r) => (
-                  <button key={r} onClick={() => { setQ(r); runAi(r); }} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-muted hover:bg-accent">
-                    <Clock className="h-3 w-3" /> {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <ul role="listbox" className="max-h-[60vh] overflow-y-auto divide-y divide-border">
-            {results.map((r, i) => {
-              const active = i === highlight;
-              const Icon = r.kind === "medicine" ? Pill : r.kind === "patient" ? User : LayoutGrid;
-              return (
-                <li
-                  key={r.id}
-                  role="option"
-                  aria-selected={active}
-                  onMouseEnter={() => setHighlight(i)}
-                  onClick={() => choose(r)}
-                  className={cn("flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors", active ? "bg-accent" : "hover:bg-accent/50")}
-                >
-                  <div className={cn("h-8 w-8 rounded-md flex items-center justify-center shrink-0",
-                    r.kind === "medicine" ? "bg-info/10 text-info" :
-                    r.kind === "patient" ? "bg-primary/10 text-primary" :
-                    "bg-muted text-foreground")}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
-                    {r.subtitle && <p className="text-xs text-muted-foreground truncate">{r.subtitle}</p>}
-                  </div>
-                  <Badge variant="outline" className="text-[10px] capitalize">{r.kind}</Badge>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                </li>
-              );
-            })}
-            {q.trim() && (
-              <li
-                role="option"
-                onMouseEnter={() => setHighlight(results.length)}
-                onClick={() => runAi(q)}
-                className={cn("flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors border-t border-border bg-gradient-to-r from-primary/5 to-transparent",
-                  highlight === results.length ? "bg-accent" : "hover:bg-accent/50")}
-              >
-                <div className="h-8 w-8 rounded-md flex items-center justify-center bg-primary/10 text-primary">
-                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">Ask AI: "{q}"</p>
-                  <p className="text-xs text-muted-foreground">Understands English, Hindi, Telugu, Hinglish</p>
-                </div>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </li>
-            )}
-            {results.length === 0 && q.trim().length < 2 && (
-              <li className="px-3 py-6 text-center text-xs text-muted-foreground">Start typing or press the mic to speak</li>
-            )}
-          </ul>
+          <div className="max-h-[65vh] overflow-y-auto">{Panel}</div>
           <div className="px-3 py-1.5 border-t border-border bg-muted/30 text-[10px] text-muted-foreground flex items-center justify-between">
             <span>↑ ↓ navigate · Enter select · Esc close</span>
-            <span className="hidden md:inline">Powered by Ezy OP AI</span>
+            <span className="hidden md:inline">{activeModuleLabel ? `Context: ${activeModuleLabel}` : "Powered by Ezy OP AI"}</span>
           </div>
         </div>
       )}
     </div>
+
+    {/* Mobile overlay: bottom sheet with back, swipe-down, outside-tap close */}
+    {isMobile && open && (
+      <div className="fixed inset-0 z-[90] flex flex-col animate-fade-in">
+        {/* Backdrop — tap to close */}
+        <button
+          aria-label="Close search"
+          onClick={() => setOpen(false)}
+          className="absolute inset-0 bg-background/70 backdrop-blur-sm"
+        />
+        {/* Sheet */}
+        <div
+          ref={sheetRef}
+          className="relative mt-auto bg-popover border-t border-border rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] animate-slide-in-right"
+          style={{ transform: `translateY(${sheetDrag}px)`, transition: sheetDrag === 0 ? "transform 0.25s ease" : "none" }}
+          onTouchStart={(e) => { touchStartY.current = e.touches[0].clientY; }}
+          onTouchMove={(e) => {
+            if (touchStartY.current == null) return;
+            const dy = e.touches[0].clientY - touchStartY.current;
+            if (dy > 0) setSheetDrag(dy);
+          }}
+          onTouchEnd={() => {
+            if (sheetDrag > 90) setOpen(false);
+            touchStartY.current = null;
+            setSheetDrag(0);
+          }}
+        >
+          {/* Drag handle */}
+          <div className="pt-2 pb-1 flex justify-center">
+            <span className="h-1.5 w-12 rounded-full bg-muted-foreground/30" />
+          </div>
+          {/* Header: back + context + close */}
+          <div className="px-3 pt-1 pb-2 flex items-center gap-2">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Back"
+              className="h-10 w-10 rounded-full hover:bg-accent active:scale-95 flex items-center justify-center"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground leading-tight">AI Search</p>
+              {activeModuleLabel && (
+                <p className="text-[11px] text-muted-foreground leading-tight truncate">in {activeModuleLabel}</p>
+              )}
+            </div>
+            {q && (
+              <button onClick={() => setQ("")} className="text-xs text-muted-foreground px-2 py-1 rounded-md hover:bg-accent">Clear</button>
+            )}
+          </div>
+          {/* Search input row */}
+          <div className="px-3 pb-2">
+            <div className={cn(
+              "flex items-center gap-2 h-12 px-3 rounded-2xl border border-border bg-background",
+              listening && "border-destructive/40 bg-destructive/[0.04]",
+            )}>
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={onKey}
+                placeholder={placeholder}
+                autoFocus
+                className="flex-1 h-10 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-[15px]"
+              />
+              {aiBusy && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+            </div>
+          </div>
+          {/* Results */}
+          <div className="flex-1 overflow-y-auto">{Panel}</div>
+          {/* Bottom actions: 3 large targets */}
+          <div className="border-t border-border p-3 grid grid-cols-3 gap-2 bg-popover">
+            <button
+              onClick={() => inputRef.current?.focus()}
+              className="flex flex-col items-center gap-1 py-3 rounded-2xl bg-muted hover:bg-accent active:scale-95 transition"
+            >
+              <Keyboard className="h-5 w-5" />
+              <span className="text-[11px] font-medium">Type</span>
+            </button>
+            <button
+              onClick={openScanner}
+              className="flex flex-col items-center gap-1 py-3 rounded-2xl bg-muted hover:bg-accent active:scale-95 transition"
+            >
+              <ScanLine className="h-5 w-5" />
+              <span className="text-[11px] font-medium">Scan</span>
+            </button>
+            <button
+              onClick={toggleVoice}
+              className={cn(
+                "flex flex-col items-center gap-1 py-3 rounded-2xl active:scale-95 transition text-primary-foreground",
+                listening ? "bg-destructive" : "bg-gradient-to-br from-primary to-primary/80 animate-ai-glow",
+              )}
+            >
+              {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              <span className="text-[11px] font-medium">{listening ? "Stop" : "Voice"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Mobile floating action bar */}
     {isMobile && (
