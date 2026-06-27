@@ -18,7 +18,7 @@ import {
   Upload, FileImage, FileText, Download, X, Plus, Trash2, Settings2, Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { resolveLabReportUrl } from "@/lib/labReports";
+import { resolveLabReportBlob } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
 
 import { loadLabReportConfig } from "@/lib/labReportConfig";
@@ -132,6 +132,8 @@ const Diagnostics = () => {
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
+  const [reportPreview, setReportPreview] = useState<{ url: string; fileName: string; mimeType: string } | null>(null);
+  const [reportPreviewLoading, setReportPreviewLoading] = useState(false);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
@@ -347,6 +349,42 @@ const Diagnostics = () => {
       toast.error(err.message || "Unable to open print preview");
     }
   };
+
+  useEffect(() => {
+    if (!viewOrder?.reportFileUrl) {
+      setReportPreview(null);
+      setReportPreviewLoading(false);
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+
+    setReportPreview(null);
+    setReportPreviewLoading(true);
+
+    resolveLabReportBlob(viewOrder.reportFileUrl)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setReportPreview({
+          url: objectUrl,
+          fileName: viewOrder.reportFileName || "lab-report.pdf",
+          mimeType: blob.type || "application/octet-stream",
+        });
+      })
+      .catch((err: any) => {
+        if (active) toast.error(err.message || "Unable to load report");
+      })
+      .finally(() => {
+        if (active) setReportPreviewLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [viewOrder?.id, viewOrder?.reportFileUrl, viewOrder?.reportFileName]);
 
   const getFileIcon = (type: string) => {
     if (type.startsWith("image/")) return <FileImage className="h-4 w-4 text-info" />;
@@ -955,31 +993,46 @@ const Diagnostics = () => {
 
               {viewOrder.reportFileUrl && (
                 <div className="border border-border rounded-lg p-3 bg-card">
-                  <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const url = await resolveLabReportUrl(viewOrder.reportFileUrl!);
-                        if (!url) return;
-                        const win = window.open(url, "_blank", "noopener,noreferrer");
-                        if (!win) {
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = viewOrder.reportFileName || "lab-report.pdf";
-                          a.target = "_blank";
-                          document.body.appendChild(a);
-                          a.click();
-                          a.remove();
-                        }
-                      } catch (err: any) {
-                        toast.error(err.message || "Unable to open report");
-                      }
-                    }}
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <Download className="h-4 w-4" /> {viewOrder.reportFileName || "Download Report"}
-                  </button>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <p className="text-xs font-semibold text-foreground flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Report File</p>
+                    {reportPreview && (
+                      <a
+                        href={reportPreview.url}
+                        download={reportPreview.fileName}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download
+                      </a>
+                    )}
+                  </div>
+
+                  {reportPreviewLoading ? (
+                    <div className="h-40 rounded-md border border-border bg-muted/40 grid place-items-center text-xs text-muted-foreground">
+                      Loading report preview...
+                    </div>
+                  ) : reportPreview ? (
+                    reportPreview.mimeType.includes("pdf") ? (
+                      <iframe
+                        title="Lab report preview"
+                        src={reportPreview.url}
+                        className="h-[420px] w-full rounded-md border border-border bg-background"
+                      />
+                    ) : reportPreview.mimeType.startsWith("image/") ? (
+                      <img
+                        src={reportPreview.url}
+                        alt="Lab report preview"
+                        className="max-h-[420px] w-full rounded-md border border-border object-contain bg-background"
+                      />
+                    ) : (
+                      <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                        Preview is not available for this file type. Use Download to save the report.
+                      </div>
+                    )
+                  ) : (
+                    <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                      Report preview is unavailable.
+                    </div>
+                  )}
                 </div>
               )}
 
