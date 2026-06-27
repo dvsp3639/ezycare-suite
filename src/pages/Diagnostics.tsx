@@ -150,7 +150,6 @@ const Diagnostics = () => {
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
-  const [printPreview, setPrintPreview] = useState<{ url: string; fileName: string; title: string } | null>(null);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
