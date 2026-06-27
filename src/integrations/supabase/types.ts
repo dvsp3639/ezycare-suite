@@ -1950,20 +1950,121 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_bill_items: {
+        Row: {
+          ai_confidence: number | null
+          amount: number
+          batch_no: string | null
+          brand_name: string | null
+          created_at: string
+          expiry_date: string | null
+          free_quantity: number
+          generic_name: string | null
+          gst_percent: number
+          hospital_id: string
+          hsn_code: string | null
+          id: string
+          manufacturer: string | null
+          medicine_id: string | null
+          medicine_name: string
+          mfg_date: string | null
+          mrp: number
+          pack_size: string | null
+          purchase_bill_id: string
+          purchase_rate: number
+          quantity: number
+          selling_rate: number | null
+          strength: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          amount?: number
+          batch_no?: string | null
+          brand_name?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          free_quantity?: number
+          generic_name?: string | null
+          gst_percent?: number
+          hospital_id: string
+          hsn_code?: string | null
+          id?: string
+          manufacturer?: string | null
+          medicine_id?: string | null
+          medicine_name: string
+          mfg_date?: string | null
+          mrp?: number
+          pack_size?: string | null
+          purchase_bill_id: string
+          purchase_rate?: number
+          quantity?: number
+          selling_rate?: number | null
+          strength?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          amount?: number
+          batch_no?: string | null
+          brand_name?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          free_quantity?: number
+          generic_name?: string | null
+          gst_percent?: number
+          hospital_id?: string
+          hsn_code?: string | null
+          id?: string
+          manufacturer?: string | null
+          medicine_id?: string | null
+          medicine_name?: string
+          mfg_date?: string | null
+          mrp?: number
+          pack_size?: string | null
+          purchase_bill_id?: string
+          purchase_rate?: number
+          quantity?: number
+          selling_rate?: number | null
+          strength?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_bill_items_medicine_id_fkey"
+            columns: ["medicine_id"]
+            isOneToOne: false
+            referencedRelation: "medicines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_bill_items_purchase_bill_id_fkey"
+            columns: ["purchase_bill_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_bills: {
         Row: {
           bill_date: string
           bill_type: string
           created_at: string
           discount: number | null
+          extracted_payload: Json | null
           gst_amount: number | null
           hospital_id: string
           id: string
+          imported_by: string | null
+          invoice_file_url: string | null
           invoice_no: string | null
+          net_payable: number | null
           notes: string | null
           payment_mode: string | null
           payment_status: string | null
+          round_off: number | null
           subtotal: number | null
+          supplier_address: string | null
+          supplier_contact: string | null
+          supplier_gst: string | null
           total_amount: number
           updated_at: string
           vendor: string
@@ -1973,14 +2074,22 @@ export type Database = {
           bill_type?: string
           created_at?: string
           discount?: number | null
+          extracted_payload?: Json | null
           gst_amount?: number | null
           hospital_id: string
           id?: string
+          imported_by?: string | null
+          invoice_file_url?: string | null
           invoice_no?: string | null
+          net_payable?: number | null
           notes?: string | null
           payment_mode?: string | null
           payment_status?: string | null
+          round_off?: number | null
           subtotal?: number | null
+          supplier_address?: string | null
+          supplier_contact?: string | null
+          supplier_gst?: string | null
           total_amount?: number
           updated_at?: string
           vendor?: string
@@ -1990,14 +2099,22 @@ export type Database = {
           bill_type?: string
           created_at?: string
           discount?: number | null
+          extracted_payload?: Json | null
           gst_amount?: number | null
           hospital_id?: string
           id?: string
+          imported_by?: string | null
+          invoice_file_url?: string | null
           invoice_no?: string | null
+          net_payable?: number | null
           notes?: string | null
           payment_mode?: string | null
           payment_status?: string | null
+          round_off?: number | null
           subtotal?: number | null
+          supplier_address?: string | null
+          supplier_contact?: string | null
+          supplier_gst?: string | null
           total_amount?: number
           updated_at?: string
           vendor?: string
@@ -2682,6 +2799,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_purchase_invoice: {
+        Args: { _invoice: Json; _items: Json; _supplier: Json }
+        Returns: Json
       }
       next_pharmacy_invoice_no: {
         Args: { _hospital_id: string }
