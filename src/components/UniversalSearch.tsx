@@ -652,34 +652,12 @@ export function UniversalSearch() {
       </div>
     )}
 
-    {/* Scan overlay */}
-    {scanOpen && (
-      <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col animate-fade-in">
-        <div className="flex items-center justify-between p-4 text-white">
-          <div className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
-            <span className="font-medium">Smart Scan</span>
-          </div>
-          <button onClick={() => { stopScanner(); setScanOpen(false); }} className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 flex items-center justify-center px-6">
-          <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden bg-black ring-1 ring-white/10">
-            <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-            {/* corner frame */}
-            <div className="absolute inset-6 pointer-events-none">
-              <div className="absolute top-0 left-0 w-10 h-10 border-t-2 border-l-2 border-primary rounded-tl-xl" />
-              <div className="absolute top-0 right-0 w-10 h-10 border-t-2 border-r-2 border-primary rounded-tr-xl" />
-              <div className="absolute bottom-0 left-0 w-10 h-10 border-b-2 border-l-2 border-primary rounded-bl-xl" />
-              <div className="absolute bottom-0 right-0 w-10 h-10 border-b-2 border-r-2 border-primary rounded-br-xl" />
-              <div className="absolute inset-x-0 h-[2px] bg-primary/80 shadow-[0_0_12px_hsl(var(--primary))] animate-scan-line" />
-            </div>
-          </div>
-        </div>
-        <p className="text-center text-white/80 pb-8 px-6 text-sm">{scanHint}</p>
-      </div>
-    )}
+    {/* Universal Scanner: camera + image + pdf + excel + drag-drop */}
+    <UniversalScanner
+      open={scanOpen}
+      onClose={() => setScanOpen(false)}
+      onScannedBarcode={(code) => handleScannedCode(code)}
+    />
 
     {/* AI confirmation card */}
     {confirm && (
