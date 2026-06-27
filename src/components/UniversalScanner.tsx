@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading";
+type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
 type Field = { value: any; confidence: number; corrected?: boolean };
 type MedicineExtract = Record<string, Field>;
 
@@ -169,6 +169,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const [acknowledgedWarnings, setAcknowledgedWarnings] = useState(false);
   const [employeeId, setEmployeeId] = useState<string>("");
   const [approverName, setApproverName] = useState<string>("");
+  const [successInfo, setSuccessInfo] = useState<{ billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -181,6 +182,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setExcelRows([]); setExcelCols([]);
     setInvoiceStep(1); setSourceFiles([]); setLines([]); setCorrections([]);
     setWarnings([]); setAcknowledgedWarnings(false); setApproverName("");
+    setSuccessInfo(null);
     setSupplier({ name: "", gst: "", address: "", contact: "" });
     setInvoiceMeta({ invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0 });
   }, []);
@@ -778,7 +780,15 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       }
       const summary = data as any;
       toast.success(`Imported · ${summary?.created ?? 0} new · ${summary?.updated ?? 0} updated · ${summary?.total_items ?? lines.length} lines saved`);
-      close();
+      setSuccessInfo({
+        billId: summary?.bill_id || "",
+        vendor: supplier.name,
+        invoiceNo: invoiceMeta.invoiceNo,
+        created: summary?.created ?? 0,
+        updated: summary?.updated ?? 0,
+        total: invoiceMeta.netPayable || invoiceMeta.totalAmount,
+      });
+      setMode("success");
     } catch (e: any) {
       toast.error(e?.message || "Import failed");
     } finally { setBusy(false); }
@@ -878,6 +888,24 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
         {mode === "excel" && (
           <ExcelView rows={excelRows} cols={excelCols} busy={busy} onCancel={reset} onImport={importExcel} />
+        )}
+
+        {mode === "success" && successInfo && (
+          <SuccessView
+            info={successInfo}
+            onViewInventory={() => { close(); window.location.assign("/inventory"); }}
+            onViewInvoice={() => {
+              const id = successInfo.billId;
+              close();
+              // Navigate to inventory, switch to purchases tab, open the bill
+              const url = new URL(window.location.origin + "/inventory");
+              url.searchParams.set("tab", "purchases");
+              if (id) url.searchParams.set("bill", id);
+              window.location.assign(url.toString());
+            }}
+            onPrintGRN={() => window.print()}
+            onClose={close}
+          />
         )}
       </div>
 
@@ -1150,6 +1178,32 @@ function InvoiceWizard(props: {
   const allExtracted = sourceFiles.length > 0 && sourceFiles.every((f) => f.status === "done" || f.status === "error");
   const anyExtracted = sourceFiles.some((f) => f.status === "done");
 
+  // ---- Readiness checks for Step 3 ----
+  const lowConfLines = useMemo(() => lines.filter((l) => (l.confidence ?? 1) < 0.6).length, [lines]);
+  const dupInvoiceBlocked = warnings.some((w) => w.kind === "duplicate_invoice");
+  const otherWarnings = warnings.filter((w) => w.kind !== "duplicate_invoice");
+  const requireAck = otherWarnings.length > 0;
+  const checks = [
+    { ok: !!supplier.name?.trim(), label: "Supplier name entered" },
+    { ok: !!invoice.invoiceNo?.trim(), label: "Invoice number entered" },
+    { ok: !!invoice.invoiceDate, label: "Invoice date set" },
+    { ok: lines.length > 0, label: "At least one medicine line" },
+    { ok: lines.every((l) => l.name?.trim() && (Number(l.quantity) || 0) > 0), label: "Every line has name & quantity" },
+    { ok: lowConfLines === 0, label: `Low-confidence rows reviewed${lowConfLines ? ` (${lowConfLines} pending)` : ""}` },
+    { ok: !!employeeId.trim(), label: "Employee ID entered" },
+    { ok: !requireAck || acknowledged, label: "Pre-import warnings acknowledged" },
+    { ok: !dupInvoiceBlocked, label: "Duplicate invoice resolved" },
+  ];
+  const blockingMissing = checks.filter((c) => !c.ok);
+
+  function tryApprove() {
+    if (blockingMissing.length) {
+      toast.error(`Cannot import yet — ${blockingMissing[0].label} is missing.`);
+      return;
+    }
+    setConfirmOpen(true);
+  }
+
   const totals = useMemo(() => {
     const qty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
     const amt = lines.reduce((s, l) => s + (Number(l.amount) || (Number(l.purchaseRate) || 0) * (Number(l.quantity) || 0)), 0);
@@ -1365,6 +1419,24 @@ function InvoiceWizard(props: {
           )}
 
           <Section title="Audit trail" icon={ShieldCheck}>
+            {/* hidden marker */}
+            <div className="hidden" />
+          </Section>
+          <Section title="Import readiness" icon={ShieldCheck}>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs">
+              {checks.map((c, i) => (
+                <li key={i} className={cn("flex items-center gap-2 px-2 py-1 rounded", c.ok ? "text-success" : "text-destructive")}>
+                  {c.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                  <span>{c.label}</span>
+                </li>
+              ))}
+            </ul>
+            {blockingMissing.length > 0 && (
+              <p className="text-xs text-destructive mt-2">{blockingMissing.length} item(s) need attention before import.</p>
+            )}
+          </Section>
+
+          <Section title="Audit details" icon={ShieldCheck}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div><p className="text-muted-foreground">Verified by</p><p className="font-medium">{profile?.full_name || user?.email || "—"}</p></div>
               <div><p className="text-muted-foreground">Date & time</p><p className="font-medium">{new Date().toLocaleString()}</p></div>
@@ -1389,8 +1461,8 @@ function InvoiceWizard(props: {
           <WizardFooter onCancel={onCancel} busy={busy}>
             <Button variant="outline" onClick={() => props.setStep(2)} disabled={busy}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
             <Button
-              onClick={() => setConfirmOpen(true)}
-              disabled={busy || (warnings.some((w) => w.severity === "warn") && !acknowledged)}
+              onClick={tryApprove}
+              disabled={busy}
             >
               <ShieldCheck className="h-4 w-4 mr-2" /> Approve & import
             </Button>
@@ -1488,6 +1560,46 @@ function WizardFooter({ children, onCancel, busy }: { children: React.ReactNode;
     <div className="flex flex-col-reverse md:flex-row md:justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur p-2 -mx-4 md:-mx-6 border-t">
       <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
       {children}
+    </div>
+  );
+}
+
+function SuccessView({ info, onViewInventory, onViewInvoice, onPrintGRN, onClose }: {
+  info: { billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number };
+  onViewInventory: () => void;
+  onViewInvoice: () => void;
+  onPrintGRN: () => void;
+  onClose: () => void;
+}) {
+  const totalLines = info.created + info.updated;
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <div className="rounded-3xl border border-success/30 bg-success/5 p-8 text-center">
+        <div className="h-16 w-16 mx-auto rounded-full bg-success/15 flex items-center justify-center mb-4">
+          <CheckCircle2 className="h-8 w-8 text-success" />
+        </div>
+        <h2 className="text-xl font-semibold mb-1">Purchase invoice imported</h2>
+        <p className="text-sm text-muted-foreground">
+          Invoice <span className="font-medium text-foreground">{info.invoiceNo || "—"}</span> from <span className="font-medium text-foreground">{info.vendor || "—"}</span>
+        </p>
+
+        <ul className="text-sm mt-6 space-y-2 inline-block text-left">
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> {totalLines} medicine{totalLines === 1 ? "" : "s"} imported successfully ({info.created} new · {info.updated} updated).</li>
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Inventory updated — visible in Stock, Pharmacy and Sale searches.</li>
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Purchase invoice archived in the repository.</li>
+        </ul>
+
+        <p className="text-xs text-muted-foreground mt-6">Total invoice value: ₹{(info.total || 0).toFixed(2)}</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-5">
+        <Button onClick={onViewInventory}><Plus className="h-4 w-4 mr-2" /> View Inventory</Button>
+        <Button variant="outline" onClick={onViewInvoice}><FileCheck2 className="h-4 w-4 mr-2" /> View Purchase Invoice</Button>
+        <Button variant="outline" onClick={onPrintGRN}><FileText className="h-4 w-4 mr-2" /> Print GRN</Button>
+      </div>
+      <div className="flex justify-center mt-4">
+        <Button variant="ghost" size="sm" onClick={onClose}>Done</Button>
+      </div>
     </div>
   );
 }
