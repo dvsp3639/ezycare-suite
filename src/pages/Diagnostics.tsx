@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +32,8 @@ import {
   useCreateTestCatalogItem, useUpdateTestCatalogItem, useDeleteTestCatalogItem,
 } from "@/modules/diagnostics/hooks";
 import type { LabTestCatalogItem } from "@/modules/diagnostics/types";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const statusColors: Record<string, string> = {
   Ordered: "bg-warning/10 text-warning border-warning/20",
@@ -132,7 +136,7 @@ const Diagnostics = () => {
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
-  const [reportPreview, setReportPreview] = useState<{ url: string; fileName: string; mimeType: string } | null>(null);
+  const [reportPreview, setReportPreview] = useState<{ url: string; fileName: string; mimeType: string; blob: Blob } | null>(null);
   const [reportPreviewLoading, setReportPreviewLoading] = useState(false);
 
   // Payment dialog
@@ -371,6 +375,7 @@ const Diagnostics = () => {
           url: objectUrl,
           fileName: viewOrder.reportFileName || "lab-report.pdf",
           mimeType: blob.type || "application/octet-stream",
+          blob,
         });
       })
       .catch((err: any) => {
@@ -1011,12 +1016,8 @@ const Diagnostics = () => {
                       Loading report preview...
                     </div>
                   ) : reportPreview ? (
-                    reportPreview.mimeType.includes("pdf") ? (
-                      <iframe
-                        title="Lab report preview"
-                        src={reportPreview.url}
-                        className="h-[420px] w-full rounded-md border border-border bg-background"
-                      />
+                    reportPreview.mimeType.includes("pdf") || reportPreview.fileName.toLowerCase().endsWith(".pdf") ? (
+                      <PdfBlobPreview blob={reportPreview.blob} />
                     ) : reportPreview.mimeType.startsWith("image/") ? (
                       <img
                         src={reportPreview.url}
