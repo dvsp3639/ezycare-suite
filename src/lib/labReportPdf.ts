@@ -286,8 +286,7 @@ function buildDoc(input: LabReportPdfInput, logoDataUrl: string | null, qrDataUr
       }
     },
   });
-  // @ts-expect-error – autotable attaches lastAutoTable
-  let cursorY = (doc.lastAutoTable?.finalY ?? y) + 14;
+  let cursorY = ((doc as any).lastAutoTable?.finalY ?? y) + 14;
 
   // ─── Clinical interpretation + remarks ───
   const writeBlock = (title: string, body: string, accentColor?: [number, number, number]) => {
