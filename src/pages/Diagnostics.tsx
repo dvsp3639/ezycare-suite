@@ -377,12 +377,36 @@ const Diagnostics = () => {
         autoPrint: true,
       });
       const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
+      void fileName;
       const url = URL.createObjectURL(pdfBlob);
-      // Revoke any previous preview URL
-      setPrintPreview((prev) => {
-        if (prev?.url) URL.revokeObjectURL(prev.url);
-        return { url, fileName, title: `${order.testName} — ${order.patientName}` };
-      });
+      // Hidden iframe → triggers the browser's NATIVE system print preview
+      const existing = document.getElementById("lab-print-frame-hidden");
+      if (existing) existing.remove();
+      const iframe = document.createElement("iframe");
+      iframe.id = "lab-print-frame-hidden";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch {
+            toast.error("Print blocked by browser");
+          }
+        }, 300);
+      };
+      document.body.appendChild(iframe);
+      // Cleanup after a minute (gives the print dialog plenty of time)
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        iframe.remove();
+      }, 60_000);
     } catch (err: any) {
       toast.error(err.message || "Failed to prepare print preview");
     }
