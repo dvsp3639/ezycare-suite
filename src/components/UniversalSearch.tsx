@@ -83,6 +83,25 @@ export function UniversalSearch() {
     return m?.title;
   }, [location.pathname]);
 
+  // Context-aware tool visibility: AI tools only appear where they add real value.
+  // - Pharmacy:      Voice + Scan (billing & dispensing)
+  // - Diagnostics:   Scan only (samples, reports). Hide Voice billing.
+  // - Inventory:     Scan only (barcode/QR, stock entry). Hide Voice billing.
+  // - Reception:     Search only. No Voice, no Scan.
+  // - Accounts:      Search only. No Voice, no Scan.
+  // - Other modules: Search only by default.
+  const toolContext = useMemo(() => {
+    const p = location.pathname;
+    if (p === "/pharmacy")            return { voice: true,  scan: true,  label: "Pharmacy · Voice billing & scan" };
+    if (p === "/diagnostics")         return { voice: false, scan: true,  label: "Diagnostics · Sample & report scan" };
+    if (p === "/inventory")           return { voice: false, scan: true,  label: "Inventory · Barcode & QR scan" };
+    if (p === "/patient-registration")return { voice: false, scan: false, label: "Reception · Smart search" };
+    if (p === "/accounts")            return { voice: false, scan: false, label: "Accounts · Smart search" };
+    return { voice: false, scan: false, label: undefined as string | undefined };
+  }, [location.pathname]);
+  const showVoice = toolContext.voice;
+  const showScan = toolContext.scan;
+
   // ⌘K / Ctrl+K to focus, Escape closes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
