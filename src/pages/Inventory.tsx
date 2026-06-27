@@ -17,6 +17,8 @@ import {
   AlertTriangle, CheckCircle2, QrCode, Scan, TrendingUp, TrendingDown,
   Building2, IndianRupee, Clock, XCircle, Landmark, Wrench, CalendarCheck, BedDouble, Star,
 } from "lucide-react";
+import { Receipt } from "lucide-react";
+import { PurchaseInvoiceRepository } from "@/components/inventory/PurchaseInvoiceRepository";
 import { cn } from "@/lib/utils";
 import {
   inventoryCategories, departments, categoryColors,
@@ -666,6 +668,7 @@ const Inventory = () => {
         <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="stock"><Package className="h-4 w-4 mr-1" /> Stock</TabsTrigger>
           <TabsTrigger value="pharma"><IndianRupee className="h-4 w-4 mr-1" /> Pharma</TabsTrigger>
+          <TabsTrigger value="purchases"><Receipt className="h-4 w-4 mr-1" /> Purchase Invoices</TabsTrigger>
           <TabsTrigger value="diagnostics"><Scan className="h-4 w-4 mr-1" /> Diagnostics</TabsTrigger>
           <TabsTrigger value="transfers"><ArrowLeftRight className="h-4 w-4 mr-1" /> Transfers</TabsTrigger>
           <TabsTrigger value="beds-wards"><BedDouble className="h-4 w-4 mr-1" /> Beds & Wards</TabsTrigger>
