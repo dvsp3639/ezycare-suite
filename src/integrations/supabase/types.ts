@@ -2045,22 +2045,29 @@ export type Database = {
       }
       purchase_bills: {
         Row: {
+          approved_by: string | null
+          approved_by_name: string | null
           bill_date: string
           bill_type: string
           created_at: string
+          device_info: string | null
           discount: number | null
+          employee_id: string | null
           extracted_payload: Json | null
           gst_amount: number | null
           hospital_id: string
           id: string
+          imported_at: string | null
           imported_by: string | null
           invoice_file_url: string | null
           invoice_no: string | null
+          manual_corrections: Json | null
           net_payable: number | null
           notes: string | null
           payment_mode: string | null
           payment_status: string | null
           round_off: number | null
+          source_files: Json | null
           subtotal: number | null
           supplier_address: string | null
           supplier_contact: string | null
@@ -2068,24 +2075,34 @@ export type Database = {
           total_amount: number
           updated_at: string
           vendor: string
+          verified_by: string | null
+          verified_by_name: string | null
+          warnings: Json | null
         }
         Insert: {
+          approved_by?: string | null
+          approved_by_name?: string | null
           bill_date?: string
           bill_type?: string
           created_at?: string
+          device_info?: string | null
           discount?: number | null
+          employee_id?: string | null
           extracted_payload?: Json | null
           gst_amount?: number | null
           hospital_id: string
           id?: string
+          imported_at?: string | null
           imported_by?: string | null
           invoice_file_url?: string | null
           invoice_no?: string | null
+          manual_corrections?: Json | null
           net_payable?: number | null
           notes?: string | null
           payment_mode?: string | null
           payment_status?: string | null
           round_off?: number | null
+          source_files?: Json | null
           subtotal?: number | null
           supplier_address?: string | null
           supplier_contact?: string | null
@@ -2093,24 +2110,34 @@ export type Database = {
           total_amount?: number
           updated_at?: string
           vendor?: string
+          verified_by?: string | null
+          verified_by_name?: string | null
+          warnings?: Json | null
         }
         Update: {
+          approved_by?: string | null
+          approved_by_name?: string | null
           bill_date?: string
           bill_type?: string
           created_at?: string
+          device_info?: string | null
           discount?: number | null
+          employee_id?: string | null
           extracted_payload?: Json | null
           gst_amount?: number | null
           hospital_id?: string
           id?: string
+          imported_at?: string | null
           imported_by?: string | null
           invoice_file_url?: string | null
           invoice_no?: string | null
+          manual_corrections?: Json | null
           net_payable?: number | null
           notes?: string | null
           payment_mode?: string | null
           payment_status?: string | null
           round_off?: number | null
+          source_files?: Json | null
           subtotal?: number | null
           supplier_address?: string | null
           supplier_contact?: string | null
@@ -2118,6 +2145,9 @@ export type Database = {
           total_amount?: number
           updated_at?: string
           vendor?: string
+          verified_by?: string | null
+          verified_by_name?: string | null
+          warnings?: Json | null
         }
         Relationships: [
           {
@@ -2800,10 +2830,20 @@ export type Database = {
         }
         Returns: boolean
       }
-      import_purchase_invoice: {
-        Args: { _invoice: Json; _items: Json; _supplier: Json }
-        Returns: Json
-      }
+      import_purchase_invoice:
+        | {
+            Args: { _invoice: Json; _items: Json; _supplier: Json }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _audit?: Json
+              _invoice: Json
+              _items: Json
+              _supplier: Json
+            }
+            Returns: Json
+          }
       next_pharmacy_invoice_no: {
         Args: { _hospital_id: string }
         Returns: string
