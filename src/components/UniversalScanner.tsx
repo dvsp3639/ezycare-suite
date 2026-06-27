@@ -1419,6 +1419,24 @@ function InvoiceWizard(props: {
           )}
 
           <Section title="Audit trail" icon={ShieldCheck}>
+            {/* hidden marker */}
+            <div className="hidden" />
+          </Section>
+          <Section title="Import readiness" icon={ShieldCheck}>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs">
+              {checks.map((c, i) => (
+                <li key={i} className={cn("flex items-center gap-2 px-2 py-1 rounded", c.ok ? "text-success" : "text-destructive")}>
+                  {c.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                  <span>{c.label}</span>
+                </li>
+              ))}
+            </ul>
+            {blockingMissing.length > 0 && (
+              <p className="text-xs text-destructive mt-2">{blockingMissing.length} item(s) need attention before import.</p>
+            )}
+          </Section>
+
+          <Section title="Audit details" icon={ShieldCheck}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div><p className="text-muted-foreground">Verified by</p><p className="font-medium">{profile?.full_name || user?.email || "—"}</p></div>
               <div><p className="text-muted-foreground">Date & time</p><p className="font-medium">{new Date().toLocaleString()}</p></div>
