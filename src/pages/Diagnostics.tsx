@@ -265,11 +265,15 @@ const Diagnostics = () => {
         fileLabel = reportFile.name;
       } else if (!isRadiology && filledResults.length > 0) {
         // Auto-generate a PDF report from the entered parameter values
-        const pdfBlob = generateLabReportPdf({
+        const pdfBlob = await generateLabReportPdfAsync({
           testName: resultOrder.testName,
           category: resultOrder.category,
+          hospital: hospitalProfile,
+          config: loadLabReportConfig(),
           patientName: resultOrder.patientName,
           patientRegNo: resultOrder.patientRegNo,
+          uhid: resultOrder.patientRegNo,
+          reportId: resultOrder.id,
           orderedBy: resultOrder.orderedBy,
           priority: resultOrder.priority,
           orderedAt: resultOrder.orderedAt,
@@ -277,6 +281,7 @@ const Diagnostics = () => {
           price: resultOrder.price,
           paymentStatus: resultOrder.paymentStatus,
           paymentMode: resultOrder.paymentMode,
+          department: resultOrder.category,
           reportNotes,
           clinicalNotes: resultOrder.clinicalNotes,
           results: filledResults,
