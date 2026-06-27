@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { flushSync } from "react-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -1180,6 +1180,95 @@ const StepIndicator = ({ label, active, done }: { label: string; active: boolean
     <span className={cn("text-[9px]", active || done ? "text-foreground font-medium" : "text-muted-foreground")}>{label}</span>
   </div>
 );
+
+const PdfBlobPreview = ({ blob }: { blob: Blob }) => {
+  const [pages, setPages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const renderedUrls: string[] = [];
+
+    const renderPdf = async () => {
+      setLoading(true);
+      setError(null);
+      setPages([]);
+
+      try {
+        const data = await blob.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        const nextPages: string[] = [];
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          if (cancelled) return;
+
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 1.45 });
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d");
+
+          if (!context) throw new Error("Unable to render report preview");
+
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          const imageBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+          if (!imageBlob) throw new Error("Unable to render report preview");
+
+          const pageUrl = URL.createObjectURL(imageBlob);
+          renderedUrls.push(pageUrl);
+          nextPages.push(pageUrl);
+          if (!cancelled) setPages([...nextPages]);
+        }
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || "Unable to render report preview");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    renderPdf();
+
+    return () => {
+      cancelled = true;
+      renderedUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [blob]);
+
+  if (loading && pages.length === 0) {
+    return (
+      <div className="h-40 rounded-md border border-border bg-muted/40 grid place-items-center text-xs text-muted-foreground">
+        Rendering PDF preview...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        {error}. Use Download to save the report.
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[520px] overflow-y-auto rounded-md border border-border bg-muted/40 p-3 space-y-3">
+      {pages.map((pageUrl, index) => (
+        <img
+          key={pageUrl}
+          src={pageUrl}
+          alt={`Lab report page ${index + 1}`}
+          loading="lazy"
+          className="mx-auto w-full max-w-[760px] rounded-sm border border-border bg-background shadow-sm"
+        />
+      ))}
+      {loading && <p className="text-center text-xs text-muted-foreground">Rendering remaining pages...</p>}
+    </div>
+  );
+};
 
 const PrintableLabReport = ({ order }: { order: DisplayLabOrder }) => (
   <section className="diagnostics-print-root" aria-hidden="true">
