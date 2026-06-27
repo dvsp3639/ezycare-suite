@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { resolveLabReportBlob } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 import { loadLabReportConfig } from "@/lib/labReportConfig";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
@@ -99,6 +100,8 @@ const Diagnostics = () => {
   const { data: labTestCatalog = [], isLoading: catalogLoading } = useLabTestCatalog();
   const { data: rawLabOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useLabOrders();
   const { data: hospitalProfile } = useHospitalProfile();
+  const { profile, user } = useAuth();
+  const signedByName = (profile?.full_name?.trim() || user?.email?.split("@")[0] || "").trim();
 
   const updateStatusMutation = useUpdateLabOrderStatus();
   const updatePaymentMutation = useUpdateLabOrderPayment();
@@ -293,6 +296,8 @@ const Diagnostics = () => {
           reportNotes,
           clinicalNotes: resultOrder.clinicalNotes,
           results: filledResults,
+          signedByName,
+          signedByRole: "Lab Technician",
         });
         const fileName = `lab-report-${resultOrder.patientRegNo || resultOrder.id}-${Date.now()}.pdf`;
         filePath = `${resultOrder.id}/${fileName}`;
