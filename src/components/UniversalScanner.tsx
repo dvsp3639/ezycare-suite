@@ -1178,6 +1178,32 @@ function InvoiceWizard(props: {
   const allExtracted = sourceFiles.length > 0 && sourceFiles.every((f) => f.status === "done" || f.status === "error");
   const anyExtracted = sourceFiles.some((f) => f.status === "done");
 
+  // ---- Readiness checks for Step 3 ----
+  const lowConfLines = useMemo(() => lines.filter((l) => (l.confidence ?? 1) < 0.6).length, [lines]);
+  const dupInvoiceBlocked = warnings.some((w) => w.kind === "duplicate_invoice");
+  const otherWarnings = warnings.filter((w) => w.kind !== "duplicate_invoice");
+  const requireAck = otherWarnings.length > 0;
+  const checks = [
+    { ok: !!supplier.name?.trim(), label: "Supplier name entered" },
+    { ok: !!invoice.invoiceNo?.trim(), label: "Invoice number entered" },
+    { ok: !!invoice.invoiceDate, label: "Invoice date set" },
+    { ok: lines.length > 0, label: "At least one medicine line" },
+    { ok: lines.every((l) => l.name?.trim() && (Number(l.quantity) || 0) > 0), label: "Every line has name & quantity" },
+    { ok: lowConfLines === 0, label: `Low-confidence rows reviewed${lowConfLines ? ` (${lowConfLines} pending)` : ""}` },
+    { ok: !!employeeId.trim(), label: "Employee ID entered" },
+    { ok: !requireAck || acknowledged, label: "Pre-import warnings acknowledged" },
+    { ok: !dupInvoiceBlocked, label: "Duplicate invoice resolved" },
+  ];
+  const blockingMissing = checks.filter((c) => !c.ok);
+
+  function tryApprove() {
+    if (blockingMissing.length) {
+      toast.error(`Cannot import yet — ${blockingMissing[0].label} is missing.`);
+      return;
+    }
+    setConfirmOpen(true);
+  }
+
   const totals = useMemo(() => {
     const qty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
     const amt = lines.reduce((s, l) => s + (Number(l.amount) || (Number(l.purchaseRate) || 0) * (Number(l.quantity) || 0)), 0);
@@ -1417,8 +1443,8 @@ function InvoiceWizard(props: {
           <WizardFooter onCancel={onCancel} busy={busy}>
             <Button variant="outline" onClick={() => props.setStep(2)} disabled={busy}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
             <Button
-              onClick={() => setConfirmOpen(true)}
-              disabled={busy || (warnings.some((w) => w.severity === "warn") && !acknowledged)}
+              onClick={tryApprove}
+              disabled={busy}
             >
               <ShieldCheck className="h-4 w-4 mr-2" /> Approve & import
             </Button>
