@@ -275,6 +275,19 @@ const Diagnostics = () => {
         if (uploadError) throw uploadError;
         fileLabel = reportFile.name;
       } else if (!isRadiology && filledResults.length > 0) {
+        // Resolve the signer name — prefer profile.full_name, then session
+        // user metadata, then email local-part. Guarantees a non-empty value
+        // so the digital signature always renders on the PDF.
+        let resolvedSigner = signedByName;
+        if (!resolvedSigner) {
+          const { data: sess } = await supabase.auth.getUser();
+          const meta = (sess?.user?.user_metadata ?? {}) as Record<string, any>;
+          resolvedSigner =
+            (meta.full_name as string) ||
+            (meta.name as string) ||
+            (sess?.user?.email ? sess.user.email.split("@")[0] : "") ||
+            "Lab Technician";
+        }
         // Auto-generate a PDF report from the entered parameter values
         const pdfBlob = await generateLabReportPdfAsync({
           testName: resultOrder.testName,
@@ -296,7 +309,7 @@ const Diagnostics = () => {
           reportNotes,
           clinicalNotes: resultOrder.clinicalNotes,
           results: filledResults,
-          signedByName,
+          signedByName: resolvedSigner,
           signedByRole: "Lab Technician",
         });
         const fileName = `lab-report-${resultOrder.patientRegNo || resultOrder.id}-${Date.now()}.pdf`;
