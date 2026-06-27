@@ -780,7 +780,15 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       }
       const summary = data as any;
       toast.success(`Imported · ${summary?.created ?? 0} new · ${summary?.updated ?? 0} updated · ${summary?.total_items ?? lines.length} lines saved`);
-      close();
+      setSuccessInfo({
+        billId: summary?.bill_id || "",
+        vendor: supplier.name,
+        invoiceNo: invoiceMeta.invoiceNo,
+        created: summary?.created ?? 0,
+        updated: summary?.updated ?? 0,
+        total: invoiceMeta.netPayable || invoiceMeta.totalAmount,
+      });
+      setMode("success");
     } catch (e: any) {
       toast.error(e?.message || "Import failed");
     } finally { setBusy(false); }
