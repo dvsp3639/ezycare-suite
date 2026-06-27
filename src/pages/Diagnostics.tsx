@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveLabReportUrl } from "@/lib/labReports";
-import { generateLabReportPdf } from "@/lib/labReportPdf";
+import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+import { loadLabReportConfig } from "@/lib/labReportConfig";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import {
   useLabTestCatalog, useLabOrders,
@@ -90,6 +92,7 @@ function mapDbOrder(o: any): DisplayLabOrder {
 const Diagnostics = () => {
   const { data: labTestCatalog = [], isLoading: catalogLoading } = useLabTestCatalog();
   const { data: rawLabOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useLabOrders();
+  const { data: hospitalProfile } = useHospitalProfile();
 
   const updateStatusMutation = useUpdateLabOrderStatus();
   const updatePaymentMutation = useUpdateLabOrderPayment();
@@ -262,11 +265,15 @@ const Diagnostics = () => {
         fileLabel = reportFile.name;
       } else if (!isRadiology && filledResults.length > 0) {
         // Auto-generate a PDF report from the entered parameter values
-        const pdfBlob = generateLabReportPdf({
+        const pdfBlob = await generateLabReportPdfAsync({
           testName: resultOrder.testName,
           category: resultOrder.category,
+          hospital: hospitalProfile,
+          config: loadLabReportConfig(),
           patientName: resultOrder.patientName,
           patientRegNo: resultOrder.patientRegNo,
+          uhid: resultOrder.patientRegNo,
+          reportId: resultOrder.id,
           orderedBy: resultOrder.orderedBy,
           priority: resultOrder.priority,
           orderedAt: resultOrder.orderedAt,
@@ -274,6 +281,7 @@ const Diagnostics = () => {
           price: resultOrder.price,
           paymentStatus: resultOrder.paymentStatus,
           paymentMode: resultOrder.paymentMode,
+          department: resultOrder.category,
           reportNotes,
           clinicalNotes: resultOrder.clinicalNotes,
           results: filledResults,
@@ -319,28 +327,56 @@ const Diagnostics = () => {
     }
   };
 
-  useEffect(() => {
-    if (!printOrder) return;
-
-    const clearPrintOrder = () => setPrintOrder(null);
-    window.addEventListener("afterprint", clearPrintOrder, { once: true });
-
-    const timer = window.setTimeout(() => {
-      window.print();
-    }, 100);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("afterprint", clearPrintOrder);
-    };
-  }, [printOrder]);
-
-  const handlePrintReport = (order: DisplayLabOrder) => {
+  const handlePrintReport = async (order: DisplayLabOrder) => {
     if ((!order.results || order.results.length === 0) && !order.reportNotes) {
       toast.error("No printable lab results available");
       return;
     }
-    setPrintOrder(order);
+    try {
+      const pdfBlob = await generateLabReportPdfAsync({
+        hospital: hospitalProfile,
+        config: { ...loadLabReportConfig(), }, 
+        testName: order.testName,
+        category: order.category,
+        patientName: order.patientName,
+        patientRegNo: order.patientRegNo,
+        uhid: order.patientRegNo,
+        reportId: order.id,
+        orderedBy: order.orderedBy,
+        priority: order.priority,
+        orderedAt: order.orderedAt,
+        completedAt: order.completedAt || new Date().toLocaleString(),
+        price: order.price,
+        paymentStatus: order.paymentStatus,
+        paymentMode: order.paymentMode,
+        department: order.category,
+        reportNotes: order.reportNotes,
+        clinicalNotes: order.clinicalNotes,
+        results: order.results || [],
+        autoPrint: true,
+      });
+      const url = URL.createObjectURL(pdfBlob);
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        setTimeout(() => {
+          try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch { /* ignore */ }
+        }, 200);
+      };
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        iframe.remove();
+      }, 60_000);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to prepare print preview");
+    }
   };
 
   const getFileIcon = (type: string) => {
