@@ -889,6 +889,24 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         {mode === "excel" && (
           <ExcelView rows={excelRows} cols={excelCols} busy={busy} onCancel={reset} onImport={importExcel} />
         )}
+
+        {mode === "success" && successInfo && (
+          <SuccessView
+            info={successInfo}
+            onViewInventory={() => { close(); window.location.assign("/inventory"); }}
+            onViewInvoice={() => {
+              const id = successInfo.billId;
+              close();
+              // Navigate to inventory, switch to purchases tab, open the bill
+              const url = new URL(window.location.origin + "/inventory");
+              url.searchParams.set("tab", "purchases");
+              if (id) url.searchParams.set("bill", id);
+              window.location.assign(url.toString());
+            }}
+            onPrintGRN={() => window.print()}
+            onClose={close}
+          />
+        )}
       </div>
 
       <input
