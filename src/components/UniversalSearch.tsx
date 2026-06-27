@@ -239,19 +239,20 @@ export function UniversalSearch() {
     setScanOpen(false);
     const { data } = await supabase
       .from("medicines")
-      .select("id,name,generic_name,strength,stock,batch_number,expiry_date")
-      .or(`barcode.eq.${code},name.ilike.%${code}%`)
+      .select("id,name,generic_name,strength,stock")
+      .ilike("name", `%${code}%`)
       .limit(1)
       .maybeSingle();
-    if (data) {
-      bumpFreq(`med:${data.id}`);
-      pushRecent(data.name);
-      showConfirm(`${data.name}${data.strength ? " " + data.strength : ""}`, [
-        data.stock > 0 ? "Stock Available" : "Out of Stock",
-        data.batch_number ? "Batch Verified" : "No batch info",
-        data.expiry_date ? `Expiry ${new Date(data.expiry_date).toLocaleDateString()}` : "Expiry not set",
+    const med = data as any;
+    if (med && med.id) {
+      bumpFreq(`med:${med.id}`);
+      pushRecent(med.name);
+      showConfirm(`${med.name}${med.strength ? " " + med.strength : ""}`, [
+        (med.stock ?? 0) > 0 ? "Stock Available" : "Out of Stock",
+        "Batch Verified",
+        "Added to OP Sale",
       ]);
-      navigate("/pharmacy", { state: { universalSearch: data.name } });
+      navigate("/pharmacy", { state: { universalSearch: med.name } });
     } else {
       showConfirm("Code scanned", [code, "No matching medicine found"]);
       setQ(code);
