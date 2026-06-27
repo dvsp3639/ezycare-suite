@@ -296,6 +296,8 @@ const Diagnostics = () => {
           reportNotes,
           clinicalNotes: resultOrder.clinicalNotes,
           results: filledResults,
+          signedByName,
+          signedByRole: "Lab Technician",
         });
         const fileName = `lab-report-${resultOrder.patientRegNo || resultOrder.id}-${Date.now()}.pdf`;
         filePath = `${resultOrder.id}/${fileName}`;
