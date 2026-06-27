@@ -4,7 +4,8 @@ import * as XLSX from "xlsx";
 import {
   Camera, X, Upload, FileText, FileSpreadsheet, Image as ImageIcon,
   Loader2, CheckCircle2, AlertCircle, ScanLine, Save, Plus, Pencil,
-  FileCheck2, Building2, Trash2,
+  FileCheck2, Building2, Trash2, ArrowLeft, ArrowRight, ShieldCheck,
+  ChevronUp, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading";
 type Field = { value: any; confidence: number; corrected?: boolean };
