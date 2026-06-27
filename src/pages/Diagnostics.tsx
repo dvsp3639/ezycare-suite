@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -20,25 +21,6 @@ import { cn } from "@/lib/utils";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
 
-/**
- * Reliable PDF "open + print" inside the Lovable preview (sandboxed iframe):
- * - Try opening the blob URL in a new tab so the browser shows native print preview.
- * - If the popup is blocked (or window.open returns null), fall back to a forced download
- *   via an anchor click — that always works.
- */
-function openOrDownloadPdf(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, "_blank", "noopener,noreferrer");
-  if (!win) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
 import { loadLabReportConfig } from "@/lib/labReportConfig";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
@@ -347,67 +329,22 @@ const Diagnostics = () => {
     }
   };
 
-  const handlePrintReport = async (order: DisplayLabOrder) => {
+  const handlePrintReport = (order: DisplayLabOrder) => {
     if ((!order.results || order.results.length === 0) && !order.reportNotes) {
       toast.error("No printable lab results available");
       return;
     }
+
+    const clearPrintReport = () => setPrintOrder(null);
+    window.addEventListener("afterprint", clearPrintReport, { once: true });
+
     try {
-      const pdfBlob = await generateLabReportPdfAsync({
-        hospital: hospitalProfile,
-        config: { ...loadLabReportConfig(), }, 
-        testName: order.testName,
-        category: order.category,
-        patientName: order.patientName,
-        patientRegNo: order.patientRegNo,
-        uhid: order.patientRegNo,
-        reportId: order.id,
-        orderedBy: order.orderedBy,
-        priority: order.priority,
-        orderedAt: order.orderedAt,
-        completedAt: order.completedAt || new Date().toLocaleString(),
-        price: order.price,
-        paymentStatus: order.paymentStatus,
-        paymentMode: order.paymentMode,
-        department: order.category,
-        reportNotes: order.reportNotes,
-        clinicalNotes: order.clinicalNotes,
-        results: order.results || [],
-        autoPrint: true,
-      });
-      const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
-      void fileName;
-      const url = URL.createObjectURL(pdfBlob);
-      // Hidden iframe → triggers the browser's NATIVE system print preview
-      const existing = document.getElementById("lab-print-frame-hidden");
-      if (existing) existing.remove();
-      const iframe = document.createElement("iframe");
-      iframe.id = "lab-print-frame-hidden";
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.src = url;
-      iframe.onload = () => {
-        setTimeout(() => {
-          try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-          } catch {
-            toast.error("Print blocked by browser");
-          }
-        }, 300);
-      };
-      document.body.appendChild(iframe);
-      // Cleanup after a minute (gives the print dialog plenty of time)
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        iframe.remove();
-      }, 60_000);
+      flushSync(() => setPrintOrder(order));
+      window.print();
     } catch (err: any) {
-      toast.error(err.message || "Failed to prepare print preview");
+      window.removeEventListener("afterprint", clearPrintReport);
+      clearPrintReport();
+      toast.error(err.message || "Unable to open print preview");
     }
   };
 
