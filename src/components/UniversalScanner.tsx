@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import {
   Camera, X, Upload, FileText, FileSpreadsheet, Image as ImageIcon,
   Loader2, CheckCircle2, AlertCircle, ScanLine, Save, Plus, Pencil,
+  FileCheck2, Building2, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,43 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-type Mode = "menu" | "camera" | "verify" | "excel" | "loading";
+type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading";
 type Field = { value: any; confidence: number; corrected?: boolean };
 type MedicineExtract = Record<string, Field>;
+
+type InvoiceLine = {
+  name: string;
+  brandName?: string;
+  genericName?: string;
+  strength?: string;
+  packSize?: string;
+  manufacturer?: string;
+  batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
+  quantity: number;
+  freeQuantity: number;
+  purchaseRate: number;
+  mrp: number;
+  sellingRate?: number;
+  gstPercent: number;
+  hsnCode?: string;
+  amount: number;
+  confidence?: number;
+  _existingId?: string | null; // resolved after lookup
+};
+
+type SupplierExtract = { name: string; gst: string; address: string; contact: string };
+type InvoiceMeta = {
+  invoiceNo: string;
+  invoiceDate: string;
+  subtotal: number;
+  discount: number;
+  gstAmount: number;
+  roundOff: number;
+  totalAmount: number;
+  netPayable: number;
+};
 
 const FIELDS: { key: string; label: string; type?: "number" | "date" | "text" }[] = [
   { key: "name", label: "Medicine Name" },
@@ -75,6 +110,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const [excelCols, setExcelCols] = useState<string[]>([]);
   const [sourceType, setSourceType] = useState<"image" | "pdf" | "excel" | "camera">("image");
 
+  // Invoice state
+  const [supplier, setSupplier] = useState<SupplierExtract>({ name: "", gst: "", address: "", contact: "" });
+  const [invoiceMeta, setInvoiceMeta] = useState<InvoiceMeta>({
+    invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0,
+  });
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -90,6 +132,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setAddQty(0);
     setExcelRows([]);
     setExcelCols([]);
+    setSupplier({ name: "", gst: "", address: "", contact: "" });
+    setInvoiceMeta({ invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0 });
+    setLines([]);
   }, []);
 
   const close = useCallback(() => {
@@ -132,6 +177,25 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     }
   }
 
+  async function resolveLineMatches(items: InvoiceLine[]): Promise<InvoiceLine[]> {
+    const names = Array.from(new Set(items.map((i) => (i.name || "").trim()).filter(Boolean)));
+    if (!names.length) return items;
+    const { data } = await supabase
+      .from("medicines")
+      .select("id,name,strength")
+      .in("name", names);
+    const map = new Map<string, { id: string; strength: string | null }>();
+    (data || []).forEach((m: any) => {
+      const key = `${m.name?.toLowerCase()}|${(m.strength || "").toLowerCase()}`;
+      map.set(key, { id: m.id, strength: m.strength });
+    });
+    return items.map((i) => {
+      const key = `${i.name?.toLowerCase()}|${(i.strength || "").toLowerCase()}`;
+      const hit = map.get(key) || Array.from(map.entries()).find(([k]) => k.startsWith(`${i.name?.toLowerCase()}|`))?.[1];
+      return { ...i, _existingId: hit?.id ?? null };
+    });
+  }
+
   async function handleFile(file: File) {
     setBusy(true);
     setMode("loading");
@@ -170,11 +234,69 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error === "credits_exhausted" ? "AI credits exhausted." : data.error === "rate_limited" ? "Rate limited — retry shortly." : data.error);
-      const med = data?.medicine || {};
-      setDocumentType(data?.documentType || "medicine_label");
-      setExtract(med as MedicineExtract);
-      await lookupExisting(med?.name?.value, med?.barcode?.value);
-      setMode("verify");
+      const docType = data?.documentType || (data?.invoice?.items?.length ? "supplier_invoice" : "medicine_label");
+      setDocumentType(docType);
+
+      const invoiceItems: any[] = data?.invoice?.items || [];
+      if (docType === "supplier_invoice" || invoiceItems.length > 0) {
+        const sup = data?.supplier || {};
+        setSupplier({
+          name: sup.name?.value || "",
+          gst: sup.gst?.value || "",
+          address: sup.address?.value || "",
+          contact: sup.contact?.value || "",
+        });
+        const inv = data?.invoice || {};
+        const num = (x: any) => Number(x ?? 0) || 0;
+        setInvoiceMeta({
+          invoiceNo: inv.invoiceNo?.value || "",
+          invoiceDate: inv.invoiceDate?.value || new Date().toISOString().slice(0, 10),
+          subtotal: num(inv.subtotal?.value),
+          discount: num(inv.discount?.value),
+          gstAmount: num(inv.gstAmount?.value),
+          roundOff: num(inv.roundOff?.value),
+          totalAmount: num(inv.totalAmount?.value),
+          netPayable: num(inv.netPayable?.value) || num(inv.totalAmount?.value),
+        });
+        const normalized: InvoiceLine[] = invoiceItems.map((it: any) => ({
+          name: String(it.name || "").trim(),
+          brandName: it.brandName || "",
+          genericName: it.genericName || "",
+          strength: it.strength || "",
+          packSize: it.packSize || "",
+          manufacturer: it.manufacturer || "",
+          batchNo: it.batchNo || "",
+          mfgDate: it.mfgDate || "",
+          expiryDate: it.expiryDate || "",
+          quantity: num(it.quantity),
+          freeQuantity: num(it.freeQuantity),
+          purchaseRate: num(it.purchaseRate),
+          mrp: num(it.mrp),
+          sellingRate: it.sellingRate != null ? num(it.sellingRate) : undefined,
+          gstPercent: it.gstPercent != null ? num(it.gstPercent) : 12,
+          hsnCode: it.hsnCode || "",
+          amount: num(it.amount) || num(it.purchaseRate) * num(it.quantity),
+          confidence: typeof it.confidence === "number" ? it.confidence : 0.7,
+        })).filter((l) => l.name);
+        const resolved = await resolveLineMatches(normalized);
+        setLines(resolved);
+        if (!resolved.length) {
+          toast.error("AI could not detect medicine rows. Try a clearer scan.");
+          reset();
+          return;
+        }
+        setMode("invoice");
+      } else {
+        const med = data?.medicine || {};
+        if (!med?.name?.value) {
+          toast.error("Couldn't read a medicine label. Try a clearer image or a supplier invoice.");
+          reset();
+          return;
+        }
+        setExtract(med as MedicineExtract);
+        await lookupExisting(med?.name?.value, med?.barcode?.value);
+        setMode("verify");
+      }
     } catch (e: any) {
       toast.error(e?.message || "Could not analyze file");
       reset();
@@ -348,6 +470,49 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     }
   }
 
+  async function importInvoice() {
+    if (!lines.length) { toast.error("No medicine lines to import"); return; }
+    if (!supplier.name.trim()) { toast.error("Supplier name is required"); return; }
+    setBusy(true);
+    try {
+      const payloadItems = lines.map((l) => ({
+        name: l.name,
+        brandName: l.brandName || null,
+        genericName: l.genericName || null,
+        strength: l.strength || null,
+        packSize: l.packSize || null,
+        manufacturer: l.manufacturer || null,
+        batchNo: l.batchNo || null,
+        mfgDate: l.mfgDate || null,
+        expiryDate: l.expiryDate || null,
+        quantity: Number(l.quantity) || 0,
+        freeQuantity: Number(l.freeQuantity) || 0,
+        purchaseRate: Number(l.purchaseRate) || 0,
+        mrp: Number(l.mrp) || 0,
+        sellingRate: l.sellingRate != null ? Number(l.sellingRate) : null,
+        gstPercent: Number(l.gstPercent) || 12,
+        hsnCode: l.hsnCode || null,
+        amount: Number(l.amount) || 0,
+        confidence: l.confidence ?? null,
+      }));
+      const { data, error } = await supabase.rpc("import_purchase_invoice", {
+        _supplier: supplier as any,
+        _invoice: invoiceMeta as any,
+        _items: payloadItems as any,
+      });
+      if (error) throw error;
+      const summary = data as any;
+      toast.success(
+        `Imported · ${summary?.created ?? 0} new · ${summary?.updated ?? 0} updated · ${summary?.total_items ?? lines.length} lines saved`,
+      );
+      close();
+    } catch (e: any) {
+      toast.error(e?.message || "Import failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!open) return null;
 
   const node = (
@@ -365,6 +530,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               {mode === "camera" && "Live camera"}
               {mode === "loading" && "AI analyzing document…"}
               {mode === "verify" && (documentType.replace("_", " ") || "Verify extracted data")}
+            {mode === "invoice" && `Purchase invoice · ${lines.length} medicines detected`}
               {mode === "excel" && `${excelRows.length} rows · map columns`}
             </p>
           </div>
@@ -420,6 +586,20 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             busy={busy}
             onSave={saveMedicine}
             onCancel={reset}
+          />
+        )}
+
+        {mode === "invoice" && (
+          <InvoiceVerifyView
+            supplier={supplier}
+            setSupplier={setSupplier}
+            invoice={invoiceMeta}
+            setInvoice={setInvoiceMeta}
+            lines={lines}
+            setLines={setLines}
+            busy={busy}
+            onCancel={reset}
+            onImport={importInvoice}
           />
         )}
 
@@ -670,6 +850,150 @@ function ExcelView({ rows, cols, busy, onCancel, onImport }: {
         <Button onClick={() => onImport(mapping)} disabled={busy || !mapping.name}>
           {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Import {rows.length} medicines
+        </Button>
+      </div>
+    </div>
+  );
+}
+/* ------------------------- Invoice Verification ------------------------- */
+
+function InvoiceVerifyView({
+  supplier, setSupplier, invoice, setInvoice, lines, setLines, busy, onCancel, onImport,
+}: {
+  supplier: SupplierExtract;
+  setSupplier: (s: SupplierExtract) => void;
+  invoice: InvoiceMeta;
+  setInvoice: (i: InvoiceMeta) => void;
+  lines: InvoiceLine[];
+  setLines: (l: InvoiceLine[]) => void;
+  busy: boolean;
+  onCancel: () => void;
+  onImport: () => void;
+}) {
+  const totals = useMemo(() => {
+    const qty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+    const amt = lines.reduce((s, l) => s + (Number(l.amount) || (Number(l.purchaseRate) || 0) * (Number(l.quantity) || 0)), 0);
+    const newCount = lines.filter((l) => !l._existingId).length;
+    return { qty, amt, newCount, updateCount: lines.length - newCount };
+  }, [lines]);
+
+  const update = (idx: number, patch: Partial<InvoiceLine>) => {
+    setLines(lines.map((l, i) => i === idx ? { ...l, ...patch } : l));
+  };
+  const remove = (idx: number) => setLines(lines.filter((_, i) => i !== idx));
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
+      {/* Verified banner */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-2xl bg-success/10 text-success p-3 flex items-center gap-2">
+          <FileCheck2 className="h-5 w-5" />
+          <div><p className="text-xs opacity-80">Document</p><p className="font-semibold text-sm">Purchase Invoice detected</p></div>
+        </div>
+        <div className="rounded-2xl bg-info/10 text-info p-3 flex items-center gap-2">
+          <Building2 className="h-5 w-5" />
+          <div><p className="text-xs opacity-80">Supplier</p><p className="font-semibold text-sm truncate">{supplier.name || "—"}</p></div>
+        </div>
+        <div className="rounded-2xl bg-primary/10 text-primary p-3 flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5" />
+          <div><p className="text-xs opacity-80">Lines</p><p className="font-semibold text-sm">{lines.length} medicines · {totals.newCount} new · {totals.updateCount} update</p></div>
+        </div>
+      </div>
+
+      {/* Supplier */}
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /><p className="font-semibold">Supplier information</p></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-1"><Label className="text-xs">Supplier Name *</Label><Input value={supplier.name} onChange={(e) => setSupplier({ ...supplier, name: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">GST Number</Label><Input value={supplier.gst} onChange={(e) => setSupplier({ ...supplier, gst: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplier.contact} onChange={(e) => setSupplier({ ...supplier, contact: e.target.value })} /></div>
+          <div className="space-y-1 md:col-span-2 lg:col-span-1"><Label className="text-xs">Address</Label><Input value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} /></div>
+        </div>
+      </div>
+
+      {/* Invoice summary */}
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><p className="font-semibold">Invoice summary</p></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="space-y-1"><Label className="text-xs">Invoice No.</Label><Input value={invoice.invoiceNo} onChange={(e) => setInvoice({ ...invoice, invoiceNo: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Invoice Date</Label><Input type="date" value={invoice.invoiceDate} onChange={(e) => setInvoice({ ...invoice, invoiceDate: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Subtotal</Label><Input type="number" value={invoice.subtotal} onChange={(e) => setInvoice({ ...invoice, subtotal: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Discount</Label><Input type="number" value={invoice.discount} onChange={(e) => setInvoice({ ...invoice, discount: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-1"><Label className="text-xs">GST</Label><Input type="number" value={invoice.gstAmount} onChange={(e) => setInvoice({ ...invoice, gstAmount: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Round Off</Label><Input type="number" value={invoice.roundOff} onChange={(e) => setInvoice({ ...invoice, roundOff: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Total</Label><Input type="number" value={invoice.totalAmount} onChange={(e) => setInvoice({ ...invoice, totalAmount: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Net Payable</Label><Input type="number" value={invoice.netPayable} onChange={(e) => setInvoice({ ...invoice, netPayable: Number(e.target.value) || 0 })} /></div>
+        </div>
+      </div>
+
+      {/* Line items */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-2 border-b flex items-center justify-between">
+          <p className="font-semibold text-sm flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" /> Medicine line items</p>
+          <p className="text-xs text-muted-foreground">All fields editable · low-confidence rows highlighted</p>
+        </div>
+        <div className="overflow-x-auto max-h-[55vh]">
+          <Table>
+            <TableHeader>
+              <TableRow className="text-[11px]">
+                <TableHead className="min-w-[200px]">Medicine</TableHead>
+                <TableHead>Strength</TableHead>
+                <TableHead>Pack</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Expiry</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Free</TableHead>
+                <TableHead className="text-right">P. Rate</TableHead>
+                <TableHead className="text-right">MRP</TableHead>
+                <TableHead className="text-right">GST%</TableHead>
+                <TableHead>HSN</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l, i) => {
+                const low = (l.confidence ?? 1) < 0.6;
+                return (
+                  <TableRow key={i} className={cn("text-xs align-top", low && "bg-warning/5")}>
+                    <TableCell>
+                      <Input className="h-8 text-xs" value={l.name} onChange={(e) => update(i, { name: e.target.value })} />
+                      <Input className="h-7 text-[11px] mt-1 text-muted-foreground" placeholder="Brand / Generic" value={l.brandName || ""} onChange={(e) => update(i, { brandName: e.target.value })} />
+                    </TableCell>
+                    <TableCell><Input className="h-8 text-xs w-20" value={l.strength || ""} onChange={(e) => update(i, { strength: e.target.value })} /></TableCell>
+                    <TableCell><Input className="h-8 text-xs w-20" value={l.packSize || ""} onChange={(e) => update(i, { packSize: e.target.value })} /></TableCell>
+                    <TableCell><Input className="h-8 text-xs w-24" value={l.batchNo || ""} onChange={(e) => update(i, { batchNo: e.target.value })} /></TableCell>
+                    <TableCell><Input type="date" className="h-8 text-xs w-36" value={l.expiryDate || ""} onChange={(e) => update(i, { expiryDate: e.target.value })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-16 text-right" value={l.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) || 0 })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-14 text-right" value={l.freeQuantity} onChange={(e) => update(i, { freeQuantity: Number(e.target.value) || 0 })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-20 text-right" value={l.purchaseRate} onChange={(e) => update(i, { purchaseRate: Number(e.target.value) || 0 })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-20 text-right" value={l.mrp} onChange={(e) => update(i, { mrp: Number(e.target.value) || 0 })} /></TableCell>
+                    <TableCell><Input type="number" className="h-8 text-xs w-14 text-right" value={l.gstPercent} onChange={(e) => update(i, { gstPercent: Number(e.target.value) || 12 })} /></TableCell>
+                    <TableCell><Input className="h-8 text-xs w-20" value={l.hsnCode || ""} onChange={(e) => update(i, { hsnCode: e.target.value })} /></TableCell>
+                    <TableCell>
+                      {l._existingId
+                        ? <Badge variant="outline" className="text-[10px] bg-info/10 text-info">Update</Badge>
+                        : <Badge variant="outline" className="text-[10px] bg-success/10 text-success">New</Badge>}
+                      {low && <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning ml-1">Review</Badge>}
+                    </TableCell>
+                    <TableCell><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(i)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="px-4 py-2 border-t bg-muted/30 text-xs flex items-center justify-between">
+          <span>Total qty: <strong>{totals.qty}</strong></span>
+          <span>Computed amount: <strong>₹ {totals.amt.toFixed(2)}</strong></span>
+        </div>
+      </div>
+
+      <div className="flex flex-col-reverse md:flex-row md:justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur p-2 -mx-4 md:-mx-6 border-t">
+        <Button variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button onClick={onImport} disabled={busy || !lines.length || !supplier.name.trim()}>
+          {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Verify & Import {lines.length} medicines
         </Button>
       </div>
     </div>

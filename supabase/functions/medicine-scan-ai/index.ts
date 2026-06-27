@@ -2,17 +2,57 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
-const SYSTEM = `You are an expert pharmacy OCR assistant for an Indian hospital. The user uploads an image or PDF of a medicine strip, bottle, carton, label, supplier invoice, purchase bill, prescription, or lab report.
+const SYSTEM = `You are an expert pharmacy OCR assistant for an Indian hospital. The user uploads an image or PDF of a medicine strip, supplier invoice, purchase bill, prescription, or lab report (camera photo, WhatsApp image, scanned PDF, etc.).
 
-Auto-detect the document type and extract every relevant field. Return ONLY valid JSON of this exact shape (omit unknown fields, never invent values):
+Auto-detect the document type. If it shows ANY supplier/distributor info, invoice number, or a table of medicine line items, classify it as "supplier_invoice" and fill BOTH "supplier" and "invoice". Only use "medicine_label" for a single strip/bottle photo without any invoice/bill context.
+
+Return ONLY valid JSON in this exact shape (omit unknown fields, never invent values):
 
 {
-  "documentType": "medicine_label" | "supplier_invoice" | "purchase_bill" | "prescription" | "lab_report" | "discharge_summary" | "other",
+  "documentType": "supplier_invoice" | "medicine_label" | "prescription" | "lab_report" | "discharge_summary" | "other",
   "confidence": 0.0-1.0,
+  "supplier": {
+    "name": { "value": string, "confidence": number },
+    "gst":  { "value": string, "confidence": number },
+    "address": { "value": string, "confidence": number },
+    "contact": { "value": string, "confidence": number }
+  },
+  "invoice": {
+    "invoiceNo":   { "value": string, "confidence": number },
+    "invoiceDate": { "value": "YYYY-MM-DD", "confidence": number },
+    "subtotal":    { "value": number, "confidence": number },
+    "discount":    { "value": number, "confidence": number },
+    "gstAmount":   { "value": number, "confidence": number },
+    "roundOff":    { "value": number, "confidence": number },
+    "totalAmount": { "value": number, "confidence": number },
+    "netPayable":  { "value": number, "confidence": number },
+    "items": [
+      {
+        "name": string,
+        "brandName": string,
+        "genericName": string,
+        "strength": string,
+        "packSize": string,
+        "manufacturer": string,
+        "batchNo": string,
+        "mfgDate": "YYYY-MM-DD",
+        "expiryDate": "YYYY-MM-DD",
+        "quantity": number,
+        "freeQuantity": number,
+        "purchaseRate": number,
+        "mrp": number,
+        "sellingRate": number,
+        "gstPercent": number,
+        "hsnCode": string,
+        "amount": number,
+        "confidence": number
+      }
+    ]
+  },
   "medicine": {
-    "name": { "value": string, "confidence": 0.0-1.0 },
-    "genericName": { "value": string, "confidence": number },
+    "name": { "value": string, "confidence": number },
     "brandName": { "value": string, "confidence": number },
+    "genericName": { "value": string, "confidence": number },
     "strength": { "value": string, "confidence": number },
     "dosageForm": { "value": "Tablet"|"Capsule"|"Syrup"|"Injection"|"Cream"|"Drops"|"Other", "confidence": number },
     "manufacturer": { "value": string, "confidence": number },
@@ -25,17 +65,15 @@ Auto-detect the document type and extract every relevant field. Return ONLY vali
     "packSize": { "value": string, "confidence": number },
     "barcode": { "value": string, "confidence": number }
   },
-  "invoice": {
-    "vendor": { "value": string, "confidence": number },
-    "invoiceNo": { "value": string, "confidence": number },
-    "invoiceDate": { "value": "YYYY-MM-DD", "confidence": number },
-    "totalAmount": { "value": number, "confidence": number },
-    "items": [ { "name": string, "batchNo": string, "expiryDate": string, "quantity": number, "rate": number, "mrp": number, "gstPercent": number } ]
-  },
   "rawText": "all extracted text"
 }
 
-If only one medicine is on the label, fill "medicine". If it is an invoice with multiple line items, fill "invoice.items". For expiry like "07/2027" return "2027-07-31"; for "07/27" assume 20YY.`;
+Rules:
+- Extract EVERY medicine row in an invoice table — do not stop at the first row.
+- For dates like "07/2027" return "2027-07-31"; "07/27" → assume 20YY; "Mar-26" → "2026-03-31".
+- If selling rate isn't printed, leave it null — do not invent it.
+- Use 0 for missing free quantity, never null.
+- Always set per-item "confidence" 0.0-1.0 reflecting OCR clarity for that row.`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
