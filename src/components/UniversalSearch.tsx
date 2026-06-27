@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Search, Mic, MicOff, ScanLine, Sparkles, Loader2, ArrowRight, Clock,
-  Pill, User, LayoutGrid, Camera, X, CheckCircle2, Keyboard,
+  Pill, User, LayoutGrid, Camera, X, CheckCircle2, Keyboard, ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,8 +72,18 @@ export function UniversalSearch() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanStreamRef = useRef<MediaStream | null>(null);
   const scanRafRef = useRef<number | null>(null);
+  const lastScanRef = useRef<{ code: string; at: number } | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
+  const [sheetDrag, setSheetDrag] = useState(0);
 
-  // ⌘K / Ctrl+K to focus
+  const inPharmacy = location.pathname === "/pharmacy";
+  const activeModuleLabel = useMemo(() => {
+    const m = modules.find((x) => x.route === location.pathname);
+    return m?.title;
+  }, [location.pathname]);
+
+  // ⌘K / Ctrl+K to focus, Escape closes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -87,26 +97,40 @@ export function UniversalSearch() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Auto-focus when entering Pharmacy
+  // Lock body scroll & intercept Android back when mobile overlay is open
   useEffect(() => {
-    if (location.pathname === "/pharmacy") {
-      const t = setTimeout(() => inputRef.current?.focus(), 180);
-      return () => clearTimeout(t);
-    }
-  }, [location.pathname]);
+    if (!isMobile || !open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.history.pushState({ ezyopSearch: true }, "");
+    const onPop = () => { setOpen(false); };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("popstate", onPop);
+      // pop our own state entry if still present
+      if ((window.history.state as any)?.ezyopSearch) window.history.back();
+    };
+  }, [isMobile, open]);
 
-  // Outside click
+  // Outside click (desktop only — mobile uses overlay backdrop)
   useEffect(() => {
+    if (isMobile) return;
     const h = (e: MouseEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, []);
+  }, [isMobile]);
 
   const moduleResults = useMemo<Result[]>(() => {
     const freq = getFreq();
     const term = q.trim().toLowerCase();
+    // In Pharmacy, hide unrelated modules unless the user explicitly types a module-like query
+    const explicitModuleQuery = term.length >= 3 && modules.some((m) =>
+      m.title.toLowerCase().includes(term) || m.id.includes(term)
+    );
+    if (inPharmacy && !explicitModuleQuery) return [];
     const list = modules
       .filter((m) => !term || m.title.toLowerCase().includes(term) || m.id.includes(term) || m.description.toLowerCase().includes(term))
       .map((m) => ({
@@ -118,8 +142,8 @@ export function UniversalSearch() {
         score: (freq[`mod:${m.id}`] || 0) + (m.title.toLowerCase().startsWith(term) ? 5 : 0),
       }));
     list.sort((a, b) => (b.score || 0) - (a.score || 0));
-    return list.slice(0, term ? 6 : 8);
-  }, [q]);
+    return list.slice(0, term ? 6 : inPharmacy ? 0 : 8);
+  }, [q, inPharmacy]);
 
   // Live search of medicines + patients (debounced)
   useEffect(() => {
@@ -151,11 +175,12 @@ export function UniversalSearch() {
         route: "/patient-registration",
         state: { universalSearch: p.registration_number || p.full_name },
       }));
-      setResults([...moduleResults, ...med, ...pat]);
+      // Context-aware ordering: in Pharmacy, medicines first, then patients, then modules
+      setResults(inPharmacy ? [...med, ...pat, ...moduleResults] : [...moduleResults, ...med, ...pat]);
       setHighlight(0);
     }, 180);
     return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
-  }, [q, moduleResults]);
+  }, [q, moduleResults, inPharmacy]);
 
   const runAi = async (text: string) => {
     if (!text.trim()) return;
@@ -186,7 +211,12 @@ export function UniversalSearch() {
   const choose = (r: Result) => {
     bumpFreq(r.id);
     pushRecent(q || r.title);
-    navigate(r.route, { state: r.state });
+    // Stay on Pharmacy: instead of navigating, dispatch a contextual event so the active workflow can pick it up
+    if (inPharmacy && (r.kind === "medicine" || r.kind === "patient")) {
+      window.dispatchEvent(new CustomEvent("ezyop:universal-pick", { detail: { kind: r.kind, title: r.title, state: r.state } }));
+    } else {
+      navigate(r.route, { state: r.state });
+    }
     setOpen(false);
     setQ("");
   };
@@ -234,9 +264,11 @@ export function UniversalSearch() {
   };
 
   const handleScannedCode = async (code: string) => {
+    // Debounce duplicate detections from the continuous loop
+    const now = Date.now();
+    if (lastScanRef.current && lastScanRef.current.code === code && now - lastScanRef.current.at < 1500) return;
+    lastScanRef.current = { code, at: now };
     setScanHint("Verifying…");
-    stopScanner();
-    setScanOpen(false);
     const { data } = await supabase
       .from("medicines")
       .select("id,name,generic_name,strength,stock")
@@ -250,13 +282,17 @@ export function UniversalSearch() {
       showConfirm(`${med.name}${med.strength ? " " + med.strength : ""}`, [
         (med.stock ?? 0) > 0 ? "Stock Available" : "Out of Stock",
         "Batch Verified",
-        "Added to OP Sale",
+        inPharmacy ? "Added to current cart" : "Tap Pharmacy to dispense",
       ]);
-      navigate("/pharmacy", { state: { universalSearch: med.name } });
+      if (inPharmacy) {
+        window.dispatchEvent(new CustomEvent("ezyop:universal-pick", { detail: { kind: "medicine", title: med.name, state: { universalSearch: med.name } } }));
+      } else {
+        navigate("/pharmacy", { state: { universalSearch: med.name } });
+      }
+      setScanHint("Scan next medicine — camera stays open");
     } else {
       showConfirm("Code scanned", [code, "No matching medicine found"]);
-      setQ(code);
-      inputRef.current?.focus();
+      setScanHint("Try another barcode");
     }
   };
 
@@ -288,7 +324,7 @@ export function UniversalSearch() {
           const codes = await detector.detect(videoRef.current);
           if (codes && codes.length > 0) {
             const raw = String(codes[0].rawValue || "").trim();
-            if (raw) { await handleScannedCode(raw); return; }
+            if (raw) { await handleScannedCode(raw); }
           }
         } catch {}
         scanRafRef.current = requestAnimationFrame(loop);
