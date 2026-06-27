@@ -317,44 +317,7 @@ export function UniversalSearch() {
   };
 
   const openScanner = async () => {
-    const Detector = (window as any).BarcodeDetector;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.info("Camera not available. Focus the search and use a USB scanner.");
-      inputRef.current?.focus();
-      return;
-    }
-    if (!Detector) {
-      toast.info("Barcode detection not supported in this browser. Use a USB scanner.");
-      inputRef.current?.focus();
-      return;
-    }
-    try {
-      setScanOpen(true);
-      setScanHint("Point the camera at the medicine barcode");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      scanStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      const detector = new Detector({ formats: ["qr_code", "ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "data_matrix"] });
-      const loop = async () => {
-        if (!videoRef.current || !scanStreamRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes && codes.length > 0) {
-            const raw = String(codes[0].rawValue || "").trim();
-            if (raw) { await handleScannedCode(raw); }
-          }
-        } catch {}
-        scanRafRef.current = requestAnimationFrame(loop);
-      };
-      scanRafRef.current = requestAnimationFrame(loop);
-    } catch {
-      toast.error("Camera permission denied");
-      setScanOpen(false);
-      stopScanner();
-    }
+    setScanOpen(true);
   };
 
   useEffect(() => () => stopScanner(), []);
