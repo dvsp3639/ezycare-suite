@@ -98,6 +98,14 @@ const Inventory = () => {
   const toggleFavoriteMutation = useToggleFavorite();
 
   const [activeTab, setActiveTab] = useState("stock");
+  const [openBillId, setOpenBillId] = useState<string | null>(null);
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const tab = u.searchParams.get("tab");
+    const bill = u.searchParams.get("bill");
+    if (tab) setActiveTab(tab);
+    if (bill) setOpenBillId(bill);
+  }, []);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
   const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
@@ -866,7 +874,7 @@ const Inventory = () => {
 
         {/* ════════ PURCHASE INVOICES TAB ════════ */}
         <TabsContent value="purchases">
-          <PurchaseInvoiceRepository />
+          <PurchaseInvoiceRepository openBillId={openBillId} onOpenedBillId={() => setOpenBillId(null)} />
         </TabsContent>
 
         {/* ════════ DIAGNOSTICS TAB ════════ */}
