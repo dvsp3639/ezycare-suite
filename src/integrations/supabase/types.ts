@@ -2176,6 +2176,42 @@ export type Database = {
           },
         ]
       }
+      scanner_corrections: {
+        Row: {
+          ai_value: string | null
+          corrected_value: string | null
+          created_at: string
+          field: string
+          hospital_id: string
+          id: string
+          medicine_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          ai_value?: string | null
+          corrected_value?: string | null
+          created_at?: string
+          field: string
+          hospital_id: string
+          id?: string
+          medicine_id?: string | null
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          ai_value?: string | null
+          corrected_value?: string | null
+          created_at?: string
+          field?: string
+          hospital_id?: string
+          id?: string
+          medicine_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       staff_members: {
         Row: {
           aadhar_no: string | null
