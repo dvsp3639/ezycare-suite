@@ -996,7 +996,17 @@ const Diagnostics = () => {
                     onClick={async () => {
                       try {
                         const url = await resolveLabReportUrl(viewOrder.reportFileUrl!);
-                        if (url) window.open(url, "_blank", "noopener,noreferrer");
+                        if (!url) return;
+                        const win = window.open(url, "_blank", "noopener,noreferrer");
+                        if (!win) {
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = viewOrder.reportFileName || "lab-report.pdf";
+                          a.target = "_blank";
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                        }
                       } catch (err: any) {
                         toast.error(err.message || "Unable to open report");
                       }
