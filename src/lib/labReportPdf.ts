@@ -120,14 +120,13 @@ function buildDoc(input: LabReportPdfInput, logoDataUrl: string | null, qrDataUr
 
   // ─── Optional watermark ───
   if (config.showWatermark && config.watermarkText) {
-    doc.saveGraphicsState();
-    // @ts-expect-error – setGState exists at runtime
-    doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
+    (doc as any).saveGraphicsState?.();
+    (doc as any).setGState?.(new (doc as any).GState({ opacity: 0.06 }));
     doc.setFont("helvetica", "bold");
     doc.setFontSize(96);
     doc.setTextColor(120);
     doc.text(config.watermarkText, pageWidth / 2, pageHeight / 2, { align: "center", angle: 30 });
-    doc.restoreGraphicsState();
+    (doc as any).restoreGraphicsState?.();
     doc.setTextColor(0);
   }
 
