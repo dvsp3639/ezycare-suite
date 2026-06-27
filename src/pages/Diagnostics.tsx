@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { resolveLabReportBlob } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 import { loadLabReportConfig } from "@/lib/labReportConfig";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
