@@ -355,25 +355,9 @@ const Diagnostics = () => {
         results: order.results || [],
         autoPrint: true,
       });
-      const url = URL.createObjectURL(pdfBlob);
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        setTimeout(() => {
-          try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch { /* ignore */ }
-        }, 200);
-      };
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        iframe.remove();
-      }, 60_000);
+      const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
+      openOrDownloadPdf(pdfBlob, fileName);
+      toast.success("Report ready — opening print preview");
     } catch (err: any) {
       toast.error(err.message || "Failed to prepare print preview");
     }
