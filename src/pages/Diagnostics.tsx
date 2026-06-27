@@ -99,6 +99,8 @@ const Diagnostics = () => {
   const { data: labTestCatalog = [], isLoading: catalogLoading } = useLabTestCatalog();
   const { data: rawLabOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useLabOrders();
   const { data: hospitalProfile } = useHospitalProfile();
+  const { profile, user } = useAuth();
+  const signedByName = (profile?.full_name?.trim() || user?.email?.split("@")[0] || "").trim();
 
   const updateStatusMutation = useUpdateLabOrderStatus();
   const updatePaymentMutation = useUpdateLabOrderPayment();
