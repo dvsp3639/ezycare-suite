@@ -53,6 +53,8 @@ export interface LabReportPdfInput {
   results: LabReportResultInput[];
   autoPrint?: boolean;
   reportId?: string;             // used to build the verification URL
+  signedByName?: string;         // logged-in user — rendered as digital signature
+  signedByRole?: string;         // optional role/designation shown under signature
 }
 
 /**
