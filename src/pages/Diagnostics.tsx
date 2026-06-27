@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveLabReportUrl } from "@/lib/labReports";
-import { generateLabReportPdf } from "@/lib/labReportPdf";
+import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+import { loadLabReportConfig } from "@/lib/labReportConfig";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import {
   useLabTestCatalog, useLabOrders,
@@ -90,6 +92,7 @@ function mapDbOrder(o: any): DisplayLabOrder {
 const Diagnostics = () => {
   const { data: labTestCatalog = [], isLoading: catalogLoading } = useLabTestCatalog();
   const { data: rawLabOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useLabOrders();
+  const { data: hospitalProfile } = useHospitalProfile();
 
   const updateStatusMutation = useUpdateLabOrderStatus();
   const updatePaymentMutation = useUpdateLabOrderPayment();
