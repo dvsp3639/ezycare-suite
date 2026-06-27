@@ -514,16 +514,16 @@ export function UniversalSearch() {
             <kbd className="hidden md:inline-flex items-center px-1.5 h-5 text-[10px] rounded border border-border/60 bg-muted/60 text-muted-foreground">⌘K</kbd>
           )}
           {/* Secondary: Scan */}
-          <button
+          {showScan && <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openScanner(); }}
             title="Scan medicine"
             className="hidden sm:inline-flex items-center justify-center h-9 w-9 rounded-full bg-muted hover:bg-accent text-foreground transition-all hover:scale-105"
           >
             <ScanLine className="h-4 w-4" />
-          </button>
+          </button>}
           {/* Primary: Speak */}
-          <button
+          {showVoice && <button
             type="button"
             onClick={(e) => { e.stopPropagation(); toggleVoice(); }}
             title="Speak (English / Hindi / Telugu)"
@@ -535,7 +535,7 @@ export function UniversalSearch() {
             )}
           >
             {listening ? <MicOff className="h-[18px] w-[18px]" /> : <Mic className="h-[18px] w-[18px]" />}
-          </button>
+          </button>}
           {aiBusy && (
             <Loader2 className="h-4 w-4 animate-spin text-primary mr-1" />
           )}
@@ -624,7 +624,8 @@ export function UniversalSearch() {
           {/* Results */}
           <div className="flex-1 overflow-y-auto">{Panel}</div>
           {/* Bottom actions: 3 large targets */}
-          <div className="border-t border-border p-3 grid grid-cols-3 gap-2 bg-popover">
+          <div className={cn("border-t border-border p-3 grid gap-2 bg-popover",
+            showScan && showVoice ? "grid-cols-3" : (showScan || showVoice) ? "grid-cols-2" : "grid-cols-1")}>
             <button
               onClick={() => inputRef.current?.focus()}
               className="flex flex-col items-center gap-1 py-3 rounded-2xl bg-muted hover:bg-accent active:scale-95 transition"
@@ -632,14 +633,14 @@ export function UniversalSearch() {
               <Keyboard className="h-5 w-5" />
               <span className="text-[11px] font-medium">Type</span>
             </button>
-            <button
+            {showScan && <button
               onClick={openScanner}
               className="flex flex-col items-center gap-1 py-3 rounded-2xl bg-muted hover:bg-accent active:scale-95 transition"
             >
               <ScanLine className="h-5 w-5" />
               <span className="text-[11px] font-medium">Scan</span>
-            </button>
-            <button
+            </button>}
+            {showVoice && <button
               onClick={toggleVoice}
               className={cn(
                 "flex flex-col items-center gap-1 py-3 rounded-2xl active:scale-95 transition text-primary-foreground",
@@ -648,7 +649,7 @@ export function UniversalSearch() {
             >
               {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               <span className="text-[11px] font-medium">{listening ? "Stop" : "Voice"}</span>
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -657,31 +658,32 @@ export function UniversalSearch() {
     {/* Mobile floating action bar */}
     {isMobile && (
       <div className="fixed bottom-4 inset-x-4 z-40 pointer-events-none">
-        <div className="pointer-events-auto mx-auto max-w-md flex items-center justify-between gap-2 p-2 rounded-2xl bg-popover/95 backdrop-blur border border-border shadow-2xl">
+        <div className={cn("pointer-events-auto mx-auto max-w-md grid gap-2 p-2 rounded-2xl bg-popover/95 backdrop-blur border border-border shadow-2xl",
+          showScan && showVoice ? "grid-cols-3" : (showScan || showVoice) ? "grid-cols-2" : "grid-cols-1")}>
           <button
             onClick={() => { inputRef.current?.focus(); setOpen(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl hover:bg-accent active:scale-95 transition"
+            className="flex flex-col items-center gap-0.5 py-2 rounded-xl hover:bg-accent active:scale-95 transition"
           >
             <Keyboard className="h-5 w-5 text-foreground" />
             <span className="text-[10px] font-medium">Search</span>
           </button>
-          <button
+          {showScan && <button
             onClick={openScanner}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-muted hover:bg-accent active:scale-95 transition"
+            className="flex flex-col items-center gap-0.5 py-2 rounded-xl bg-muted hover:bg-accent active:scale-95 transition"
           >
             <ScanLine className="h-5 w-5 text-foreground" />
             <span className="text-[10px] font-medium">Scan</span>
-          </button>
-          <button
+          </button>}
+          {showVoice && <button
             onClick={toggleVoice}
             className={cn(
-              "flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl active:scale-95 transition text-primary-foreground",
+              "flex flex-col items-center gap-0.5 py-2 rounded-xl active:scale-95 transition text-primary-foreground",
               listening ? "bg-destructive" : "bg-gradient-to-br from-primary to-primary/80 animate-ai-glow",
             )}
           >
             {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             <span className="text-[10px] font-medium">{listening ? "Stop" : "Speak"}</span>
-          </button>
+          </button>}
         </div>
       </div>
     )}
