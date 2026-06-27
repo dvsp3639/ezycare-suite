@@ -19,6 +19,26 @@ import {
 import { cn } from "@/lib/utils";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { generateLabReportPdfAsync } from "@/lib/labReportPdf";
+
+/**
+ * Reliable PDF "open + print" inside the Lovable preview (sandboxed iframe):
+ * - Try opening the blob URL in a new tab so the browser shows native print preview.
+ * - If the popup is blocked (or window.open returns null), fall back to a forced download
+ *   via an anchor click — that always works.
+ */
+function openOrDownloadPdf(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 import { loadLabReportConfig } from "@/lib/labReportConfig";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
@@ -355,25 +375,9 @@ const Diagnostics = () => {
         results: order.results || [],
         autoPrint: true,
       });
-      const url = URL.createObjectURL(pdfBlob);
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        setTimeout(() => {
-          try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch { /* ignore */ }
-        }, 200);
-      };
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        iframe.remove();
-      }, 60_000);
+      const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
+      openOrDownloadPdf(pdfBlob, fileName);
+      toast.success("Report ready — opening print preview");
     } catch (err: any) {
       toast.error(err.message || "Failed to prepare print preview");
     }
@@ -992,7 +996,17 @@ const Diagnostics = () => {
                     onClick={async () => {
                       try {
                         const url = await resolveLabReportUrl(viewOrder.reportFileUrl!);
-                        if (url) window.open(url, "_blank", "noopener,noreferrer");
+                        if (!url) return;
+                        const win = window.open(url, "_blank", "noopener,noreferrer");
+                        if (!win) {
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = viewOrder.reportFileName || "lab-report.pdf";
+                          a.target = "_blank";
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                        }
                       } catch (err: any) {
                         toast.error(err.message || "Unable to open report");
                       }
