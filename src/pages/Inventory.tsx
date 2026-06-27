@@ -866,14 +866,6 @@ const Inventory = () => {
 
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
-        </TabsContent>
-
-        {/* ════════ PURCHASE INVOICES TAB ════════ */}
-        <TabsContent value="purchases">
-          <PurchaseInvoiceRepository openBillId={openBillId} onOpenedBillId={() => setOpenBillId(null)} />
-        </TabsContent>
-
-        <TabsContent value="diagnostics_dummy">
            <div className="flex items-center justify-between mb-4">
              <div className="flex items-center gap-3">
                <p className="text-sm text-muted-foreground">Manage lab test catalog — add/edit/remove tests and categories</p>
