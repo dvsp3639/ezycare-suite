@@ -1563,3 +1563,43 @@ function WizardFooter({ children, onCancel, busy }: { children: React.ReactNode;
     </div>
   );
 }
+
+function SuccessView({ info, onViewInventory, onViewInvoice, onPrintGRN, onClose }: {
+  info: { billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number };
+  onViewInventory: () => void;
+  onViewInvoice: () => void;
+  onPrintGRN: () => void;
+  onClose: () => void;
+}) {
+  const totalLines = info.created + info.updated;
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <div className="rounded-3xl border border-success/30 bg-success/5 p-8 text-center">
+        <div className="h-16 w-16 mx-auto rounded-full bg-success/15 flex items-center justify-center mb-4">
+          <CheckCircle2 className="h-8 w-8 text-success" />
+        </div>
+        <h2 className="text-xl font-semibold mb-1">Purchase invoice imported</h2>
+        <p className="text-sm text-muted-foreground">
+          Invoice <span className="font-medium text-foreground">{info.invoiceNo || "—"}</span> from <span className="font-medium text-foreground">{info.vendor || "—"}</span>
+        </p>
+
+        <ul className="text-sm mt-6 space-y-2 inline-block text-left">
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> {totalLines} medicine{totalLines === 1 ? "" : "s"} imported successfully ({info.created} new · {info.updated} updated).</li>
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Inventory updated — visible in Stock, Pharmacy and Sale searches.</li>
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Purchase invoice archived in the repository.</li>
+        </ul>
+
+        <p className="text-xs text-muted-foreground mt-6">Total invoice value: ₹{(info.total || 0).toFixed(2)}</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-5">
+        <Button onClick={onViewInventory}><Plus className="h-4 w-4 mr-2" /> View Inventory</Button>
+        <Button variant="outline" onClick={onViewInvoice}><FileCheck2 className="h-4 w-4 mr-2" /> View Purchase Invoice</Button>
+        <Button variant="outline" onClick={onPrintGRN}><FileText className="h-4 w-4 mr-2" /> Print GRN</Button>
+      </div>
+      <div className="flex justify-center mt-4">
+        <Button variant="ghost" size="sm" onClick={onClose}>Done</Button>
+      </div>
+    </div>
+  );
+}
