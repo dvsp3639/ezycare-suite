@@ -150,6 +150,7 @@ const Diagnostics = () => {
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
+  const [printPreview, setPrintPreview] = useState<{ url: string; fileName: string; title: string } | null>(null);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
@@ -376,8 +377,12 @@ const Diagnostics = () => {
         autoPrint: true,
       });
       const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
-      openOrDownloadPdf(pdfBlob, fileName);
-      toast.success("Report ready — opening print preview");
+      const url = URL.createObjectURL(pdfBlob);
+      // Revoke any previous preview URL
+      setPrintPreview((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return { url, fileName, title: `${order.testName} — ${order.patientName}` };
+      });
     } catch (err: any) {
       toast.error(err.message || "Failed to prepare print preview");
     }
