@@ -864,6 +864,11 @@ const Inventory = () => {
           </div>
         </TabsContent>
 
+        {/* ════════ PURCHASE INVOICES TAB ════════ */}
+        <TabsContent value="purchases">
+          <PurchaseInvoiceRepository />
+        </TabsContent>
+
         {/* ════════ DIAGNOSTICS TAB ════════ */}
         <TabsContent value="diagnostics">
            <div className="flex items-center justify-between mb-4">
