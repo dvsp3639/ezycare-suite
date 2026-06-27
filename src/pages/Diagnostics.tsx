@@ -150,7 +150,6 @@ const Diagnostics = () => {
   // Report view dialog
   const [viewOrder, setViewOrder] = useState<DisplayLabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<DisplayLabOrder | null>(null);
-  const [printPreview, setPrintPreview] = useState<{ url: string; fileName: string; title: string } | null>(null);
 
   // Payment dialog
   const [paymentOrder, setPaymentOrder] = useState<DisplayLabOrder | null>(null);
@@ -377,12 +376,36 @@ const Diagnostics = () => {
         autoPrint: true,
       });
       const fileName = `lab-report-${order.patientRegNo || order.id}.pdf`;
+      void fileName;
       const url = URL.createObjectURL(pdfBlob);
-      // Revoke any previous preview URL
-      setPrintPreview((prev) => {
-        if (prev?.url) URL.revokeObjectURL(prev.url);
-        return { url, fileName, title: `${order.testName} — ${order.patientName}` };
-      });
+      // Hidden iframe → triggers the browser's NATIVE system print preview
+      const existing = document.getElementById("lab-print-frame-hidden");
+      if (existing) existing.remove();
+      const iframe = document.createElement("iframe");
+      iframe.id = "lab-print-frame-hidden";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch {
+            toast.error("Print blocked by browser");
+          }
+        }, 300);
+      };
+      document.body.appendChild(iframe);
+      // Cleanup after a minute (gives the print dialog plenty of time)
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        iframe.remove();
+      }, 60_000);
     } catch (err: any) {
       toast.error(err.message || "Failed to prepare print preview");
     }
@@ -482,68 +505,6 @@ const Diagnostics = () => {
   return (
     <>
     {printOrder && <PrintableLabReport order={printOrder} />}
-    {/* Print preview modal — shows generated PDF inside an iframe */}
-    <Dialog
-      open={!!printPreview}
-      onOpenChange={(open) => {
-        if (!open) {
-          setPrintPreview((prev) => {
-            if (prev?.url) URL.revokeObjectURL(prev.url);
-            return null;
-          });
-        }
-      }}
-    >
-      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] p-0 flex flex-col gap-0">
-        <DialogHeader className="px-5 py-3 border-b border-border flex-row items-center justify-between space-y-0">
-          <div className="min-w-0">
-            <DialogTitle className="text-base truncate">Print Preview</DialogTitle>
-            <p className="text-xs text-muted-foreground truncate">{printPreview?.title}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (!printPreview) return;
-                const a = document.createElement("a");
-                a.href = printPreview.url;
-                a.download = printPreview.fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-              }}
-            >
-              <Download className="h-4 w-4 mr-1" /> Download
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                const iframe = document.getElementById("lab-print-frame") as HTMLIFrameElement | null;
-                try {
-                  iframe?.contentWindow?.focus();
-                  iframe?.contentWindow?.print();
-                } catch {
-                  toast.error("Use the Download button if print is blocked");
-                }
-              }}
-            >
-              <Printer className="h-4 w-4 mr-1" /> Print
-            </Button>
-          </div>
-        </DialogHeader>
-        <div className="flex-1 bg-muted/30">
-          {printPreview && (
-            <iframe
-              id="lab-print-frame"
-              title="Lab report preview"
-              src={printPreview.url}
-              className="w-full h-full border-0"
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
     <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-display font-bold text-foreground">Diagnostics</h1>
