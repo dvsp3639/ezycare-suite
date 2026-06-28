@@ -46,6 +46,7 @@ import {
   STAGE_LABEL, STAGE_ORDER,
   type WorkspaceScan, type WorkspaceItem, type WorkspaceStage, type SaleType,
 } from "@/modules/pharmacy/workspace";
+import { batchesFor } from "@/modules/pharmacy/workspace";
 import { canvasToBlob, enhance, fileToImage, imageToCanvas, blobToBase64 } from "@/lib/docScan";
 import type { Medicine } from "@/modules/pharmacy/types";
 import { useIsMobile } from "@/hooks/use-mobile";
