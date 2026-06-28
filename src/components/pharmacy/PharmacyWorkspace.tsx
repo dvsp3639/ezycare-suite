@@ -925,7 +925,12 @@ function ReviewStage({
       return;
     }
     // Quantity / availability guard — block billing on errors
-    const blockers = items.filter(
+    const billable = items.filter((it) => it.matchStatus !== "skipped" && it.matchStatus !== "pending");
+    if (!billable.length) {
+      toast.error("All medicines are skipped or pending — nothing to bill");
+      return;
+    }
+    const blockers = billable.filter(
       (it) => it.matchStatus === "unmatched" || it.matchStatus === "out" ||
               (it.availableStock !== undefined && it.quantity > (it.availableStock || 0)),
     );
