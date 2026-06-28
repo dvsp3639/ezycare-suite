@@ -1367,7 +1367,9 @@ function DeductionStage({ scan, onSave }: { scan: WorkspaceScan; onSave: (p: Par
         payment_mode: scan.payment_json?.mode || "Cash",
         status: "Completed",
       };
-      const items = (scan.items_json || []).map((i) => ({
+      const items = (scan.items_json || [])
+        .filter((i) => i.matchStatus !== "skipped" && i.matchStatus !== "pending")
+        .map((i) => ({
         medicine_id: i.medicineId || null,
         medicine_name: i.name,
         batch_no: i.batchNo || "",
