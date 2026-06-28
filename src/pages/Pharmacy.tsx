@@ -75,6 +75,9 @@ const Pharmacy = () => {
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
+  const [showRxScanner, setShowRxScanner] = useState(false);
+  const [activeScanId, setActiveScanId] = useState<string>("");
+  const [rxBanner, setRxBanner] = useState<{ doctor: string; date: string; count: number } | null>(null);
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -244,7 +247,7 @@ const Pharmacy = () => {
     const finalPaymentMode = isIP || isDirectSale ? paymentMode : "Cash";
     const customerName = isDirectSale ? directCustomer.name.trim() : selectedPatient?.name || "";
     try {
-      await pharmacyService.completeSale(
+      const created = await pharmacyService.completeSale(
         {
           patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
           customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
@@ -260,6 +263,12 @@ const Pharmacy = () => {
           hospital_id: hospitalId,
         } as any))
       );
+      if (activeScanId && (created as any)?.id) {
+        try {
+          await supabase.from("pharmacy_orders").update({ prescription_scan_id: activeScanId } as any).eq("id", (created as any).id);
+          await supabase.from("prescription_scans").update({ status: "dispensed", pharmacy_order_id: (created as any).id } as any).eq("id", activeScanId);
+        } catch (e) { console.warn("prescription link failed", e); }
+      }
       await refetchMedicines();
       setOrderCompleted(true);
       toast.success(
