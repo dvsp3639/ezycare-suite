@@ -900,9 +900,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 function Stepper({ step, pages, rows, verified }: { step: Step; pages: number; rows: number; verified: number }) {
   const steps: Array<{ key: Step; label: string; meta?: string }> = [
     { key: "scan", label: "Scan", meta: pages ? `${pages} page${pages > 1 ? "s" : ""}` : "" },
-    { key: "patient", label: "Patient" },
     { key: "extracting", label: "AI" },
     { key: "review", label: "Edit", meta: rows ? `${rows}` : "" },
+    { key: "transaction", label: "Sale" },
     { key: "verify", label: "Verify", meta: rows ? `${verified}/${rows}` : "" },
     { key: "barcode", label: "Barcode" },
   ];
