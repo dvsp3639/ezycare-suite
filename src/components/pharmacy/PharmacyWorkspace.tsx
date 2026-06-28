@@ -13,6 +13,7 @@ import {
   Monitor, Camera, Upload, Printer, Package, AlertTriangle,
   PanelLeftClose, PanelLeftOpen, Maximize2, Minimize2,
   ZoomIn, ZoomOut, RotateCw, ChevronRight, Image as ImageIcon,
+  MoreVertical, Search, Replace, Eye, Layers, Edit3, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,17 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMedicines } from "@/modules/pharmacy/hooks";
@@ -774,7 +786,23 @@ function ReviewStage({
     setItems(next);
   };
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
-  const addItem = () => setItems([...items, { name: "", quantity: 1, mrp: 0, gstPercent: 12, matchStatus: "unmatched" }]);
+  const replaceItem = (i: number, next: WorkspaceItem) =>
+    setItems(items.map((it, idx) => (idx === i ? next : it)));
+  const appendItem = (next: WorkspaceItem) => setItems([...items, next]);
+
+  // UI state for new safe workflows
+  const [picker, setPicker] = useState<{ open: boolean; mode: "add" | "replace"; index?: number; seedName?: string }>({ open: false, mode: "add" });
+  const [removeIdx, setRemoveIdx] = useState<number | null>(null);
+  const [inspect, setInspect] = useState<{ kind: "inventory" | "alternatives" | "batches"; item: WorkspaceItem } | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+
+  // Append an audit entry into notes (lightweight, no migration)
+  const appendAudit = (action: string, detail: string) => {
+    const stamp = format(new Date(), "dd/MM/yyyy HH:mm");
+    const line = `[${stamp}] ${action} — ${detail}`;
+    const prev = scan.notes ? `${scan.notes}\n` : "";
+    return prev + line;
+  };
 
   const commit = async (next?: Partial<WorkspaceScan>) => {
     await onSave({
@@ -796,7 +824,25 @@ function ReviewStage({
       toast.error("Add at least one medicine");
       return;
     }
-    await commit({ stage: "billing", verification_status: "verified" });
+    // Quantity / availability guard — block billing on errors
+    const blockers = items.filter(
+      (it) => it.matchStatus === "unmatched" || it.matchStatus === "out" ||
+              (it.availableStock !== undefined && it.quantity > (it.availableStock || 0)),
+    );
+    if (blockers.length) {
+      toast.error(`${blockers.length} medicine(s) need attention before billing`);
+      return;
+    }
+    setVerifyOpen(true);
+  };
+
+  const confirmAndBill = async () => {
+    setVerifyOpen(false);
+    await commit({
+      stage: "billing",
+      verification_status: "verified",
+      notes: appendAudit("Verified", `${items.length} medicine(s) confirmed for billing`) as any,
+    });
   };
 
   const missing = (v?: string) => !v || !v.trim();
@@ -862,7 +908,14 @@ function ReviewStage({
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Medicines ({items.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={addItem} className="gap-1"><Plus className="h-3 w-3" /> Add</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPicker({ open: true, mode: "add" })}
+            className="gap-1"
+          >
+            <Plus className="h-3 w-3" /> Add Medicine
+          </Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {items.map((it, i) => (
@@ -878,20 +931,56 @@ function ReviewStage({
               </div>
               <div className="col-span-3 md:col-span-1">
                 <Input type="number" min={1} value={it.quantity}
-                  onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })} />
+                  onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+                  className={cn(
+                    it.availableStock !== undefined && it.quantity > (it.availableStock || 0) &&
+                      "border-destructive bg-destructive/5",
+                  )} />
               </div>
               <div className="col-span-3 md:col-span-2">
                 <Input type="number" min={0} step="0.01" value={it.mrp}
                   onChange={(e) => updateItem(i, { mrp: Number(e.target.value) || 0 })} placeholder="MRP" />
               </div>
-              <div className="col-span-2 md:col-span-2 flex items-center gap-1">
+              <div className="col-span-2 md:col-span-2 flex items-center gap-1 flex-wrap">
                 <MatchPill s={it.matchStatus} />
                 {it.confidence !== undefined && <span className="text-[10px] text-muted-foreground">{Math.round((it.confidence || 0) * 100)}%</span>}
+                {it.availableStock !== undefined && it.quantity > (it.availableStock || 0) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                    Need {it.quantity}, have {it.availableStock}
+                  </span>
+                )}
               </div>
               <div className="col-span-12 md:col-span-1 flex justify-end">
-                <Button size="icon" variant="ghost" onClick={() => removeItem(i)} className="h-7 w-7 text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" title="More actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="text-xs">{it.name || "Medicine"}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setPicker({ open: true, mode: "replace", index: i, seedName: it.name })}>
+                      <Replace className="h-3.5 w-3.5 mr-2" /> Replace Medicine
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "inventory", item: it })}>
+                      <Eye className="h-3.5 w-3.5 mr-2" /> View Inventory
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "alternatives", item: it })}>
+                      <Layers className="h-3.5 w-3.5 mr-2" /> View Alternatives
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "batches", item: it })}>
+                      <Package className="h-3.5 w-3.5 mr-2" /> View Batch Details
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setRemoveIdx(i)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Remove Medicine…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           ))}
@@ -903,6 +992,133 @@ function ReviewStage({
         <Button variant="outline" onClick={() => commit()} className="flex-1">Save Draft</Button>
         <Button onClick={proceed} className="flex-1 gap-2"><CheckCircle2 className="h-4 w-4" /> Verify & Bill →</Button>
       </div>
+
+      {/* Guided medicine picker (search → batch → qty → review) */}
+      <MedicinePickerDialog
+        open={picker.open}
+        mode={picker.mode}
+        seedName={picker.seedName}
+        medicines={medicines}
+        onClose={() => setPicker({ open: false, mode: "add" })}
+        onConfirm={(next) => {
+          if (picker.mode === "replace" && picker.index !== undefined) {
+            const prev = items[picker.index];
+            replaceItem(picker.index, next);
+            commit({ notes: appendAudit("Replaced", `${prev?.name || "—"} → ${next.name} × ${next.quantity}`) as any });
+          } else {
+            appendItem(next);
+            commit({ notes: appendAudit("Added", `${next.name} × ${next.quantity} (batch ${next.batchNo || "—"})`) as any });
+          }
+          setPicker({ open: false, mode: "add" });
+        }}
+      />
+
+      {/* Confirm remove */}
+      <AlertDialog open={removeIdx !== null} onOpenChange={(o) => !o && setRemoveIdx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this medicine?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeIdx !== null && (
+                <>This will remove <strong>{items[removeIdx]?.name || "the line"}</strong> from the prescription. You can re-add it from the inventory.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (removeIdx !== null) {
+                  const target = items[removeIdx];
+                  removeItem(removeIdx);
+                  commit({ notes: appendAudit("Removed", `${target?.name || "—"} × ${target?.quantity || 0}`) as any });
+                }
+                setRemoveIdx(null);
+              }}
+            >Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Inventory / alternatives / batches inspector */}
+      <InspectDialog
+        info={inspect}
+        medicines={medicines}
+        onClose={() => setInspect(null)}
+        onReplace={(med) => {
+          if (!inspect) return;
+          const idx = items.findIndex((x) => x === inspect.item);
+          if (idx >= 0) {
+            const next: WorkspaceItem = {
+              ...inspect.item,
+              name: med.name,
+              strength: med.strength || inspect.item.strength,
+              medicineId: med.id,
+              medicineName: med.name,
+              batchNo: med.batchNo || "",
+              mrp: med.mrp || 0,
+              gstPercent: med.gstPercent ?? 12,
+              availableStock: med.stock || 0,
+              matchStatus: (med.stock || 0) <= 0 ? "out" : (med.stock || 0) < (inspect.item.quantity || 1) ? "low" : "available",
+            };
+            replaceItem(idx, next);
+            commit({ notes: appendAudit("Replaced", `${inspect.item.name} → ${med.name}`) as any });
+          }
+          setInspect(null);
+        }}
+      />
+
+      {/* Pre-bill verification summary */}
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" /> Verify & Bill
+            </DialogTitle>
+            <DialogDescription>
+              Confirm patient, medicines and reserved stock before billing. Inventory will only be deducted after successful payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><div className="text-muted-foreground">Patient</div><div className="font-medium">{patient.name || "—"} {patient.mobile && `· ${patient.mobile}`}</div></div>
+              <div><div className="text-muted-foreground">Doctor</div><div className="font-medium">{doctor.name || "—"}</div></div>
+              <div><div className="text-muted-foreground">Sale Type</div><div className="font-medium">{saleType}</div></div>
+              <div><div className="text-muted-foreground">Items</div><div className="font-medium">{items.length}</div></div>
+            </div>
+            <div className="border rounded-lg max-h-64 overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40">
+                  <tr><th className="p-2 text-left">Medicine</th><th className="p-2">Batch</th><th className="p-2">Qty</th><th className="p-2">Stock</th><th className="p-2 text-right">Amount</th></tr>
+                </thead>
+                <tbody className="divide-y">
+                  {items.map((it, i) => (
+                    <tr key={i}>
+                      <td className="p-2">{it.name} {it.strength && <span className="text-muted-foreground">{it.strength}</span>}</td>
+                      <td className="p-2 text-center font-mono">{it.batchNo || "—"}</td>
+                      <td className="p-2 text-center">{it.quantity}</td>
+                      <td className="p-2 text-center">
+                        <MatchPill s={it.matchStatus} />
+                      </td>
+                      <td className="p-2 text-right">₹{((it.mrp || 0) * it.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-800">
+              ✓ Stock will be <strong>reserved</strong> now and deducted only after payment is confirmed. Cancelling releases the reservation.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVerifyOpen(false)}>Back to Edit</Button>
+            <Button onClick={confirmAndBill} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" /> Confirm & Proceed to Billing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1121,5 +1337,274 @@ function AuditStage({ scan, onDone }: { scan: WorkspaceScan; onDone: () => void 
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/* ═════════════════════ Medicine Picker (guided add/replace) ═════════════════════ */
+function MedicinePickerDialog({
+  open, mode, seedName, medicines, onClose, onConfirm,
+}: {
+  open: boolean;
+  mode: "add" | "replace";
+  seedName?: string;
+  medicines: Medicine[];
+  onClose: () => void;
+  onConfirm: (it: WorkspaceItem) => void;
+}) {
+  const [step, setStep] = useState<"search" | "qty">("search");
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Medicine | null>(null);
+  const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    if (open) {
+      setStep("search");
+      setQ(seedName || "");
+      setSelected(null);
+      setQty(1);
+    }
+  }, [open, seedName]);
+
+  const results = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return medicines.slice(0, 30);
+    return medicines
+      .filter((m) =>
+        (m.name || "").toLowerCase().includes(t) ||
+        (m.genericName || "").toLowerCase().includes(t) ||
+        (m.brandName || "").toLowerCase().includes(t),
+      )
+      .slice(0, 50);
+  }, [q, medicines]);
+
+  const status = (m: Medicine, want: number): WorkspaceItem["matchStatus"] =>
+    (m.stock || 0) <= 0 ? "out" : (m.stock || 0) < want ? "low" : "available";
+
+  const confirm = () => {
+    if (!selected) return;
+    if (qty < 1) { toast.error("Quantity must be at least 1"); return; }
+    if ((selected.stock || 0) <= 0) {
+      toast.error("Out of stock — choose another batch or alternative");
+      return;
+    }
+    if (qty > (selected.stock || 0)) {
+      toast.error(`Only ${selected.stock} unit(s) available`);
+      return;
+    }
+    const next: WorkspaceItem = {
+      name: selected.name,
+      strength: selected.strength || "",
+      quantity: qty,
+      medicineId: selected.id,
+      medicineName: selected.name,
+      batchNo: selected.batchNo || "",
+      mrp: selected.mrp || 0,
+      gstPercent: selected.gstPercent ?? 12,
+      availableStock: selected.stock || 0,
+      matchStatus: status(selected, qty),
+    };
+    onConfirm(next);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {mode === "replace" ? <Replace className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {mode === "replace" ? "Replace Medicine" : "Add Medicine"}
+          </DialogTitle>
+          <DialogDescription>
+            Search inventory → pick batch → set quantity → review. Nothing is added until you confirm.
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === "search" && (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by brand, generic, salt…"
+                className="pl-8"
+              />
+            </div>
+            <div className="border rounded-lg divide-y max-h-80 overflow-auto">
+              {results.map((m) => {
+                const expired = m.expiryDate && new Date(m.expiryDate) < new Date();
+                const s = status(m, 1);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => { setSelected(m); setStep("qty"); }}
+                    disabled={!!expired}
+                    className={cn(
+                      "w-full text-left p-2 hover:bg-accent/40 flex items-center gap-2",
+                      expired && "opacity-50 cursor-not-allowed",
+                    )}
+                  >
+                    <Pill className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {m.name} {m.strength && <span className="text-muted-foreground">· {m.strength}</span>}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {m.genericName || "—"} · Batch {m.batchNo || "—"} ·
+                        {m.expiryDate ? ` Exp ${format(new Date(m.expiryDate), "MM/yy")}` : " No expiry"}
+                        {expired && <span className="text-destructive font-medium"> · EXPIRED</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-semibold">₹{(m.mrp || 0).toFixed(2)}</div>
+                      <MatchPill s={s} />
+                    </div>
+                  </button>
+                );
+              })}
+              {!results.length && (
+                <div className="p-6 text-center text-xs text-muted-foreground">
+                  No medicines match "{q}". Try a different brand or generic name.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "qty" && selected && (
+          <div className="space-y-3">
+            <div className="border rounded-lg p-3 bg-muted/30">
+              <div className="text-sm font-semibold">{selected.name} {selected.strength}</div>
+              <div className="text-xs text-muted-foreground">
+                {selected.genericName || "—"} · {selected.manufacturer || "—"}
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                <div><div className="text-muted-foreground">Batch</div><div className="font-mono">{selected.batchNo || "—"}</div></div>
+                <div><div className="text-muted-foreground">Expiry</div><div>{selected.expiryDate ? format(new Date(selected.expiryDate), "dd/MM/yyyy") : "—"}</div></div>
+                <div><div className="text-muted-foreground">In Stock</div><div className="font-semibold">{selected.stock || 0} {selected.unit || ""}</div></div>
+                <div><div className="text-muted-foreground">MRP</div><div>₹{(selected.mrp || 0).toFixed(2)}</div></div>
+                <div><div className="text-muted-foreground">Selling</div><div>₹{(selected.sellingPrice || selected.mrp || 0).toFixed(2)}</div></div>
+                <div><div className="text-muted-foreground">GST</div><div>{selected.gstPercent ?? 12}%</div></div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Quantity</Label>
+              <Input
+                type="number" min={1} max={selected.stock || 1} value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                className={cn(qty > (selected.stock || 0) && "border-destructive bg-destructive/5")}
+              />
+              {qty > (selected.stock || 0) && (
+                <div className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Only {selected.stock || 0} unit(s) available
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between text-sm bg-emerald-50 border border-emerald-200 rounded p-2">
+              <span>Line total (incl GST)</span>
+              <span className="font-semibold">
+                ₹{(((selected.mrp || 0) * qty) * (1 + (selected.gstPercent ?? 12) / 100)).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          {step === "qty" ? (
+            <>
+              <Button variant="outline" onClick={() => setStep("search")}>← Back</Button>
+              <Button onClick={confirm} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                {mode === "replace" ? "Replace" : "Add"} to Prescription
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ═════════════════════ Inspect dialog (inventory / alternatives / batches) ═════════════════════ */
+function InspectDialog({
+  info, medicines, onClose, onReplace,
+}: {
+  info: { kind: "inventory" | "alternatives" | "batches"; item: WorkspaceItem } | null;
+  medicines: Medicine[];
+  onClose: () => void;
+  onReplace: (m: Medicine) => void;
+}) {
+  const open = !!info;
+  const item = info?.item;
+  const kind = info?.kind;
+
+  const title = kind === "alternatives" ? "Generic Alternatives"
+    : kind === "batches" ? "Available Batches" : "Inventory Match";
+
+  const rows = useMemo(() => {
+    if (!item) return [];
+    const norm = (s?: string) => (s || "").toLowerCase().trim();
+    if (kind === "batches") {
+      return medicines.filter((m) => norm(m.name) === norm(item.name));
+    }
+    if (kind === "alternatives") {
+      const salt = norm(item.medicineName ? medicines.find((x) => x.id === item.medicineId)?.genericName : "") || norm(item.name);
+      return medicines.filter((m) => norm(m.genericName).includes(salt) || norm(m.saltName || "").includes(salt) || norm(m.name).includes(norm(item.name))).slice(0, 30);
+    }
+    // inventory: exact + similar
+    return medicines.filter((m) => norm(m.name).includes(norm(item.name)) || norm(item.name).includes(norm(m.name))).slice(0, 30);
+  }, [info, medicines, kind, item]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {item ? <>For <strong>{item.name}</strong> {item.strength}</> : null}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="border rounded-lg divide-y max-h-96 overflow-auto">
+          {rows.map((m) => {
+            const expired = m.expiryDate && new Date(m.expiryDate) < new Date();
+            const s: WorkspaceItem["matchStatus"] = (m.stock || 0) <= 0 ? "out" : "available";
+            return (
+              <div key={m.id} className="p-2 flex items-center gap-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{m.name} {m.strength}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {m.genericName || "—"} · Batch {m.batchNo || "—"} ·
+                    {m.expiryDate ? ` Exp ${format(new Date(m.expiryDate), "MM/yy")}` : " No expiry"} ·
+                    Stock {m.stock || 0}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs">₹{(m.mrp || 0).toFixed(2)}</div>
+                  <MatchPill s={s} />
+                </div>
+                <Button
+                  size="sm" variant="outline"
+                  disabled={!!expired || (m.stock || 0) <= 0}
+                  onClick={() => onReplace(m)}
+                >
+                  Use
+                </Button>
+              </div>
+            );
+          })}
+          {!rows.length && (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No matching items in inventory.
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
