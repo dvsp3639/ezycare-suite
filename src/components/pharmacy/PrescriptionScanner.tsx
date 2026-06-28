@@ -1505,3 +1505,129 @@ function BarcodeStep(props: {
     </div>
   );
 }
+function TransactionStep(props: {
+  saleType: SaleType;
+  setSaleType: (s: SaleType) => void;
+  info: PatientInfo;
+  setInfo: React.Dispatch<React.SetStateAction<PatientInfo>>;
+  search: string;
+  setSearch: (v: string) => void;
+  matches: any[];
+  searching: boolean;
+  onPick: (p: any) => void;
+  onQuickRegister: () => void;
+}) {
+  const { saleType, setSaleType, info, setInfo, search, setSearch, matches, searching, onPick, onQuickRegister } = props;
+  const tabs: { key: SaleType; label: string; desc: string }[] = [
+    { key: "OP", label: "OP Sale", desc: "Outpatient — link UHID / Mobile / OP #" },
+    { key: "IP", label: "IP Sale", desc: "Inpatient — link IP # / Ward / Bed" },
+    { key: "Direct", label: "Direct Sale", desc: "OTC — patient details optional" },
+    { key: "Return", label: "Return", desc: "Refund / replacement" },
+  ];
+  return (
+    <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.key} type="button"
+            onClick={() => setSaleType(t.key)}
+            className={cn(
+              "rounded-xl border-2 p-3 text-left transition-all",
+              saleType === t.key
+                ? "border-primary bg-primary/10"
+                : "border-border bg-card hover:border-primary/40",
+            )}
+          >
+            <p className="font-semibold text-sm">{t.label}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{t.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      {(saleType === "OP" || saleType === "IP" || saleType === "Return") && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Search className="h-4 w-4 text-primary" /> Find patient
+          </h3>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              saleType === "IP"
+                ? "Search by IP #, Ward, Bed, Patient Name…"
+                : "Search by UHID, Mobile, OP #, or Name…"
+            }
+            className="h-10"
+          />
+          {searching && (
+            <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> searching…
+            </p>
+          )}
+          {matches.length > 0 && (
+            <div className="rounded-md border border-border bg-popover divide-y divide-border max-h-60 overflow-auto">
+              {matches.map((m) => (
+                <button
+                  key={m.id} type="button"
+                  onClick={() => onPick(m)}
+                  className="w-full text-left px-3 py-2 hover:bg-accent text-xs"
+                >
+                  <span className="font-medium">{m.name}</span>
+                  <span className="text-muted-foreground"> · {m.mobile} · {m.registrationNumber}</span>
+                  {m.age && <span className="text-muted-foreground"> · {m.age}y</span>}
+                  {m.gender && <span className="text-muted-foreground"> · {m.gender}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {info.patientId && (
+            <div className="rounded-lg border border-success/40 bg-success/5 p-3 text-xs">
+              <p className="font-medium text-success flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Linked: {info.name}
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                {info.opIp ? `Reg # ${info.opIp}` : ""}
+                {info.mobile ? ` · ${info.mobile}` : ""}
+                {info.age ? ` · ${info.age}y` : ""}
+                {info.gender ? ` · ${info.gender}` : ""}
+              </p>
+            </div>
+          )}
+
+          {!info.patientId && (
+            <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+              <p className="text-xs font-medium text-foreground">No match? Quick register</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <Input placeholder="Name *" value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" />
+                <Input placeholder="Mobile *" value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className="h-9" />
+                <Input placeholder="Age" value={info.age} onChange={(e) => setInfo((p) => ({ ...p, age: e.target.value }))} className="h-9" />
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" className="gap-1" onClick={onQuickRegister}>
+                  <Plus className="h-3.5 w-3.5" /> Register Patient
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {saleType === "Direct" && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h3 className="text-sm font-semibold">Walk-in customer (optional)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Customer Name</Label>
+              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" placeholder="Optional" />
+            </div>
+            <div>
+              <Label className="text-xs">Mobile</Label>
+              <Input value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className="h-9" placeholder="Optional" />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">OTC sale — no prescription link required.</p>
+        </div>
+      )}
+    </div>
+  );
+}
