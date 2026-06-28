@@ -658,7 +658,10 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 
   /* ── Apply to cart ── */
   async function applyToCart() {
-    if (!patientInfo.name.trim()) { toast.error("Patient name is required"); return; }
+    if (saleType !== "Direct" && !patientInfo.name.trim()) {
+      toast.error("Patient name is required");
+      return;
+    }
     if (!allVerified) { toast.error("Verify every medicine before continuing"); return; }
 
     const verifiedItems: VerifiedPrescriptionItem[] = verifiableRows.map((r) => {
@@ -701,6 +704,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
       hospital: { name: hospitalName },
       prescriptionDate: rxDate,
       items: verifiedItems,
+      saleType,
+      patientId: patientInfo.patientId,
+      registrationNumber: patientInfo.opIp,
     });
     toast.success(`${verifiedItems.length} verified medicine(s) added to cart`);
     doClose();
