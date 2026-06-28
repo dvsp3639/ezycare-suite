@@ -1,113 +1,75 @@
-# Smart Universal Medicine Search
+## Goal
+Keep the existing `PrescriptionScanner` architecture intact and layer in the 10 workflow improvements. Work splits into 5 focused passes inside `src/components/pharmacy/PrescriptionScanner.tsx` plus a few supporting files.
 
-A Google-like, reusable medicine search component powering Pharmacy (OP/IP/Emergency), Inventory, Purchase, Billing, and Prescription modules — backed by a single shared search engine over the existing `medicines` table.
-
-## Scope of this build
-
-In-scope now:
-- Reusable `<SmartMedicineSearch />` React component (command-palette style).
-- Shared search engine (`src/modules/pharmacy/smartSearch.ts`) with fuzzy + partial + strength + brand/generic matching, ranking, highlighting, debouncing, keyboard nav, voice input (Web Speech API), barcode scan input.
-- Personalised ranking via a new `medicine_search_usage` table (per-hospital, per-user frequency + recency) updated when a result is selected.
-- Integration into the existing Pharmacy page search bar (Direct Sale + Patient flows) as the first consumer.
-- Result card showing all listed fields that exist today; gracefully hide fields the schema doesn't have yet.
-
-Out-of-scope (flagged for follow-up):
-- Adding new columns to `medicines` for fields we don't store yet: `dosage_form`, `rack_location`, `selling_price`, `barcode`, `brand_name`, `salt_name`, `strength_value/unit`, `min_stock`, `is_active`. I'll add these in the migration so the UI has real data — see Technical section.
-- Wiring the same component into Inventory / Purchase / Billing / Prescription pages — component will be exported and ready, but page-level wiring beyond Pharmacy is a follow-up to keep this PR reviewable.
-- Cross-store stock view (needs multi-store inventory model; today inventory is single-hospital scoped). The "View Stock Across Stores" action will be present but show current-hospital stock only with a "coming soon" hint.
-
-## User experience
-
-```text
-┌─ Search medicines… (⌘K) ──────────────────────[🎤] [📷]─┐
-│  azi                                                     │
-├──────────────────────────────────────────────────────────┤
-│  Azithromycin 500 mg · Tablet           🟢 In Stock 240 │
-│  Azithromycin · Azee · Strip(3) · Rack A-12 · ₹120      │
-│  [Issue] [Details] [Alternatives] [Stock]               │
-├──────────────────────────────────────────────────────────┤
-│  Azithromycin 250 mg · Tablet           🟡 Low Stock 8  │
-│  …                                                       │
-└──────────────────────────────────────────────────────────┘
+## New Workflow
+```
+Scan/Upload (multi-page, enhance) → Patient Gate → AI Extract
+   → Inventory Match → Edit & Add → Verify Checklist (+ optional Barcode) → Apply to Cart → Bill → Pay → Deduct
 ```
 
-- Typing ≥2 chars triggers search (150 ms debounce, p95 target <200 ms).
-- Arrow keys navigate, Enter selects, Esc closes, Tab cycles quick actions.
-- Matching letters bolded in name + generic.
-- Voice: Web Speech API (`webkitSpeechRecognition`) with mic toggle; falls back gracefully.
-- Barcode: input mode that accepts scanner keyboard-wedge input (Enter-terminated) and exact-matches `barcode` field.
-- Stock chip colour: green ≥ min_stock×2, amber > 0, red = 0.
+## Changes by area
 
-## Ranking formula
+### 1. Adobe-style Document Scanner (`upload` step)
+- New `ScannerCapture` sub-component handles multi-page capture.
+- Per page, run a client-side enhancement pipeline on `<canvas>`:
+  - Grayscale luminance pass → Otsu-based brightness/contrast stretch
+  - Adaptive shadow removal (subtract blurred background)
+  - Auto-rotate using EXIF orientation when present
+  - Edge detection via Sobel + largest-quad heuristic → perspective warp (4-point homography) with manual corner-drag fallback
+- Pages list with thumbnails: reorder (drag), delete, "Add page", "Retake", preview modal.
+- Merge final pages into one PDF (using existing jsPDF) before sending to `prescription-scan-ai`. (Edge function already accepts PDFs.)
+- All heavy logic runs in a new util `src/lib/docScan.ts` (pure functions, no extra deps).
+- Note: "Adobe-level" perspective warp on the web has limits — we implement a solid heuristic plus manual corner adjust, not a full ML segmenter.
 
-```text
-score = 1000·exactNameMatch
-      +  600·prefixMatch(name|generic|brand)
-      +  400·prefixMatch(strength)
-      +  300·substringMatch
-      +  200·fuzzy(score)          // Fuse.js threshold 0.3
-      +   80·log(1+userPicks)      // personal recency/frequency
-      +   40·log(1+hospitalPicks)  // hospital-wide popularity
-      +   30·inStock               // stock > 0
-      +   10·isGeneric
-      -  500·expired
-```
+### 2. Mandatory Patient Gate (new step `patient` between upload and extracting)
+- Block AI call until: Patient Name, Mobile, and OP/IP # (one of) filled.
+- Quick-search existing patients (reuses `patientService.search`); if match → auto-fill UHID, age, gender, last doctor/department. If no match → inline "Quick Register" form that calls `patientService.create`.
+- Optional fields: UHID, Age, Gender, Doctor, Department.
 
-## Technical
+### 3. Fully Editable AI Results (`review` step rewrite)
+For every row add: ✏ Edit, ➕ Add, 🗑 Delete, ⎘ Duplicate, ↕ Reorder, ⤴ Merge-with-duplicate.
+Editable fields: name, brand, generic, strength, dosage, frequency, duration, quantity, instructions.
+"Add another medicine" creates an empty row with intelligent-search field focused.
 
-### Database migration
+### 4. Intelligent Inventory Search (in edit mode)
+- 2-char debounced search using existing `useSmartMedicineSearch` (already wired to `searchMedicines` + `fuse`).
+- Dropdown shows top 8 with stock, batch, expiry, rack, GST.
+- Selecting a result: sets `matchId`, marks `substituted` if name differs, records correction.
 
-New table for personalised ranking + new optional columns on `medicines`:
+### 5. AI Learning loop
+- New table `prescription_corrections` (hospital_id, doctor_name, ai_text, corrected_medicine_id, picks, last_used_at).
+- On every manual replacement, upsert a row (RPC `record_rx_correction`).
+- On next AI extraction, after we get raw AI output, query corrections for `(hospital_id, doctor_name)` and pre-apply matches where `ai_text` matches a row's AI name (case-insensitive trigram).
+- Doctor-specific only; falls back to hospital-wide then global if no hit.
 
-```sql
-ALTER TABLE public.medicines
-  ADD COLUMN IF NOT EXISTS brand_name text,
-  ADD COLUMN IF NOT EXISTS salt_name text,
-  ADD COLUMN IF NOT EXISTS strength text,           -- "500 mg"
-  ADD COLUMN IF NOT EXISTS dosage_form text,        -- Tablet/Capsule/Syrup/Injection
-  ADD COLUMN IF NOT EXISTS rack_location text,
-  ADD COLUMN IF NOT EXISTS barcode text,
-  ADD COLUMN IF NOT EXISTS selling_price numeric,
-  ADD COLUMN IF NOT EXISTS min_stock integer DEFAULT 10,
-  ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+### 6. Verification Checklist
+Already present; keep 5-point checklist plus an explicit "Verified by Pharmacist" master checkbox (auto-checks remaining when ticked, prevents accidental skip).
 
-CREATE INDEX IF NOT EXISTS medicines_search_trgm
-  ON public.medicines USING gin ((coalesce(name,'') || ' ' || coalesce(generic_name,'') || ' ' || coalesce(brand_name,'') || ' ' || coalesce(salt_name,'') || ' ' || coalesce(strength,'')) gin_trgm_ops);
+### 7. Inventory Match Panel
+Already partially there. Add per row: Rack location, Generic equivalent badge, Alternative-brands chip list (top 3 from `searchMedicines` by generic), explicit "Out of Stock" red banner.
 
-CREATE TABLE public.medicine_search_usage (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  hospital_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  medicine_id uuid NOT NULL REFERENCES public.medicines(id) ON DELETE CASCADE,
-  query text,
-  picks integer NOT NULL DEFAULT 1,
-  last_used_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (hospital_id, user_id, medicine_id)
-);
--- standard GRANTs + RLS scoped to hospital_id via get_user_hospital_id(auth.uid())
-```
+### 8. Optional Barcode Verification (new step `barcode`, skippable)
+- Uses existing `@zxing` integration from `UniversalScanner` (extract to `src/lib/barcodeReader.ts` if needed).
+- For each verified row, pharmacist may scan the physical pack. If barcode matches `medicines.barcode` → ✅; mismatch → ⚠ warning, block until override or re-pick.
 
-Plus a `record_medicine_pick(_medicine_id uuid, _query text)` SECURITY DEFINER upsert.
+### 9. Audit Trail (persist on every state change)
+Extend `prescription_scans` with: `pages` (jsonb of page metadata), `enhanced_file_path`, `corrections` (jsonb array of {field, from, to, by, at}), `barcode_verifications` (jsonb), `dispensed_by`, `dispensed_at`, `payment_id`.
+Already-present columns reused: scanned_by, verified_by, extracted_payload, verified_items.
+Hook into existing `pharmacy_orders.prescription_scan_id` link for payment + deduction trail.
 
-### Frontend
+### 10. Files touched
+- `src/components/pharmacy/PrescriptionScanner.tsx` — extend wizard with steps `patient` and `barcode`; new row editor.
+- `src/components/pharmacy/ScannerCapture.tsx` (new) — multi-page scan UI.
+- `src/lib/docScan.ts` (new) — enhancement + perspective utilities.
+- `src/lib/barcodeReader.ts` (new) — extracted ZXing helper.
+- `src/modules/pharmacy/services.ts` — `recordCorrection`, `applyLearnedCorrections` helpers.
+- DB migration — new `prescription_corrections` table + GRANT/RLS + RPC `record_rx_correction` + columns added to `prescription_scans`.
 
-- `src/modules/pharmacy/smartSearch.ts` — fetches medicines (cached via React Query, 60 s stale), runs Fuse.js fuzzy match in-worker-free memory, merges with usage stats, returns ranked results.
-- `src/modules/pharmacy/useSmartMedicineSearch.ts` — hook: `{ query, setQuery, results, loading, pickMedicine }`.
-- `src/components/pharmacy/SmartMedicineSearch.tsx` — cmdk-based popover; exposes `onSelect(medicine, action)` so each module decides what "Issue" means.
-- `src/lib/highlightMatch.tsx` — tiny helper to bold matched chars.
-- Integrate into `src/pages/Pharmacy.tsx` replacing the current medicine picker. Other modules get a one-liner import — wiring deferred.
+## Out of scope / honest limits
+- Real handwriting-recognition model training is impossible client-side; "AI learning" is implemented as the doctor-scoped correction memory above, which materially improves repeat prescriptions without a custom ML model.
+- Perspective correction quality varies with photo quality; manual corner drag is provided.
 
-### Performance
+## Estimated size
+Sizable but contained — ~1 migration, 3 new files, 1 large edit. No new npm deps required (uses existing `jspdf`, `fuse.js`, `@zxing` if already present; otherwise we add `@zxing/browser` only for barcode step).
 
-- Initial load: one `select` of active medicines (id, name, generic, brand, salt, strength, dosage_form, stock, min_stock, mrp, selling_price, batch_no, expiry_date, rack_location, barcode) cached client-side.
-- For 100k+ medicines: switch the hook to server-side `rpc('search_medicines', …)` using the trigram index — added as a follow-up flag once the table grows past ~5k rows; current dataset fits comfortably in client memory.
-
-## Deliverables
-
-1. Migration (new columns, index, usage table, RPC).
-2. Smart search engine + hook + reusable component.
-3. Pharmacy page integration.
-4. Voice + barcode input.
-5. Personalised ranking via `record_medicine_pick`.
-
-Follow-ups (not in this PR): wire into Inventory/Purchase/Billing/Prescription, multi-store stock view, server-side RPC mode for very large catalogs.
+Approve to start implementation, or tell me which sections to drop/defer (e.g. skip barcode step, skip perspective warp) and I'll scope down.
