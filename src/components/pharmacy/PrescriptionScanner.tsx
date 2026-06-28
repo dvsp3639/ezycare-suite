@@ -54,6 +54,9 @@ export type PrescriptionScanResult = {
   hospital: { name: string };
   prescriptionDate: string;
   items: VerifiedPrescriptionItem[];
+  saleType?: "OP" | "IP" | "Direct" | "Return";
+  patientId?: string;
+  registrationNumber?: string;
 };
 
 type AiMedicine = {
@@ -89,7 +92,9 @@ type RowState = AiMedicine & {
   originalAiText?: string;
 };
 
-type Step = "scan" | "patient" | "extracting" | "review" | "verify" | "barcode";
+type Step = "scan" | "extracting" | "review" | "transaction" | "verify" | "barcode";
+
+type SaleType = "OP" | "IP" | "Direct" | "Return";
 
 type Page = {
   id: string;
