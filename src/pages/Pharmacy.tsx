@@ -298,17 +298,25 @@ const Pharmacy = () => {
   const handleApplyPrescription = (result: PrescriptionScanResult) => {
     setActiveScanId(result.scanId);
     setRxBanner({ doctor: result.doctor.name || "—", date: result.prescriptionDate, count: result.items.length });
-    const match = allPatients.find((p) => p.name.toLowerCase() === (result.patient.name || "").toLowerCase());
-    if (match) {
-      handleSelectPatient(match);
-      setIssueType("OP Sale");
-      setOrderSource("doctor");
-    } else {
-      setIssueType("Direct Sale");
+    const wantIssue =
+      result.saleType === "IP" ? "IP Sale" :
+      result.saleType === "Return" ? "OP Return" :
+      result.saleType === "Direct" ? "Direct Sale" :
+      "OP Sale";
+    const match =
+      (result.patientId && allPatients.find((p) => p.id === result.patientId)) ||
+      (result.registrationNumber && allPatients.find((p) => p.registrationNumber === result.registrationNumber)) ||
+      allPatients.find((p) => p.name.toLowerCase() === (result.patient.name || "").toLowerCase());
+    if (result.saleType === "Direct" || !match) {
+      setIssueType(result.saleType === "Direct" || !match ? (result.saleType === "Direct" ? "Direct Sale" : wantIssue) : wantIssue);
       setSelectedPatient(null);
       setOrderSource("manual");
-      setDirectCustomer({ name: result.patient.name || "Walk-in Customer", mobile: result.patient.mobile || "" });
+      setDirectCustomer({ name: result.patient.name || "", mobile: result.patient.mobile || "" });
       setPaymentMode("Cash");
+    } else {
+      handleSelectPatient(match);
+      setIssueType(wantIssue);
+      setOrderSource("doctor");
     }
     setOrderItems(result.items.map((i) => ({
       medicineId: i.medicineId,

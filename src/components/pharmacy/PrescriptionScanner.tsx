@@ -54,6 +54,9 @@ export type PrescriptionScanResult = {
   hospital: { name: string };
   prescriptionDate: string;
   items: VerifiedPrescriptionItem[];
+  saleType?: "OP" | "IP" | "Direct" | "Return";
+  patientId?: string;
+  registrationNumber?: string;
 };
 
 type AiMedicine = {
@@ -89,7 +92,9 @@ type RowState = AiMedicine & {
   originalAiText?: string;
 };
 
-type Step = "scan" | "patient" | "extracting" | "review" | "verify" | "barcode";
+type Step = "scan" | "extracting" | "review" | "transaction" | "verify" | "barcode";
+
+type SaleType = "OP" | "IP" | "Direct" | "Return";
 
 type Page = {
   id: string;
@@ -156,6 +161,23 @@ function statusBadge(med: DbMedicine | undefined, requestedQty: number) {
   return { label: `In Stock — ${med.stock}`, tone: "success" as const, icon: "✅" };
 }
 
+function txnGateValid(saleType: SaleType, info: PatientInfo): boolean {
+  if (saleType === "Direct") return true;
+  if (saleType === "OP" || saleType === "Return") {
+    return info.name.trim().length >= 2 && (info.opIp.trim() !== "" || !!info.patientId || info.mobile.trim() !== "");
+  }
+  if (saleType === "IP") {
+    return info.name.trim().length >= 2 && (info.opIp.trim() !== "" || !!info.patientId);
+  }
+  return false;
+}
+
+function txnSaleStatus(saleType: SaleType, info: PatientInfo): string {
+  if (saleType === "Direct") return "OTC sale — patient details optional";
+  if (txnGateValid(saleType, info)) return `${saleType} · ${info.name}`;
+  return `Link a patient to continue (${saleType})`;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────────────────────── */
@@ -183,6 +205,10 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
   const [rows, setRows] = useState<RowState[]>([]);
   const [corrections, setCorrections] = useState<AuditCorrection[]>([]);
   const [barcodeChecks, setBarcodeChecks] = useState<Array<{ rowId: string; scanned: string; matched: boolean; at: string }>>([]);
+  const [saleType, setSaleType] = useState<SaleType>("OP");
+  const [txnSearch, setTxnSearch] = useState("");
+  const [txnMatches, setTxnMatches] = useState<any[]>([]);
+  const [txnSearchBusy, setTxnSearchBusy] = useState(false);
 
   const [scanId, setScanId] = useState<string>("");
   const [streamingCamera, setStreamingCamera] = useState(false);
@@ -368,7 +394,15 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 
       setAiPayload(data);
       const aiDoctor = data?.doctor?.name?.value || patientInfo.doctor || "";
-      if (!patientInfo.doctor && aiDoctor) setPatientInfo((p) => ({ ...p, doctor: aiDoctor }));
+      const aiPatient = data?.patient || {};
+      setPatientInfo((p) => ({
+        ...p,
+        name:   p.name   || aiPatient?.name?.value   || "",
+        mobile: p.mobile || aiPatient?.mobile?.value || "",
+        age:    p.age    || aiPatient?.age?.value    || "",
+        gender: p.gender || aiPatient?.gender?.value || "",
+        doctor: p.doctor || aiDoctor,
+      }));
       setHospitalName(data?.hospital?.name?.value || "");
       setRxDate(data?.prescriptionDate?.value || new Date().toISOString().slice(0, 10));
 
@@ -508,7 +542,7 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
   /* ── Patient gate ── */
   useEffect(() => {
     const q = patientInfo.mobile.trim();
-    if (!open || step !== "patient" || q.length < 4) { setPatientMatches([]); return; }
+    if (!open || step !== "transaction" || q.length < 4) { setPatientMatches([]); return; }
     let cancel = false;
     setPatientSearchBusy(true);
     const t = setTimeout(async () => {
@@ -520,6 +554,24 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
     }, 300);
     return () => { cancel = true; clearTimeout(t); };
   }, [patientInfo.mobile, open, step]);
+
+  // Transaction search (OP/IP) — UHID / Mobile / OP-IP no / Name / Ward
+  useEffect(() => {
+    const q = txnSearch.trim();
+    if (!open || step !== "transaction" || (saleType !== "OP" && saleType !== "IP") || q.length < 2) {
+      setTxnMatches([]); return;
+    }
+    let cancel = false;
+    setTxnSearchBusy(true);
+    const t = setTimeout(async () => {
+      try {
+        const hits = await patientService.search(q);
+        if (!cancel) setTxnMatches(hits.slice(0, 8));
+      } catch { /* */ }
+      finally { if (!cancel) setTxnSearchBusy(false); }
+    }, 250);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [txnSearch, open, step, saleType]);
 
   async function pickPatient(p: any) {
     setPatientInfo((prev) => ({
@@ -631,7 +683,10 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 
   /* ── Apply to cart ── */
   async function applyToCart() {
-    if (!patientInfo.name.trim()) { toast.error("Patient name is required"); return; }
+    if (saleType !== "Direct" && !patientInfo.name.trim()) {
+      toast.error("Patient name is required");
+      return;
+    }
     if (!allVerified) { toast.error("Verify every medicine before continuing"); return; }
 
     const verifiedItems: VerifiedPrescriptionItem[] = verifiableRows.map((r) => {
@@ -674,6 +729,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
       hospital: { name: hospitalName },
       prescriptionDate: rxDate,
       items: verifiedItems,
+      saleType,
+      patientId: patientInfo.patientId,
+      registrationNumber: patientInfo.opIp,
     });
     toast.success(`${verifiedItems.length} verified medicine(s) added to cart`);
     doClose();
@@ -693,9 +751,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
             <h2 className="font-semibold text-foreground text-sm">AI Prescription Scanner</h2>
             <p className="text-xs text-muted-foreground">
               {step === "scan" && "Scan or upload prescription pages — auto-enhanced"}
-              {step === "patient" && "Patient details (mandatory before AI processing)"}
               {step === "extracting" && "AI is reading the prescription…"}
               {step === "review" && `${rows.length} medicine(s) — edit, search, match`}
+              {step === "transaction" && "Choose sale type & link patient"}
               {step === "verify" && "Final pharmacist verification"}
               {step === "barcode" && "Optional: scan physical packs"}
             </p>
@@ -722,14 +780,6 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
           />
         )}
 
-        {step === "patient" && (
-          <PatientStep
-            info={patientInfo} setInfo={setPatientInfo}
-            matches={patientMatches} searching={patientSearchBusy}
-            onPick={pickPatient} onQuickRegister={quickRegister}
-          />
-        )}
-
         {step === "extracting" && (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="h-10 w-10 text-primary animate-spin" />
@@ -748,6 +798,17 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
             editField={editField} setMatch={setMatch}
             addRow={addBlankRow} duplicateRow={duplicateRow} deleteRow={deleteRow}
             moveRow={moveRow} mergeDuplicates={mergeDuplicates}
+          />
+        )}
+
+        {step === "transaction" && (
+          <TransactionStep
+            saleType={saleType} setSaleType={setSaleType}
+            info={patientInfo} setInfo={setPatientInfo}
+            search={txnSearch} setSearch={setTxnSearch}
+            matches={txnMatches} searching={txnSearchBusy}
+            onPick={(p) => { pickPatient(p); setTxnMatches([]); setTxnSearch(""); }}
+            onQuickRegister={quickRegister}
           />
         )}
 
@@ -774,34 +835,38 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
       <div className="border-t border-border bg-card/80 px-4 py-3 flex items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           {step === "scan" && `${pages.length} page(s) ready`}
-          {step === "patient" && (patientGateValid() ? "Ready" : "Fill name, mobile, OP/IP no.")}
           {step === "review" && "AI prepares · Pharmacist edits · System records"}
+          {step === "transaction" && txnSaleStatus(saleType, patientInfo)}
           {step === "verify" && `${verifiedCount}/${verifiableRows.length} verified`}
           {step === "barcode" && "Barcode verification is optional"}
         </div>
         <div className="flex items-center gap-2">
           {step === "scan" && (
-            <Button disabled={pages.length === 0 || busy} onClick={() => setStep("patient")} className="gap-2">
-              Continue <ArrowRight className="h-4 w-4" />
+            <Button disabled={pages.length === 0 || busy} onClick={processPages} className="gap-2">
+              <Wand2 className="h-4 w-4" /> Process with AI
             </Button>
           )}
-          {step === "patient" && (
+          {step === "review" && (
             <>
               <Button variant="outline" onClick={() => setStep("scan")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button disabled={!patientGateValid()} onClick={processPages} className="gap-2">
-                <Wand2 className="h-4 w-4" /> Process with AI
+              <Button
+                disabled={!rows.some((r) => !r.dropped && r.matchId)}
+                onClick={() => setStep("transaction")}
+                className="gap-2"
+              >
+                Continue <ArrowRight className="h-4 w-4" />
               </Button>
             </>
           )}
-          {step === "review" && (
+          {step === "transaction" && (
             <>
-              <Button variant="outline" onClick={() => setStep("patient")} className="gap-2">
+              <Button variant="outline" onClick={() => setStep("review")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button
-                disabled={!rows.some((r) => !r.dropped && r.matchId)}
+                disabled={!txnGateValid(saleType, patientInfo)}
                 onClick={() => setStep("verify")}
                 className="gap-2"
               >
@@ -811,7 +876,7 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
           )}
           {step === "verify" && (
             <>
-              <Button variant="outline" onClick={() => setStep("review")} className="gap-2">
+              <Button variant="outline" onClick={() => setStep("transaction")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button variant="outline" disabled={!allVerified} onClick={() => setStep("barcode")} className="gap-2">
@@ -860,9 +925,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 function Stepper({ step, pages, rows, verified }: { step: Step; pages: number; rows: number; verified: number }) {
   const steps: Array<{ key: Step; label: string; meta?: string }> = [
     { key: "scan", label: "Scan", meta: pages ? `${pages} page${pages > 1 ? "s" : ""}` : "" },
-    { key: "patient", label: "Patient" },
     { key: "extracting", label: "AI" },
     { key: "review", label: "Edit", meta: rows ? `${rows}` : "" },
+    { key: "transaction", label: "Sale" },
     { key: "verify", label: "Verify", meta: rows ? `${verified}/${rows}` : "" },
     { key: "barcode", label: "Barcode" },
   ];
@@ -1168,14 +1233,28 @@ function ReviewStep(props: {
           <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
             <UserIcon className="h-4 w-4 text-primary" /> Prescription Details
           </h3>
+          {(!info.name.trim() || !info.mobile.trim() || !info.doctor.trim() || !info.opIp.trim()) && (
+            <div className="mb-3 rounded-lg border border-warning/40 bg-warning/5 p-2 text-xs text-warning flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              AI couldn't extract some fields — please fill the highlighted ones below.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Patient *</Label>
-              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" />
+              <Label className="text-xs">Patient Name {!info.name.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className={cn("h-9", !info.name.trim() && "border-warning/60 bg-warning/5")} />
             </div>
             <div>
-              <Label className="text-xs">Doctor</Label>
-              <Input value={info.doctor} onChange={(e) => setInfo((p) => ({ ...p, doctor: e.target.value }))} className="h-9" />
+              <Label className="text-xs">Mobile {!info.mobile.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className={cn("h-9", !info.mobile.trim() && "border-warning/60 bg-warning/5")} />
+            </div>
+            <div>
+              <Label className="text-xs">Doctor {!info.doctor.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.doctor} onChange={(e) => setInfo((p) => ({ ...p, doctor: e.target.value }))} className={cn("h-9", !info.doctor.trim() && "border-warning/60 bg-warning/5")} />
+            </div>
+            <div>
+              <Label className="text-xs">OP/IP # {!info.opIp.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.opIp} onChange={(e) => setInfo((p) => ({ ...p, opIp: e.target.value }))} className={cn("h-9", !info.opIp.trim() && "border-warning/60 bg-warning/5")} />
             </div>
             <div>
               <Label className="text-xs">Hospital</Label>
@@ -1184,6 +1263,14 @@ function ReviewStep(props: {
             <div>
               <Label className="text-xs">Date</Label>
               <Input type="date" value={rxDate} onChange={(e) => setRxDate(e.target.value)} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Age</Label>
+              <Input value={info.age} onChange={(e) => setInfo((p) => ({ ...p, age: e.target.value }))} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Gender</Label>
+              <Input value={info.gender} onChange={(e) => setInfo((p) => ({ ...p, gender: e.target.value }))} className="h-9" />
             </div>
           </div>
         </div>
@@ -1445,6 +1532,132 @@ function BarcodeStep(props: {
           </div>
         );
       })}
+    </div>
+  );
+}
+function TransactionStep(props: {
+  saleType: SaleType;
+  setSaleType: (s: SaleType) => void;
+  info: PatientInfo;
+  setInfo: React.Dispatch<React.SetStateAction<PatientInfo>>;
+  search: string;
+  setSearch: (v: string) => void;
+  matches: any[];
+  searching: boolean;
+  onPick: (p: any) => void;
+  onQuickRegister: () => void;
+}) {
+  const { saleType, setSaleType, info, setInfo, search, setSearch, matches, searching, onPick, onQuickRegister } = props;
+  const tabs: { key: SaleType; label: string; desc: string }[] = [
+    { key: "OP", label: "OP Sale", desc: "Outpatient — link UHID / Mobile / OP #" },
+    { key: "IP", label: "IP Sale", desc: "Inpatient — link IP # / Ward / Bed" },
+    { key: "Direct", label: "Direct Sale", desc: "OTC — patient details optional" },
+    { key: "Return", label: "Return", desc: "Refund / replacement" },
+  ];
+  return (
+    <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.key} type="button"
+            onClick={() => setSaleType(t.key)}
+            className={cn(
+              "rounded-xl border-2 p-3 text-left transition-all",
+              saleType === t.key
+                ? "border-primary bg-primary/10"
+                : "border-border bg-card hover:border-primary/40",
+            )}
+          >
+            <p className="font-semibold text-sm">{t.label}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{t.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      {(saleType === "OP" || saleType === "IP" || saleType === "Return") && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Search className="h-4 w-4 text-primary" /> Find patient
+          </h3>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              saleType === "IP"
+                ? "Search by IP #, Ward, Bed, Patient Name…"
+                : "Search by UHID, Mobile, OP #, or Name…"
+            }
+            className="h-10"
+          />
+          {searching && (
+            <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> searching…
+            </p>
+          )}
+          {matches.length > 0 && (
+            <div className="rounded-md border border-border bg-popover divide-y divide-border max-h-60 overflow-auto">
+              {matches.map((m) => (
+                <button
+                  key={m.id} type="button"
+                  onClick={() => onPick(m)}
+                  className="w-full text-left px-3 py-2 hover:bg-accent text-xs"
+                >
+                  <span className="font-medium">{m.name}</span>
+                  <span className="text-muted-foreground"> · {m.mobile} · {m.registrationNumber}</span>
+                  {m.age && <span className="text-muted-foreground"> · {m.age}y</span>}
+                  {m.gender && <span className="text-muted-foreground"> · {m.gender}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {info.patientId && (
+            <div className="rounded-lg border border-success/40 bg-success/5 p-3 text-xs">
+              <p className="font-medium text-success flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Linked: {info.name}
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                {info.opIp ? `Reg # ${info.opIp}` : ""}
+                {info.mobile ? ` · ${info.mobile}` : ""}
+                {info.age ? ` · ${info.age}y` : ""}
+                {info.gender ? ` · ${info.gender}` : ""}
+              </p>
+            </div>
+          )}
+
+          {!info.patientId && (
+            <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+              <p className="text-xs font-medium text-foreground">No match? Quick register</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <Input placeholder="Name *" value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" />
+                <Input placeholder="Mobile *" value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className="h-9" />
+                <Input placeholder="Age" value={info.age} onChange={(e) => setInfo((p) => ({ ...p, age: e.target.value }))} className="h-9" />
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" className="gap-1" onClick={onQuickRegister}>
+                  <Plus className="h-3.5 w-3.5" /> Register Patient
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {saleType === "Direct" && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h3 className="text-sm font-semibold">Walk-in customer (optional)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Customer Name</Label>
+              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" placeholder="Optional" />
+            </div>
+            <div>
+              <Label className="text-xs">Mobile</Label>
+              <Input value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className="h-9" placeholder="Optional" />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">OTC sale — no prescription link required.</p>
+        </div>
+      )}
     </div>
   );
 }
