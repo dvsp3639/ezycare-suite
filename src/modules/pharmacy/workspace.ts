@@ -293,7 +293,7 @@ export function useWorkspaceScan(scanId: string | null) {
       if (active) { setScan(s); setLoading(false); }
     });
     const channel = supabase
-      .channel(`workspace-scan:${scanId}`)
+      .channel(`workspace-scan:${scanId}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: TABLE, filter: `id=eq.${scanId}` },
