@@ -161,6 +161,23 @@ function statusBadge(med: DbMedicine | undefined, requestedQty: number) {
   return { label: `In Stock — ${med.stock}`, tone: "success" as const, icon: "✅" };
 }
 
+function txnGateValid(saleType: SaleType, info: PatientInfo): boolean {
+  if (saleType === "Direct") return true;
+  if (saleType === "OP" || saleType === "Return") {
+    return info.name.trim().length >= 2 && (info.opIp.trim() !== "" || !!info.patientId || info.mobile.trim() !== "");
+  }
+  if (saleType === "IP") {
+    return info.name.trim().length >= 2 && (info.opIp.trim() !== "" || !!info.patientId);
+  }
+  return false;
+}
+
+function txnSaleStatus(saleType: SaleType, info: PatientInfo): string {
+  if (saleType === "Direct") return "OTC sale — patient details optional";
+  if (txnGateValid(saleType, info)) return `${saleType} · ${info.name}`;
+  return `Link a patient to continue (${saleType})`;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Component
  * ────────────────────────────────────────────────────────────────────────── */
