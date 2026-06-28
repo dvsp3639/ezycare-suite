@@ -1806,6 +1806,7 @@ export type Database = {
           net_amount: number | null
           patient_name: string
           payment_mode: string | null
+          prescription_scan_id: string | null
           registration_number: string | null
           sale_channel: string
           status: string
@@ -1830,6 +1831,7 @@ export type Database = {
           net_amount?: number | null
           patient_name: string
           payment_mode?: string | null
+          prescription_scan_id?: string | null
           registration_number?: string | null
           sale_channel?: string
           status?: string
@@ -1854,6 +1856,7 @@ export type Database = {
           net_amount?: number | null
           patient_name?: string
           payment_mode?: string | null
+          prescription_scan_id?: string | null
           registration_number?: string | null
           sale_channel?: string
           status?: string
@@ -1868,6 +1871,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      prescription_scans: {
+        Row: {
+          created_at: string
+          device_info: string | null
+          doctor_name: string | null
+          extracted_payload: Json
+          hospital_id: string
+          hospital_name: string | null
+          id: string
+          manual_corrections: Json
+          notes: string | null
+          patient_id: string | null
+          patient_name: string | null
+          pharmacy_order_id: string | null
+          prescription_date: string | null
+          registration_number: string | null
+          scanned_by: string | null
+          scanned_by_name: string | null
+          source_file_mime: string | null
+          source_file_path: string | null
+          status: string
+          substitutions: Json
+          updated_at: string
+          verified_by: string | null
+          verified_by_name: string | null
+          verified_items: Json
+        }
+        Insert: {
+          created_at?: string
+          device_info?: string | null
+          doctor_name?: string | null
+          extracted_payload?: Json
+          hospital_id: string
+          hospital_name?: string | null
+          id?: string
+          manual_corrections?: Json
+          notes?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          pharmacy_order_id?: string | null
+          prescription_date?: string | null
+          registration_number?: string | null
+          scanned_by?: string | null
+          scanned_by_name?: string | null
+          source_file_mime?: string | null
+          source_file_path?: string | null
+          status?: string
+          substitutions?: Json
+          updated_at?: string
+          verified_by?: string | null
+          verified_by_name?: string | null
+          verified_items?: Json
+        }
+        Update: {
+          created_at?: string
+          device_info?: string | null
+          doctor_name?: string | null
+          extracted_payload?: Json
+          hospital_id?: string
+          hospital_name?: string | null
+          id?: string
+          manual_corrections?: Json
+          notes?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          pharmacy_order_id?: string | null
+          prescription_date?: string | null
+          registration_number?: string | null
+          scanned_by?: string | null
+          scanned_by_name?: string | null
+          source_file_mime?: string | null
+          source_file_path?: string | null
+          status?: string
+          substitutions?: Json
+          updated_at?: string
+          verified_by?: string | null
+          verified_by_name?: string | null
+          verified_items?: Json
+        }
+        Relationships: []
       }
       prescriptions: {
         Row: {
