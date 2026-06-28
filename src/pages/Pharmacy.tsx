@@ -291,45 +291,6 @@ const Pharmacy = () => {
     setGlobalDiscount(0);
     setDirectCustomer({ name: "", mobile: "" });
     setActiveScanId("");
-    setRxBanner(null);
-  };
-
-  const handleApplyPrescription = (result: PrescriptionScanResult) => {
-    setActiveScanId(result.scanId);
-    setRxBanner({ doctor: result.doctor.name || "—", date: result.prescriptionDate, count: result.items.length });
-    const wantIssue =
-      result.saleType === "IP" ? "IP Sale" :
-      result.saleType === "Return" ? "OP Return" :
-      result.saleType === "Direct" ? "Direct Sale" :
-      "OP Sale";
-    const match =
-      (result.patientId && allPatients.find((p) => p.id === result.patientId)) ||
-      (result.registrationNumber && allPatients.find((p) => p.registrationNumber === result.registrationNumber)) ||
-      allPatients.find((p) => p.name.toLowerCase() === (result.patient.name || "").toLowerCase());
-    if (result.saleType === "Direct" || !match) {
-      setIssueType(result.saleType === "Direct" || !match ? (result.saleType === "Direct" ? "Direct Sale" : wantIssue) : wantIssue);
-      setSelectedPatient(null);
-      setOrderSource("manual");
-      setDirectCustomer({ name: result.patient.name || "", mobile: result.patient.mobile || "" });
-      setPaymentMode("Cash");
-    } else {
-      handleSelectPatient(match);
-      setIssueType(wantIssue);
-      setOrderSource("doctor");
-    }
-    setOrderItems(result.items.map((i) => ({
-      medicineId: i.medicineId,
-      medicineName: i.medicineName,
-      batchNo: i.batchNo,
-      quantity: i.quantity,
-      mrp: i.mrp,
-      discount: 0,
-      gstPercent: i.gstPercent,
-      amount: i.mrp * i.quantity,
-    })));
-    setShowPayment(false);
-    setOrderCompleted(false);
-    setGlobalDiscount(0);
   };
 
   const handlePrintReceipt = () => {
