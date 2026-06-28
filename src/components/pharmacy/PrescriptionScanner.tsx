@@ -1225,14 +1225,28 @@ function ReviewStep(props: {
           <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
             <UserIcon className="h-4 w-4 text-primary" /> Prescription Details
           </h3>
+          {(!info.name.trim() || !info.mobile.trim() || !info.doctor.trim() || !info.opIp.trim()) && (
+            <div className="mb-3 rounded-lg border border-warning/40 bg-warning/5 p-2 text-xs text-warning flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              AI couldn't extract some fields — please fill the highlighted ones below.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Patient *</Label>
-              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className="h-9" />
+              <Label className="text-xs">Patient Name {!info.name.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} className={cn("h-9", !info.name.trim() && "border-warning/60 bg-warning/5")} />
             </div>
             <div>
-              <Label className="text-xs">Doctor</Label>
-              <Input value={info.doctor} onChange={(e) => setInfo((p) => ({ ...p, doctor: e.target.value }))} className="h-9" />
+              <Label className="text-xs">Mobile {!info.mobile.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.mobile} onChange={(e) => setInfo((p) => ({ ...p, mobile: e.target.value }))} className={cn("h-9", !info.mobile.trim() && "border-warning/60 bg-warning/5")} />
+            </div>
+            <div>
+              <Label className="text-xs">Doctor {!info.doctor.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.doctor} onChange={(e) => setInfo((p) => ({ ...p, doctor: e.target.value }))} className={cn("h-9", !info.doctor.trim() && "border-warning/60 bg-warning/5")} />
+            </div>
+            <div>
+              <Label className="text-xs">OP/IP # {!info.opIp.trim() && <span className="text-warning">⚠ missing</span>}</Label>
+              <Input value={info.opIp} onChange={(e) => setInfo((p) => ({ ...p, opIp: e.target.value }))} className={cn("h-9", !info.opIp.trim() && "border-warning/60 bg-warning/5")} />
             </div>
             <div>
               <Label className="text-xs">Hospital</Label>
@@ -1241,6 +1255,14 @@ function ReviewStep(props: {
             <div>
               <Label className="text-xs">Date</Label>
               <Input type="date" value={rxDate} onChange={(e) => setRxDate(e.target.value)} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Age</Label>
+              <Input value={info.age} onChange={(e) => setInfo((p) => ({ ...p, age: e.target.value }))} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Gender</Label>
+              <Input value={info.gender} onChange={(e) => setInfo((p) => ({ ...p, gender: e.target.value }))} className="h-9" />
             </div>
           </div>
         </div>
