@@ -32,7 +32,7 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
-import { PrescriptionScanner, type PrescriptionScanResult } from "@/components/pharmacy/PrescriptionScanner";
+import PharmacyWorkspace from "@/components/pharmacy/PharmacyWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
@@ -75,9 +75,8 @@ const Pharmacy = () => {
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
-  const [showRxScanner, setShowRxScanner] = useState(false);
   const [activeScanId, setActiveScanId] = useState<string>("");
-  const [rxBanner, setRxBanner] = useState<{ doctor: string; date: string; count: number } | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<"workspace" | "classic">("workspace");
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -382,40 +381,26 @@ const Pharmacy = () => {
       </div>
 
       {/* Primary AI Prescription Scanner CTA */}
-      <div className="mb-6 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-            <ScanLine className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-foreground text-sm flex items-center gap-2 flex-wrap">
-              AI Prescription Scanner <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <Badge variant="outline" className="text-[10px]">Primary workflow</Badge>
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Capture, upload, or scan a handwritten/printed prescription. AI extracts medicines, matches inventory, you verify before billing.
-            </p>
-            {rxBanner && (
-              <p className="text-xs text-success mt-1">
-                ✓ Prescription loaded — {rxBanner.count} item(s) from Dr. {rxBanner.doctor} ({rxBanner.date})
-              </p>
-            )}
-          </div>
-          <Button onClick={() => setShowRxScanner(true)} size="lg" className="gap-2">
-            <ScanLine className="h-4 w-4" /> Scan Prescription
-          </Button>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-3 italic">
-          AI prepares · Pharmacist verifies · System records · Inventory updates only after payment
-        </p>
-      </div>
+      <Tabs value={workspaceMode} onValueChange={(v) => setWorkspaceMode(v as any)} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="workspace" className="gap-1.5">
+            <ScanLine className="h-3.5 w-3.5" /> AI Workspace
+            <Sparkles className="h-3 w-3 text-primary" />
+          </TabsTrigger>
+          <TabsTrigger value="classic" className="gap-1.5">
+            <Pill className="h-3.5 w-3.5" /> Manual Billing
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="workspace" className="mt-3 -mx-6 lg:-mx-8">
+          <PharmacyWorkspace />
+        </TabsContent>
+        <TabsContent value="classic" className="mt-3 text-xs text-muted-foreground">
+          Manual billing form is below.
+        </TabsContent>
+      </Tabs>
 
-      <PrescriptionScanner
-        open={showRxScanner}
-        onClose={() => setShowRxScanner(false)}
-        patient={selectedPatient ? { id: selectedPatient.id, name: selectedPatient.name, mobile: selectedPatient.mobile, registrationNumber: selectedPatient.registrationNumber } : null}
-        onApply={handleApplyPrescription}
-      />
+      {workspaceMode === "workspace" ? null : (
+      <>
 
       {/* Issue Type Selector */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
