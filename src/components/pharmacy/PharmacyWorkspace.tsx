@@ -709,50 +709,147 @@ function AIExtractionStage({
 function InventoryMatchStage({
   scan, onAdvance, medicines,
 }: { scan: WorkspaceScan; onAdvance: (p: Partial<WorkspaceScan>) => Promise<void>; medicines: Medicine[] }) {
-  const items = scan.items_json || [];
+  // Local working copy so pharmacist can act before advancing.
+  const [items, setItems] = useState<WorkspaceItem[]>(scan.items_json || []);
+  useEffect(() => { setItems(scan.items_json || []); }, [scan.updated_at]);
+
+  const [batchPicker, setBatchPicker] = useState<{ idx: number; name: string } | null>(null);
+  const [altPicker, setAltPicker] = useState<{ idx: number; item: WorkspaceItem } | null>(null);
+
   const counts = useMemo(() => ({
     available: items.filter((i) => i.matchStatus === "available").length,
     low: items.filter((i) => i.matchStatus === "low").length,
     out: items.filter((i) => i.matchStatus === "out").length,
     unmatched: items.filter((i) => i.matchStatus === "unmatched").length,
+    pending: items.filter((i) => i.matchStatus === "pending").length,
+    skipped: items.filter((i) => i.matchStatus === "skipped").length,
   }), [items]);
+
+  const patch = (i: number, p: Partial<WorkspaceItem>) =>
+    setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...p } : it)));
+
+  const reduceToAvailable = (i: number) => {
+    const it = items[i];
+    const avail = it.availableStock || 0;
+    if (avail <= 0) return;
+    patch(i, { quantity: avail, matchStatus: "available" });
+    toast.success(`Quantity reduced to available stock (${avail})`);
+  };
+
+  const markPending = (i: number) => patch(i, { matchStatus: "pending" });
+  const skip = (i: number) => patch(i, { matchStatus: "skipped" });
+
+  const proceed = async () => {
+    const rematched = matchInventory(items, medicines);
+    await onAdvance({ stage: "review", items_json: rematched as any });
+  };
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Inventory Match</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Package className="h-4 w-4" /> Inventory Cross-Check
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-4 gap-2 text-center text-xs">
-          <div className="p-2 rounded bg-emerald-50 text-emerald-700"><div className="text-base font-semibold">{counts.available}</div>Available</div>
-          <div className="p-2 rounded bg-amber-50 text-amber-700"><div className="text-base font-semibold">{counts.low}</div>Low</div>
-          <div className="p-2 rounded bg-red-50 text-red-700"><div className="text-base font-semibold">{counts.out}</div>Out</div>
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center text-xs">
+          <div className="p-2 rounded bg-emerald-50 text-emerald-700"><div className="text-base font-semibold">{counts.available}</div>🟢 Available</div>
+          <div className="p-2 rounded bg-amber-50 text-amber-700"><div className="text-base font-semibold">{counts.low}</div>🟡 Low</div>
+          <div className="p-2 rounded bg-red-50 text-red-700"><div className="text-base font-semibold">{counts.out}</div>🔴 Out</div>
           <div className="p-2 rounded bg-slate-100 text-slate-700"><div className="text-base font-semibold">{counts.unmatched}</div>Unmatched</div>
+          <div className="p-2 rounded bg-indigo-50 text-indigo-700"><div className="text-base font-semibold">{counts.pending}</div>Pending</div>
+          <div className="p-2 rounded bg-slate-100 text-slate-500"><div className="text-base font-semibold">{counts.skipped}</div>Skipped</div>
         </div>
-        <div className="border rounded-lg divide-y max-h-72 overflow-auto">
+
+        <div className="border rounded-lg divide-y max-h-[28rem] overflow-auto">
           {items.map((it, idx) => (
-            <div key={idx} className="p-2 flex items-center justify-between text-sm">
-              <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{it.name} {it.strength && <span className="text-muted-foreground">· {it.strength}</span>}</div>
-                <div className="text-[11px] text-muted-foreground truncate">
-                  Qty {it.quantity} · {it.matchStatus === "unmatched" ? "Not in stock catalog" : `Stock: ${it.availableStock ?? 0}`}
-                </div>
-              </div>
-              <MatchPill s={it.matchStatus} />
-            </div>
+            <InventoryRow
+              key={idx}
+              item={it}
+              onReduce={() => reduceToAvailable(idx)}
+              onPickBatch={() => setBatchPicker({ idx, name: it.name })}
+              onFindAlt={() => setAltPicker({ idx, item: it })}
+              onMarkPending={() => markPending(idx)}
+              onSkip={() => skip(idx)}
+              onUndoSkip={() => {
+                const rematched = matchInventory([{ ...it, matchStatus: undefined }], medicines)[0];
+                patch(idx, rematched);
+              }}
+              onChangeQty={(q) => {
+                const next = { ...it, quantity: q };
+                const rematched = matchInventory([next], medicines)[0];
+                patch(idx, rematched);
+              }}
+            />
           ))}
           {!items.length && <div className="p-4 text-xs text-muted-foreground text-center">No medicines extracted.</div>}
         </div>
-        <Button
-          onClick={() => onAdvance({
-            stage: "review",
-            items_json: matchInventory(items, medicines) as any,
-          })}
-          className="w-full gap-2"
-        >
-          Continue to Review →
+
+        <div className="text-[11px] text-muted-foreground bg-muted/40 rounded p-2">
+          ✱ Substitutions are <strong>never automatic</strong> — pharmacist must confirm. Stock is reserved at billing, deducted only after payment.
+        </div>
+
+        <Button onClick={proceed} className="w-full gap-2">
+          Continue to Pharmacist Review →
         </Button>
       </CardContent>
+
+      <BatchPickerDialog
+        open={!!batchPicker}
+        name={batchPicker?.name || ""}
+        medicines={medicines}
+        requestedQty={batchPicker ? items[batchPicker.idx]?.quantity || 1 : 1}
+        onClose={() => setBatchPicker(null)}
+        onPick={(m) => {
+          if (!batchPicker) return;
+          const cur = items[batchPicker.idx];
+          const stock = m.stock || 0;
+          patch(batchPicker.idx, {
+            medicineId: m.id,
+            medicineName: m.name,
+            batchNo: m.batchNo || "",
+            mrp: m.mrp || 0,
+            sellingPrice: m.sellingPrice || m.mrp || 0,
+            expiryDate: m.expiryDate || null,
+            availableStock: stock,
+            manufacturer: m.manufacturer || "",
+            matchStatus: stock <= 0 ? "out" : stock < (cur?.quantity || 1) ? "low" : "available",
+            matchSource: "exact",
+          });
+          setBatchPicker(null);
+          toast.success(`Batch ${m.batchNo || "—"} selected`);
+        }}
+      />
+
+      {altPicker && (
+        <AlternativePickerDialog
+          open={!!altPicker}
+          item={altPicker.item}
+          medicines={medicines}
+          onClose={() => setAltPicker(null)}
+          onPick={(m) => {
+            const cur = altPicker.item;
+            const stock = m.stock || 0;
+            patch(altPicker.idx, {
+              name: m.name,
+              strength: m.strength || cur.strength,
+              medicineId: m.id,
+              medicineName: m.name,
+              batchNo: m.batchNo || "",
+              mrp: m.mrp || 0,
+              sellingPrice: m.sellingPrice || m.mrp || 0,
+              expiryDate: m.expiryDate || null,
+              availableStock: stock,
+              manufacturer: m.manufacturer || "",
+              genericName: m.genericName || "",
+              matchStatus: stock <= 0 ? "out" : stock < (cur?.quantity || 1) ? "low" : "available",
+              matchSource: "generic",
+            });
+            setAltPicker(null);
+            toast.success(`Alternative ${m.name} selected — please verify`);
+          }}
+        />
+      )}
     </Card>
   );
 }
