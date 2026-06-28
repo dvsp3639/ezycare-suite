@@ -95,6 +95,8 @@ export default function PharmacyWorkspace() {
   const userId = user?.id;
   const { scans, loading } = useWorkspaceQueue(userId);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [queueCollapsed, setQueueCollapsed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Toast on new mobile scan arriving on desktop
   const knownIds = useRef<Set<string>>(new Set());
@@ -140,31 +142,86 @@ export default function PharmacyWorkspace() {
   }
 
   /* ── Desktop: two-pane ── */
+  /* ── Desktop: 3-column workspace (Queue | Preview | Editor) ── */
+  const showPreview = !!activeId;
+  const cols = !activeId
+    ? "grid-cols-[300px_1fr]"
+    : queueCollapsed
+      ? "grid-cols-[44px_1.1fr_minmax(440px,0.9fr)]"
+      : "grid-cols-[minmax(240px,1fr)_2fr_minmax(420px,1fr)]";
   return (
-    <div className="grid grid-cols-[360px_1fr] gap-4 p-4 h-[calc(100vh-12rem)]">
+    <div
+      className={cn(
+        "grid gap-3 p-3 transition-all",
+        cols,
+        fullscreen
+          ? "fixed inset-0 z-50 bg-background h-screen"
+          : "h-[calc(100vh-9rem)]",
+      )}
+    >
+      {/* Queue column */}
       <div className="border rounded-xl bg-card flex flex-col overflow-hidden">
-        <div className="p-3 border-b flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold flex items-center gap-1.5">
-              <Monitor className="h-3.5 w-3.5" /> Live Queue
-              <Badge variant="outline" className="text-[10px] ml-1">{scans.length}</Badge>
-            </p>
-            <p className="text-[11px] text-muted-foreground">Synced across your devices</p>
-          </div>
-          <Button onClick={startNew} size="sm" className="gap-1">
-            <Plus className="h-3.5 w-3.5" /> New
-          </Button>
-        </div>
-        <div className="flex-1 overflow-auto">
-          <Queue scans={scans} loading={loading} onOpen={setActiveId} activeId={activeId} />
-        </div>
+        {queueCollapsed ? (
+          <button
+            onClick={() => setQueueCollapsed(false)}
+            className="h-full w-full flex flex-col items-center gap-2 pt-3 text-xs text-muted-foreground hover:bg-accent/40"
+            title="Expand queue"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+            <span className="[writing-mode:vertical-rl] rotate-180 mt-1">Live Queue · {scans.length}</span>
+          </button>
+        ) : (
+          <>
+            <div className="p-3 border-b flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold flex items-center gap-1.5">
+                  <Monitor className="h-3.5 w-3.5" /> Live Queue
+                  <Badge variant="outline" className="text-[10px] ml-1">{scans.length}</Badge>
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">Synced across your devices</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button onClick={startNew} size="sm" className="gap-1 h-8">
+                  <Plus className="h-3.5 w-3.5" /> New
+                </Button>
+                {activeId && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setQueueCollapsed(true)}
+                    title="Collapse"
+                  >
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <Queue scans={scans} loading={loading} onOpen={setActiveId} activeId={activeId} />
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Center: Prescription preview (only when scan active) */}
+      {showPreview && (
+        <div className="border rounded-xl bg-card overflow-hidden flex flex-col">
+          <PrescriptionPreview
+            scanId={activeId!}
+            fullscreen={fullscreen}
+            onToggleFullscreen={() => setFullscreen((f) => !f)}
+          />
+        </div>
+      )}
+
+      {/* Right: Editor / stage view */}
       <div className="border rounded-xl bg-card overflow-hidden">
         {activeId ? (
           <WorkspaceScanView
             scanId={activeId}
             onBack={() => setActiveId(null)}
-            onCompleted={() => setActiveId(null)}
+            onCompleted={() => { setActiveId(null); setFullscreen(false); }}
           />
         ) : (
           <EmptyDetail onStart={startNew} />
