@@ -1708,3 +1708,273 @@ function InspectDialog({
     </Dialog>
   );
 }
+
+/* ═════════════════════ Inventory Row (rich status with inline actions) ═════════════════════ */
+function InventoryRow({
+  item, onReduce, onPickBatch, onFindAlt, onMarkPending, onSkip, onUndoSkip, onChangeQty,
+}: {
+  item: WorkspaceItem;
+  onReduce: () => void;
+  onPickBatch: () => void;
+  onFindAlt: () => void;
+  onMarkPending: () => void;
+  onSkip: () => void;
+  onUndoSkip: () => void;
+  onChangeQty: (q: number) => void;
+}) {
+  const expired = item.expiryDate && new Date(item.expiryDate) < new Date();
+  const isSkipped = item.matchStatus === "skipped";
+  const isPending = item.matchStatus === "pending";
+  return (
+    <div className={cn("p-3", isSkipped && "opacity-60")}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm truncate">
+            {item.name}
+            {item.strength && <span className="text-muted-foreground"> · {item.strength}</span>}
+            {item.matchSource && item.matchSource !== "exact" && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                {item.matchSource === "brand" ? "brand match" : item.matchSource === "generic" ? "generic match" : "fuzzy"}
+              </span>
+            )}
+          </div>
+          {item.aiText && item.aiText !== item.name && (
+            <div className="text-[10px] text-muted-foreground">AI: {item.aiText}</div>
+          )}
+        </div>
+        <MatchPill s={item.matchStatus} />
+      </div>
+
+      {/* Details grid */}
+      {item.matchStatus !== "unmatched" && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[11px]">
+          <Field label="Batch" value={item.batchNo || "—"} mono />
+          <Field
+            label="Expiry"
+            value={item.expiryDate ? format(new Date(item.expiryDate), "MM/yy") : "—"}
+            warn={!!expired}
+          />
+          <Field label="Available" value={`${item.availableStock ?? 0}`} />
+          <Field label="MRP" value={`₹${(item.mrp || 0).toFixed(2)}`} />
+          <Field label="Selling" value={`₹${(item.sellingPrice || item.mrp || 0).toFixed(2)}`} />
+        </div>
+      )}
+
+      {item.matchStatus === "unmatched" && (
+        <div className="mt-2 text-[11px] text-red-700 bg-red-50 rounded p-1.5">
+          Medicine not available in inventory.
+        </div>
+      )}
+
+      {/* Qty + status messaging */}
+      <div className="flex items-center justify-between mt-2 gap-2">
+        <div className="flex items-center gap-2">
+          <Label className="text-[11px] text-muted-foreground">Qty</Label>
+          <Input
+            type="number" min={1} value={item.quantity}
+            onChange={(e) => onChangeQty(Math.max(1, Number(e.target.value) || 1))}
+            className="h-7 w-20 text-xs"
+            disabled={isSkipped}
+          />
+          {item.matchStatus === "low" && (
+            <span className="text-[11px] text-amber-700">
+              Need {item.quantity}, have {item.availableStock} — short by {item.quantity - (item.availableStock || 0)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Inline actions per status */}
+      {!isSkipped && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {item.matchStatus === "low" && (
+            <>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onReduce}>
+                Reduce to {item.availableStock}
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onPickBatch}>
+                <Package className="h-3 w-3 mr-1" /> Another Batch
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onFindAlt}>
+                <Replace className="h-3 w-3 mr-1" /> Alternative Brand
+              </Button>
+            </>
+          )}
+          {(item.matchStatus === "out" || item.matchStatus === "unmatched") && (
+            <>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onFindAlt}>
+                <Search className="h-3 w-3 mr-1" /> Search Alternative
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onPickBatch}>
+                <Package className="h-3 w-3 mr-1" /> Pick Batch
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onMarkPending}>
+                Mark Pending
+              </Button>
+            </>
+          )}
+          {item.matchStatus === "available" && (
+            <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onPickBatch}>
+              <Package className="h-3 w-3 mr-1" /> Change Batch
+            </Button>
+          )}
+          {!isPending && item.matchStatus !== "available" && (
+            <Button size="sm" variant="ghost" className="h-7 text-[11px] text-muted-foreground" onClick={onSkip}>
+              Skip
+            </Button>
+          )}
+        </div>
+      )}
+      {isSkipped && (
+        <div className="mt-2">
+          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={onUndoSkip}>
+            Undo Skip
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, mono, warn }: { label: string; value: string; mono?: boolean; warn?: boolean }) {
+  return (
+    <div>
+      <div className="text-muted-foreground">{label}</div>
+      <div className={cn(mono && "font-mono", warn && "text-destructive font-medium")}>{value}</div>
+    </div>
+  );
+}
+
+/* ═════════════════════ Batch Picker (FEFO ranked) ═════════════════════ */
+function BatchPickerDialog({
+  open, name, medicines, requestedQty, onClose, onPick,
+}: {
+  open: boolean;
+  name: string;
+  medicines: Medicine[];
+  requestedQty: number;
+  onClose: () => void;
+  onPick: (m: Medicine) => void;
+}) {
+  const batches = useMemo(() => batchesFor(name, medicines), [name, medicines]);
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-4 w-4" /> Select Batch — {name}
+          </DialogTitle>
+          <DialogDescription>
+            FEFO recommendation first. Pharmacist may pick any valid batch.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="border rounded-lg divide-y max-h-96 overflow-auto">
+          {batches.map((m, i) => {
+            const stock = m.stock || 0;
+            const enough = stock >= requestedQty;
+            return (
+              <div key={m.id} className="p-2 flex items-center gap-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate flex items-center gap-2">
+                    Batch <span className="font-mono">{m.batchNo || "—"}</span>
+                    {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">FEFO ★</span>}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Exp {m.expiryDate ? format(new Date(m.expiryDate), "dd/MM/yyyy") : "—"} ·
+                    Stock {stock} · MRP ₹{(m.mrp || 0).toFixed(2)} · Selling ₹{(m.sellingPrice || m.mrp || 0).toFixed(2)}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={enough ? "default" : "outline"}
+                  onClick={() => onPick(m)}
+                >
+                  {enough ? "Use" : `Use (short ${requestedQty - stock})`}
+                </Button>
+              </div>
+            );
+          })}
+          {!batches.length && (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No in-stock batches available for this medicine.
+            </div>
+          )}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ═════════════════════ Alternative Picker (generic/brand alternatives) ═════════════════════ */
+function AlternativePickerDialog({
+  open, item, medicines, onClose, onPick,
+}: {
+  open: boolean;
+  item: WorkspaceItem;
+  medicines: Medicine[];
+  onClose: () => void;
+  onPick: (m: Medicine) => void;
+}) {
+  const norm = (s?: string) => (s || "").toLowerCase().trim();
+  const [q, setQ] = useState("");
+  useEffect(() => { if (open) setQ(item.genericName || item.name || ""); }, [open, item.genericName, item.name]);
+
+  const matches = useMemo(() => {
+    const t = norm(q);
+    if (!t) return [];
+    return medicines
+      .filter((m) => (m.stock || 0) > 0)
+      .filter((m) =>
+        norm(m.genericName).includes(t) ||
+        norm(m.saltName || "").includes(t) ||
+        norm(m.name).includes(t) ||
+        norm(m.brandName || "").includes(t),
+      )
+      .filter((m) => !m.expiryDate || new Date(m.expiryDate) > new Date())
+      .slice(0, 40);
+  }, [q, medicines]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Replace className="h-4 w-4" /> Find Alternative — {item.name}
+          </DialogTitle>
+          <DialogDescription>
+            Suggestions only — pharmacist must confirm any substitution.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by generic, brand, salt…" className="pl-8"
+          />
+        </div>
+        <div className="border rounded-lg divide-y max-h-80 overflow-auto mt-2">
+          {matches.map((m) => (
+            <div key={m.id} className="p-2 flex items-center gap-2 text-sm">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{m.name} {m.strength}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {m.genericName || "—"} · {m.manufacturer || "—"} · Stock {m.stock || 0} ·
+                  Exp {m.expiryDate ? format(new Date(m.expiryDate), "MM/yy") : "—"}
+                </div>
+              </div>
+              <div className="text-right text-xs">₹{(m.mrp || 0).toFixed(2)}</div>
+              <Button size="sm" onClick={() => onPick(m)}>Use</Button>
+            </div>
+          ))}
+          {!matches.length && (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No alternatives found. Try a different generic name.
+            </div>
+          )}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
