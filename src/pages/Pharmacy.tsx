@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   Pill, Search, ShoppingCart, Plus, Minus, Trash2, CreditCard,
   Banknote, FileText, User, Package, Printer, CheckCircle2, ClipboardList,
+  ScanLine, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
@@ -31,6 +32,8 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
+import { PrescriptionScanner, type PrescriptionScanResult } from "@/components/pharmacy/PrescriptionScanner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
 type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
