@@ -400,21 +400,83 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       if (!user) { toast.error("Please sign in to scan prescriptions"); setBusy(false); setMode("menu"); return; }
       setMode("loading");
       try {
-        let created = 0;
-        for (const f of sf) {
+        // Run the dedicated prescription extractor per page, then merge into ONE scan
+        // so the pharmacist sees fully auto-populated patient + doctor + medicines.
+        const num = (x: any) => Number(x ?? 0) || 0;
+        const patient: any = {};
+        const doctor: any = {};
+        let confidenceSum = 0;
+        let confidenceN = 0;
+        const items: any[] = [];
+        const paths: string[] = [];
+
+        // Create the workspace row up front so we can upload pages against it.
+        const scan = await workspaceService.createScan(user.id, { stage: "ai_extraction" as any });
+
+        for (let i = 0; i < sf.length; i++) {
+          const f = sf[i];
           const blob = await (await fetch(`data:${f.mime};base64,${f.base64}`)).blob();
-          const scan = await workspaceService.createScan(user.id, { stage: "scan" });
-          const path = await workspaceService.uploadPage(scan.id, user.id, blob, 0);
-          await workspaceService.updateScan(scan.id, {
-            source_files: [path] as any,
-            page_count: 1,
-            stage: "ai_extraction" as any,
-          });
-          created++;
+          try {
+            const path = await workspaceService.uploadPage(scan.id, user.id, blob, i);
+            paths.push(path);
+          } catch (e) { /* upload failure is non-fatal for extraction */ }
+
+          try {
+            const { data, error } = await supabase.functions.invoke("prescription-scan-ai", {
+              body: { fileBase64: f.base64, mimeType: f.mime },
+            });
+            if (error || data?.error) continue;
+            const p = data?.patient || {};
+            const d = data?.doctor || {};
+            patient.name      ||= p.name?.value || "";
+            patient.mobile    ||= p.mobile?.value || "";
+            patient.age       ||= p.age?.value || "";
+            patient.gender    ||= p.gender?.value || "";
+            doctor.name          ||= d.name?.value || "";
+            doctor.qualification ||= d.qualification?.value || "";
+            doctor.registration  ||= d.registration?.value || "";
+            if (typeof data?.confidence === "number") {
+              confidenceSum += data.confidence; confidenceN++;
+            }
+            const meds: any[] = Array.isArray(data?.medicines) ? data.medicines : [];
+            meds.forEach((m) => {
+              const name = String(m.name || m.brandName || m.genericName || "").trim();
+              if (!name) return;
+              items.push({
+                aiText: name,
+                name,
+                strength: m.strength || "",
+                dosage: m.dosage || "",
+                frequency: m.frequency || "",
+                duration: m.duration || "",
+                instructions: m.instructions || "",
+                quantity: Math.max(1, num(m.quantity)) || 1,
+                medicineId: null,
+                medicineName: name,
+                batchNo: "",
+                mrp: 0,
+                gstPercent: 12,
+                discount: 0,
+                confidence: typeof m.confidence === "number" ? m.confidence : 0.7,
+                matchStatus: "unmatched",
+              });
+            });
+          } catch { /* per-page extraction failure ignored */ }
         }
+
+        await workspaceService.updateScan(scan.id, {
+          source_files: paths as any,
+          page_count: sf.length,
+          patient_json: patient,
+          doctor_json: doctor,
+          items_json: items as any,
+          ai_confidence: confidenceN ? confidenceSum / confidenceN : null,
+          stage: (items.length ? "inventory_match" : "ai_extraction") as any,
+        });
+
         toast.success(
-          created > 1
-            ? `📋 ${created} prescriptions queued — opening Pharmacy Workspace`
+          items.length
+            ? `📋 ${items.length} medicines extracted — opening Pharmacy Workspace`
             : `📋 Prescription queued — opening Pharmacy Workspace`,
         );
         close();
