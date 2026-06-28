@@ -258,6 +258,110 @@ function EmptyDetail({ onStart }: { onStart: () => void }) {
   );
 }
 
+/* ═════════════════════ Prescription Preview Pane ═════════════════════ */
+function PrescriptionPreview({
+  scanId, fullscreen, onToggleFullscreen,
+}: { scanId: string; fullscreen: boolean; onToggleFullscreen: () => void }) {
+  const { scan } = useWorkspaceScan(scanId);
+  const pages = scan?.source_files || [];
+  const [pageIdx, setPageIdx] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [enhanced, setEnhanced] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setPageIdx(0); setZoom(1); setRotation(0); }, [scanId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const p = pages[pageIdx];
+    if (!p) { setUrl(null); return; }
+    setLoading(true);
+    workspaceService.signedUrl(p, 3600).then((u) => {
+      if (!cancelled) { setUrl(u); setLoading(false); }
+    }).catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [pages, pageIdx]);
+
+  const hasPages = pages.length > 0;
+
+  return (
+    <>
+      <div className="p-2 border-b flex items-center gap-1 flex-wrap bg-card">
+        <span className="text-xs font-semibold flex items-center gap-1.5 px-1">
+          <ImageIcon className="h-3.5 w-3.5" /> Prescription
+        </span>
+        {hasPages && (
+          <div className="flex items-center gap-0.5 ml-2">
+            <Button size="icon" variant="ghost" className="h-7 w-7"
+              disabled={pageIdx === 0}
+              onClick={() => setPageIdx((i) => Math.max(0, i - 1))}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-[11px] tabular-nums text-muted-foreground px-1">
+              {pageIdx + 1} / {pages.length}
+            </span>
+            <Button size="icon" variant="ghost" className="h-7 w-7"
+              disabled={pageIdx >= pages.length - 1}
+              onClick={() => setPageIdx((i) => Math.min(pages.length - 1, i + 1))}>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+        <div className="flex-1" />
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Zoom out"
+          onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.2).toFixed(2)))}>
+          <ZoomOut className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-[11px] tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Zoom in"
+          onClick={() => setZoom((z) => Math.min(4, +(z + 0.2).toFixed(2)))}>
+          <ZoomIn className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Rotate"
+          onClick={() => setRotation((r) => (r + 90) % 360)}>
+          <RotateCw className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm" variant={enhanced ? "default" : "ghost"}
+          className="h-7 px-2 text-[11px]"
+          onClick={() => setEnhanced((e) => !e)}
+          title="Toggle contrast enhancement"
+        >
+          Enhance
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7"
+          onClick={onToggleFullscreen}
+          title={fullscreen ? "Exit full screen" : "Full screen review"}>
+          {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto bg-muted/30 flex items-start justify-center p-3">
+        {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mt-10" />}
+        {!loading && !hasPages && (
+          <div className="text-xs text-muted-foreground mt-10 text-center">
+            No prescription image yet.<br />Capture from the Scan stage.
+          </div>
+        )}
+        {!loading && url && (
+          <img
+            src={url}
+            alt={`Prescription page ${pageIdx + 1}`}
+            style={{
+              transform: `scale(${zoom}) rotate(${rotation}deg)`,
+              transformOrigin: "top center",
+              filter: enhanced ? "contrast(1.35) brightness(1.05) saturate(0.9)" : undefined,
+            }}
+            className="max-w-full select-none shadow-sm rounded transition-transform"
+            draggable={false}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
 /* ═════════════════════ Queue ═════════════════════ */
 function Queue({
   scans, loading, onOpen, compact, activeId,
