@@ -763,6 +763,8 @@ function MatchPill({ s }: { s?: WorkspaceItem["matchStatus"] }) {
     low: "bg-amber-100 text-amber-700",
     out: "bg-red-100 text-red-700",
     unmatched: "bg-slate-200 text-slate-700",
+    pending: "bg-indigo-100 text-indigo-700",
+    skipped: "bg-slate-100 text-slate-500 line-through",
   };
   return <span className={cn("text-[10px] px-2 py-0.5 rounded-full", map[s || "unmatched"])}>{s || "unmatched"}</span>;
 }
