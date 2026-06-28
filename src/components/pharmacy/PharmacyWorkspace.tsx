@@ -908,7 +908,14 @@ function ReviewStage({
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Medicines ({items.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={addItem} className="gap-1"><Plus className="h-3 w-3" /> Add</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPicker({ open: true, mode: "add" })}
+            className="gap-1"
+          >
+            <Plus className="h-3 w-3" /> Add Medicine
+          </Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {items.map((it, i) => (
@@ -924,20 +931,56 @@ function ReviewStage({
               </div>
               <div className="col-span-3 md:col-span-1">
                 <Input type="number" min={1} value={it.quantity}
-                  onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })} />
+                  onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+                  className={cn(
+                    it.availableStock !== undefined && it.quantity > (it.availableStock || 0) &&
+                      "border-destructive bg-destructive/5",
+                  )} />
               </div>
               <div className="col-span-3 md:col-span-2">
                 <Input type="number" min={0} step="0.01" value={it.mrp}
                   onChange={(e) => updateItem(i, { mrp: Number(e.target.value) || 0 })} placeholder="MRP" />
               </div>
-              <div className="col-span-2 md:col-span-2 flex items-center gap-1">
+              <div className="col-span-2 md:col-span-2 flex items-center gap-1 flex-wrap">
                 <MatchPill s={it.matchStatus} />
                 {it.confidence !== undefined && <span className="text-[10px] text-muted-foreground">{Math.round((it.confidence || 0) * 100)}%</span>}
+                {it.availableStock !== undefined && it.quantity > (it.availableStock || 0) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                    Need {it.quantity}, have {it.availableStock}
+                  </span>
+                )}
               </div>
               <div className="col-span-12 md:col-span-1 flex justify-end">
-                <Button size="icon" variant="ghost" onClick={() => removeItem(i)} className="h-7 w-7 text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" title="More actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="text-xs">{it.name || "Medicine"}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setPicker({ open: true, mode: "replace", index: i, seedName: it.name })}>
+                      <Replace className="h-3.5 w-3.5 mr-2" /> Replace Medicine
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "inventory", item: it })}>
+                      <Eye className="h-3.5 w-3.5 mr-2" /> View Inventory
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "alternatives", item: it })}>
+                      <Layers className="h-3.5 w-3.5 mr-2" /> View Alternatives
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setInspect({ kind: "batches", item: it })}>
+                      <Package className="h-3.5 w-3.5 mr-2" /> View Batch Details
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setRemoveIdx(i)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Remove Medicine…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           ))}
@@ -949,6 +992,133 @@ function ReviewStage({
         <Button variant="outline" onClick={() => commit()} className="flex-1">Save Draft</Button>
         <Button onClick={proceed} className="flex-1 gap-2"><CheckCircle2 className="h-4 w-4" /> Verify & Bill →</Button>
       </div>
+
+      {/* Guided medicine picker (search → batch → qty → review) */}
+      <MedicinePickerDialog
+        open={picker.open}
+        mode={picker.mode}
+        seedName={picker.seedName}
+        medicines={medicines}
+        onClose={() => setPicker({ open: false, mode: "add" })}
+        onConfirm={(next) => {
+          if (picker.mode === "replace" && picker.index !== undefined) {
+            const prev = items[picker.index];
+            replaceItem(picker.index, next);
+            commit({ notes: appendAudit("Replaced", `${prev?.name || "—"} → ${next.name} × ${next.quantity}`) as any });
+          } else {
+            appendItem(next);
+            commit({ notes: appendAudit("Added", `${next.name} × ${next.quantity} (batch ${next.batchNo || "—"})`) as any });
+          }
+          setPicker({ open: false, mode: "add" });
+        }}
+      />
+
+      {/* Confirm remove */}
+      <AlertDialog open={removeIdx !== null} onOpenChange={(o) => !o && setRemoveIdx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this medicine?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeIdx !== null && (
+                <>This will remove <strong>{items[removeIdx]?.name || "the line"}</strong> from the prescription. You can re-add it from the inventory.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (removeIdx !== null) {
+                  const target = items[removeIdx];
+                  removeItem(removeIdx);
+                  commit({ notes: appendAudit("Removed", `${target?.name || "—"} × ${target?.quantity || 0}`) as any });
+                }
+                setRemoveIdx(null);
+              }}
+            >Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Inventory / alternatives / batches inspector */}
+      <InspectDialog
+        info={inspect}
+        medicines={medicines}
+        onClose={() => setInspect(null)}
+        onReplace={(med) => {
+          if (!inspect) return;
+          const idx = items.findIndex((x) => x === inspect.item);
+          if (idx >= 0) {
+            const next: WorkspaceItem = {
+              ...inspect.item,
+              name: med.name,
+              strength: med.strength || inspect.item.strength,
+              medicineId: med.id,
+              medicineName: med.name,
+              batchNo: med.batchNo || "",
+              mrp: med.mrp || 0,
+              gstPercent: med.gstPercent ?? 12,
+              availableStock: med.stock || 0,
+              matchStatus: (med.stock || 0) <= 0 ? "out" : (med.stock || 0) < (inspect.item.quantity || 1) ? "low" : "available",
+            };
+            replaceItem(idx, next);
+            commit({ notes: appendAudit("Replaced", `${inspect.item.name} → ${med.name}`) as any });
+          }
+          setInspect(null);
+        }}
+      />
+
+      {/* Pre-bill verification summary */}
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" /> Verify & Bill
+            </DialogTitle>
+            <DialogDescription>
+              Confirm patient, medicines and reserved stock before billing. Inventory will only be deducted after successful payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><div className="text-muted-foreground">Patient</div><div className="font-medium">{patient.name || "—"} {patient.mobile && `· ${patient.mobile}`}</div></div>
+              <div><div className="text-muted-foreground">Doctor</div><div className="font-medium">{doctor.name || "—"}</div></div>
+              <div><div className="text-muted-foreground">Sale Type</div><div className="font-medium">{saleType}</div></div>
+              <div><div className="text-muted-foreground">Items</div><div className="font-medium">{items.length}</div></div>
+            </div>
+            <div className="border rounded-lg max-h-64 overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40">
+                  <tr><th className="p-2 text-left">Medicine</th><th className="p-2">Batch</th><th className="p-2">Qty</th><th className="p-2">Stock</th><th className="p-2 text-right">Amount</th></tr>
+                </thead>
+                <tbody className="divide-y">
+                  {items.map((it, i) => (
+                    <tr key={i}>
+                      <td className="p-2">{it.name} {it.strength && <span className="text-muted-foreground">{it.strength}</span>}</td>
+                      <td className="p-2 text-center font-mono">{it.batchNo || "—"}</td>
+                      <td className="p-2 text-center">{it.quantity}</td>
+                      <td className="p-2 text-center">
+                        <MatchPill s={it.matchStatus} />
+                      </td>
+                      <td className="p-2 text-right">₹{((it.mrp || 0) * it.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-800">
+              ✓ Stock will be <strong>reserved</strong> now and deducted only after payment is confirmed. Cancelling releases the reservation.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVerifyOpen(false)}>Back to Edit</Button>
+            <Button onClick={confirmAndBill} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" /> Confirm & Proceed to Billing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
