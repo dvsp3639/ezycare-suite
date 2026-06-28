@@ -1339,3 +1339,272 @@ function AuditStage({ scan, onDone }: { scan: WorkspaceScan; onDone: () => void 
     </Card>
   );
 }
+
+/* ═════════════════════ Medicine Picker (guided add/replace) ═════════════════════ */
+function MedicinePickerDialog({
+  open, mode, seedName, medicines, onClose, onConfirm,
+}: {
+  open: boolean;
+  mode: "add" | "replace";
+  seedName?: string;
+  medicines: Medicine[];
+  onClose: () => void;
+  onConfirm: (it: WorkspaceItem) => void;
+}) {
+  const [step, setStep] = useState<"search" | "qty">("search");
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Medicine | null>(null);
+  const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    if (open) {
+      setStep("search");
+      setQ(seedName || "");
+      setSelected(null);
+      setQty(1);
+    }
+  }, [open, seedName]);
+
+  const results = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return medicines.slice(0, 30);
+    return medicines
+      .filter((m) =>
+        (m.name || "").toLowerCase().includes(t) ||
+        (m.genericName || "").toLowerCase().includes(t) ||
+        (m.brandName || "").toLowerCase().includes(t),
+      )
+      .slice(0, 50);
+  }, [q, medicines]);
+
+  const status = (m: Medicine, want: number): WorkspaceItem["matchStatus"] =>
+    (m.stock || 0) <= 0 ? "out" : (m.stock || 0) < want ? "low" : "available";
+
+  const confirm = () => {
+    if (!selected) return;
+    if (qty < 1) { toast.error("Quantity must be at least 1"); return; }
+    if ((selected.stock || 0) <= 0) {
+      toast.error("Out of stock — choose another batch or alternative");
+      return;
+    }
+    if (qty > (selected.stock || 0)) {
+      toast.error(`Only ${selected.stock} unit(s) available`);
+      return;
+    }
+    const next: WorkspaceItem = {
+      name: selected.name,
+      strength: selected.strength || "",
+      quantity: qty,
+      medicineId: selected.id,
+      medicineName: selected.name,
+      batchNo: selected.batchNo || "",
+      mrp: selected.mrp || 0,
+      gstPercent: selected.gstPercent ?? 12,
+      availableStock: selected.stock || 0,
+      matchStatus: status(selected, qty),
+    };
+    onConfirm(next);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {mode === "replace" ? <Replace className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {mode === "replace" ? "Replace Medicine" : "Add Medicine"}
+          </DialogTitle>
+          <DialogDescription>
+            Search inventory → pick batch → set quantity → review. Nothing is added until you confirm.
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === "search" && (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by brand, generic, salt…"
+                className="pl-8"
+              />
+            </div>
+            <div className="border rounded-lg divide-y max-h-80 overflow-auto">
+              {results.map((m) => {
+                const expired = m.expiryDate && new Date(m.expiryDate) < new Date();
+                const s = status(m, 1);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => { setSelected(m); setStep("qty"); }}
+                    disabled={!!expired}
+                    className={cn(
+                      "w-full text-left p-2 hover:bg-accent/40 flex items-center gap-2",
+                      expired && "opacity-50 cursor-not-allowed",
+                    )}
+                  >
+                    <Pill className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {m.name} {m.strength && <span className="text-muted-foreground">· {m.strength}</span>}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {m.genericName || "—"} · Batch {m.batchNo || "—"} ·
+                        {m.expiryDate ? ` Exp ${format(new Date(m.expiryDate), "MM/yy")}` : " No expiry"}
+                        {expired && <span className="text-destructive font-medium"> · EXPIRED</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-semibold">₹{(m.mrp || 0).toFixed(2)}</div>
+                      <MatchPill s={s} />
+                    </div>
+                  </button>
+                );
+              })}
+              {!results.length && (
+                <div className="p-6 text-center text-xs text-muted-foreground">
+                  No medicines match "{q}". Try a different brand or generic name.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "qty" && selected && (
+          <div className="space-y-3">
+            <div className="border rounded-lg p-3 bg-muted/30">
+              <div className="text-sm font-semibold">{selected.name} {selected.strength}</div>
+              <div className="text-xs text-muted-foreground">
+                {selected.genericName || "—"} · {selected.manufacturer || "—"}
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                <div><div className="text-muted-foreground">Batch</div><div className="font-mono">{selected.batchNo || "—"}</div></div>
+                <div><div className="text-muted-foreground">Expiry</div><div>{selected.expiryDate ? format(new Date(selected.expiryDate), "dd/MM/yyyy") : "—"}</div></div>
+                <div><div className="text-muted-foreground">In Stock</div><div className="font-semibold">{selected.stock || 0} {selected.unit || ""}</div></div>
+                <div><div className="text-muted-foreground">MRP</div><div>₹{(selected.mrp || 0).toFixed(2)}</div></div>
+                <div><div className="text-muted-foreground">Selling</div><div>₹{(selected.sellingPrice || selected.mrp || 0).toFixed(2)}</div></div>
+                <div><div className="text-muted-foreground">GST</div><div>{selected.gstPercent ?? 12}%</div></div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Quantity</Label>
+              <Input
+                type="number" min={1} max={selected.stock || 1} value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                className={cn(qty > (selected.stock || 0) && "border-destructive bg-destructive/5")}
+              />
+              {qty > (selected.stock || 0) && (
+                <div className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Only {selected.stock || 0} unit(s) available
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between text-sm bg-emerald-50 border border-emerald-200 rounded p-2">
+              <span>Line total (incl GST)</span>
+              <span className="font-semibold">
+                ₹{(((selected.mrp || 0) * qty) * (1 + (selected.gstPercent ?? 12) / 100)).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          {step === "qty" ? (
+            <>
+              <Button variant="outline" onClick={() => setStep("search")}>← Back</Button>
+              <Button onClick={confirm} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                {mode === "replace" ? "Replace" : "Add"} to Prescription
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ═════════════════════ Inspect dialog (inventory / alternatives / batches) ═════════════════════ */
+function InspectDialog({
+  info, medicines, onClose, onReplace,
+}: {
+  info: { kind: "inventory" | "alternatives" | "batches"; item: WorkspaceItem } | null;
+  medicines: Medicine[];
+  onClose: () => void;
+  onReplace: (m: Medicine) => void;
+}) {
+  const open = !!info;
+  const item = info?.item;
+  const kind = info?.kind;
+
+  const title = kind === "alternatives" ? "Generic Alternatives"
+    : kind === "batches" ? "Available Batches" : "Inventory Match";
+
+  const rows = useMemo(() => {
+    if (!item) return [];
+    const norm = (s?: string) => (s || "").toLowerCase().trim();
+    if (kind === "batches") {
+      return medicines.filter((m) => norm(m.name) === norm(item.name));
+    }
+    if (kind === "alternatives") {
+      const salt = norm(item.medicineName ? medicines.find((x) => x.id === item.medicineId)?.genericName : "") || norm(item.name);
+      return medicines.filter((m) => norm(m.genericName).includes(salt) || norm(m.saltName || "").includes(salt) || norm(m.name).includes(norm(item.name))).slice(0, 30);
+    }
+    // inventory: exact + similar
+    return medicines.filter((m) => norm(m.name).includes(norm(item.name)) || norm(item.name).includes(norm(m.name))).slice(0, 30);
+  }, [info, medicines, kind, item]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {item ? <>For <strong>{item.name}</strong> {item.strength}</> : null}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="border rounded-lg divide-y max-h-96 overflow-auto">
+          {rows.map((m) => {
+            const expired = m.expiryDate && new Date(m.expiryDate) < new Date();
+            const s: WorkspaceItem["matchStatus"] = (m.stock || 0) <= 0 ? "out" : "available";
+            return (
+              <div key={m.id} className="p-2 flex items-center gap-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{m.name} {m.strength}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {m.genericName || "—"} · Batch {m.batchNo || "—"} ·
+                    {m.expiryDate ? ` Exp ${format(new Date(m.expiryDate), "MM/yy")}` : " No expiry"} ·
+                    Stock {m.stock || 0}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs">₹{(m.mrp || 0).toFixed(2)}</div>
+                  <MatchPill s={s} />
+                </div>
+                <Button
+                  size="sm" variant="outline"
+                  disabled={!!expired || (m.stock || 0) <= 0}
+                  onClick={() => onReplace(m)}
+                >
+                  Use
+                </Button>
+              </div>
+            );
+          })}
+          {!rows.length && (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No matching items in inventory.
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
