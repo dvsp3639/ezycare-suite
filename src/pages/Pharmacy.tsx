@@ -291,6 +291,38 @@ const Pharmacy = () => {
     setSearchQuery("");
     setGlobalDiscount(0);
     setDirectCustomer({ name: "", mobile: "" });
+    setActiveScanId("");
+    setRxBanner(null);
+  };
+
+  const handleApplyPrescription = (result: PrescriptionScanResult) => {
+    setActiveScanId(result.scanId);
+    setRxBanner({ doctor: result.doctor.name || "—", date: result.prescriptionDate, count: result.items.length });
+    const match = allPatients.find((p) => p.name.toLowerCase() === (result.patient.name || "").toLowerCase());
+    if (match) {
+      handleSelectPatient(match);
+      setIssueType("OP Sale");
+      setOrderSource("doctor");
+    } else {
+      setIssueType("Direct Sale");
+      setSelectedPatient(null);
+      setOrderSource("manual");
+      setDirectCustomer({ name: result.patient.name || "Walk-in Customer", mobile: result.patient.mobile || "" });
+      setPaymentMode("Cash");
+    }
+    setOrderItems(result.items.map((i) => ({
+      medicineId: i.medicineId,
+      medicineName: i.medicineName,
+      batchNo: i.batchNo,
+      quantity: i.quantity,
+      mrp: i.mrp,
+      discount: 0,
+      gstPercent: i.gstPercent,
+      amount: i.mrp * i.quantity,
+    })));
+    setShowPayment(false);
+    setOrderCompleted(false);
+    setGlobalDiscount(0);
   };
 
   const handlePrintReceipt = () => {
