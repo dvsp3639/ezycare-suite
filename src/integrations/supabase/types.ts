@@ -1872,19 +1872,74 @@ export type Database = {
           },
         ]
       }
+      prescription_corrections: {
+        Row: {
+          ai_text: string
+          created_at: string
+          created_by: string | null
+          doctor_name: string
+          hospital_id: string
+          id: string
+          last_used_at: string
+          medicine_id: string | null
+          medicine_name: string
+          picks: number
+        }
+        Insert: {
+          ai_text: string
+          created_at?: string
+          created_by?: string | null
+          doctor_name?: string
+          hospital_id: string
+          id?: string
+          last_used_at?: string
+          medicine_id?: string | null
+          medicine_name?: string
+          picks?: number
+        }
+        Update: {
+          ai_text?: string
+          created_at?: string
+          created_by?: string | null
+          doctor_name?: string
+          hospital_id?: string
+          id?: string
+          last_used_at?: string
+          medicine_id?: string | null
+          medicine_name?: string
+          picks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescription_corrections_medicine_id_fkey"
+            columns: ["medicine_id"]
+            isOneToOne: false
+            referencedRelation: "medicines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prescription_scans: {
         Row: {
+          barcode_verifications: Json | null
+          corrections: Json | null
           created_at: string
           device_info: string | null
+          dispensed_at: string | null
+          dispensed_by: string | null
+          dispensed_by_name: string | null
           doctor_name: string | null
+          enhanced_file_path: string | null
           extracted_payload: Json
           hospital_id: string
           hospital_name: string | null
           id: string
           manual_corrections: Json
           notes: string | null
+          pages: Json | null
           patient_id: string | null
           patient_name: string | null
+          payment_id: string | null
           pharmacy_order_id: string | null
           prescription_date: string | null
           registration_number: string | null
@@ -1900,17 +1955,25 @@ export type Database = {
           verified_items: Json
         }
         Insert: {
+          barcode_verifications?: Json | null
+          corrections?: Json | null
           created_at?: string
           device_info?: string | null
+          dispensed_at?: string | null
+          dispensed_by?: string | null
+          dispensed_by_name?: string | null
           doctor_name?: string | null
+          enhanced_file_path?: string | null
           extracted_payload?: Json
           hospital_id: string
           hospital_name?: string | null
           id?: string
           manual_corrections?: Json
           notes?: string | null
+          pages?: Json | null
           patient_id?: string | null
           patient_name?: string | null
+          payment_id?: string | null
           pharmacy_order_id?: string | null
           prescription_date?: string | null
           registration_number?: string | null
@@ -1926,17 +1989,25 @@ export type Database = {
           verified_items?: Json
         }
         Update: {
+          barcode_verifications?: Json | null
+          corrections?: Json | null
           created_at?: string
           device_info?: string | null
+          dispensed_at?: string | null
+          dispensed_by?: string | null
+          dispensed_by_name?: string | null
           doctor_name?: string | null
+          enhanced_file_path?: string | null
           extracted_payload?: Json
           hospital_id?: string
           hospital_name?: string | null
           id?: string
           manual_corrections?: Json
           notes?: string | null
+          pages?: Json | null
           patient_id?: string | null
           patient_name?: string | null
+          payment_id?: string | null
           pharmacy_order_id?: string | null
           prescription_date?: string | null
           registration_number?: string | null
@@ -2938,6 +3009,15 @@ export type Database = {
       }
       record_medicine_pick: {
         Args: { _medicine_id: string; _query?: string }
+        Returns: undefined
+      }
+      record_rx_correction: {
+        Args: {
+          _ai_text: string
+          _doctor_name: string
+          _medicine_id: string
+          _medicine_name: string
+        }
         Returns: undefined
       }
       show_limit: { Args: never; Returns: number }

@@ -94,3 +94,42 @@ export const pharmacyService = {
     if (error) throw error;
   },
 };
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Prescription correction memory (AI learning loop)
+ * ──────────────────────────────────────────────────────────────────── */
+
+export type RxCorrection = {
+  ai_text: string;
+  medicine_id: string | null;
+  medicine_name: string;
+  picks: number;
+  doctor_name: string;
+};
+
+export const rxLearningService = {
+  async record(doctorName: string, aiText: string, medicineId: string, medicineName: string) {
+    try {
+      await supabase.rpc("record_rx_correction" as any, {
+        _doctor_name: doctorName || "",
+        _ai_text: aiText || "",
+        _medicine_id: medicineId,
+        _medicine_name: medicineName,
+      });
+    } catch (e) {
+      // non-fatal
+      console.warn("record_rx_correction failed", e);
+    }
+  },
+  async loadForDoctor(doctorName: string): Promise<RxCorrection[]> {
+    const d = (doctorName || "").toLowerCase().trim();
+    const { data, error } = await supabase
+      .from("prescription_corrections" as any)
+      .select("ai_text, medicine_id, medicine_name, picks, doctor_name")
+      .or(`doctor_name.eq.${d},doctor_name.eq.`)
+      .order("picks", { ascending: false })
+      .limit(500);
+    if (error) return [];
+    return (data || []) as any as RxCorrection[];
+  },
+};
