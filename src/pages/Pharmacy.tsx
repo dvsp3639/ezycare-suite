@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   Pill, Search, ShoppingCart, Plus, Minus, Trash2, CreditCard,
   Banknote, FileText, User, Package, Printer, CheckCircle2, ClipboardList,
+  ScanLine, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
@@ -31,6 +32,8 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
+import { PrescriptionScanner, type PrescriptionScanResult } from "@/components/pharmacy/PrescriptionScanner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
 type IssueType = "Direct Sale" | "IP Sale" | "IP Return" | "OP Sale" | "OP Return";
@@ -72,6 +75,9 @@ const Pharmacy = () => {
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
+  const [showRxScanner, setShowRxScanner] = useState(false);
+  const [activeScanId, setActiveScanId] = useState<string>("");
+  const [rxBanner, setRxBanner] = useState<{ doctor: string; date: string; count: number } | null>(null);
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -241,7 +247,7 @@ const Pharmacy = () => {
     const finalPaymentMode = isIP || isDirectSale ? paymentMode : "Cash";
     const customerName = isDirectSale ? directCustomer.name.trim() : selectedPatient?.name || "";
     try {
-      await pharmacyService.completeSale(
+      const created = await pharmacyService.completeSale(
         {
           patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
           customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
@@ -257,6 +263,12 @@ const Pharmacy = () => {
           hospital_id: hospitalId,
         } as any))
       );
+      if (activeScanId && (created as any)?.id) {
+        try {
+          await supabase.from("pharmacy_orders").update({ prescription_scan_id: activeScanId } as any).eq("id", (created as any).id);
+          await supabase.from("prescription_scans").update({ status: "dispensed", pharmacy_order_id: (created as any).id } as any).eq("id", activeScanId);
+        } catch (e) { console.warn("prescription link failed", e); }
+      }
       await refetchMedicines();
       setOrderCompleted(true);
       toast.success(
@@ -279,6 +291,38 @@ const Pharmacy = () => {
     setSearchQuery("");
     setGlobalDiscount(0);
     setDirectCustomer({ name: "", mobile: "" });
+    setActiveScanId("");
+    setRxBanner(null);
+  };
+
+  const handleApplyPrescription = (result: PrescriptionScanResult) => {
+    setActiveScanId(result.scanId);
+    setRxBanner({ doctor: result.doctor.name || "—", date: result.prescriptionDate, count: result.items.length });
+    const match = allPatients.find((p) => p.name.toLowerCase() === (result.patient.name || "").toLowerCase());
+    if (match) {
+      handleSelectPatient(match);
+      setIssueType("OP Sale");
+      setOrderSource("doctor");
+    } else {
+      setIssueType("Direct Sale");
+      setSelectedPatient(null);
+      setOrderSource("manual");
+      setDirectCustomer({ name: result.patient.name || "Walk-in Customer", mobile: result.patient.mobile || "" });
+      setPaymentMode("Cash");
+    }
+    setOrderItems(result.items.map((i) => ({
+      medicineId: i.medicineId,
+      medicineName: i.medicineName,
+      batchNo: i.batchNo,
+      quantity: i.quantity,
+      mrp: i.mrp,
+      discount: 0,
+      gstPercent: i.gstPercent,
+      amount: i.mrp * i.quantity,
+    })));
+    setShowPayment(false);
+    setOrderCompleted(false);
+    setGlobalDiscount(0);
   };
 
   const handlePrintReceipt = () => {
@@ -328,6 +372,42 @@ const Pharmacy = () => {
         </h1>
         <p className="text-sm text-muted-foreground">Issue medicines, process prescriptions & manage returns</p>
       </div>
+
+      {/* Primary AI Prescription Scanner CTA */}
+      <div className="mb-6 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+            <ScanLine className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-foreground text-sm flex items-center gap-2 flex-wrap">
+              AI Prescription Scanner <Sparkles className="h-3.5 w-3.5 text-primary" />
+              <Badge variant="outline" className="text-[10px]">Primary workflow</Badge>
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Capture, upload, or scan a handwritten/printed prescription. AI extracts medicines, matches inventory, you verify before billing.
+            </p>
+            {rxBanner && (
+              <p className="text-xs text-success mt-1">
+                ✓ Prescription loaded — {rxBanner.count} item(s) from Dr. {rxBanner.doctor} ({rxBanner.date})
+              </p>
+            )}
+          </div>
+          <Button onClick={() => setShowRxScanner(true)} size="lg" className="gap-2">
+            <ScanLine className="h-4 w-4" /> Scan Prescription
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3 italic">
+          AI prepares · Pharmacist verifies · System records · Inventory updates only after payment
+        </p>
+      </div>
+
+      <PrescriptionScanner
+        open={showRxScanner}
+        onClose={() => setShowRxScanner(false)}
+        patient={selectedPatient ? { id: selectedPatient.id, name: selectedPatient.name, mobile: selectedPatient.mobile, registrationNumber: selectedPatient.registrationNumber } : null}
+        onApply={handleApplyPrescription}
+      />
 
       {/* Issue Type Selector */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
