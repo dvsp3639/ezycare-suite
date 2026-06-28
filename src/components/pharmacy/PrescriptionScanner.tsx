@@ -720,9 +720,9 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
             <h2 className="font-semibold text-foreground text-sm">AI Prescription Scanner</h2>
             <p className="text-xs text-muted-foreground">
               {step === "scan" && "Scan or upload prescription pages — auto-enhanced"}
-              {step === "patient" && "Patient details (mandatory before AI processing)"}
               {step === "extracting" && "AI is reading the prescription…"}
               {step === "review" && `${rows.length} medicine(s) — edit, search, match`}
+              {step === "transaction" && "Choose sale type & link patient"}
               {step === "verify" && "Final pharmacist verification"}
               {step === "barcode" && "Optional: scan physical packs"}
             </p>
@@ -749,14 +749,6 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
           />
         )}
 
-        {step === "patient" && (
-          <PatientStep
-            info={patientInfo} setInfo={setPatientInfo}
-            matches={patientMatches} searching={patientSearchBusy}
-            onPick={pickPatient} onQuickRegister={quickRegister}
-          />
-        )}
-
         {step === "extracting" && (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="h-10 w-10 text-primary animate-spin" />
@@ -775,6 +767,17 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
             editField={editField} setMatch={setMatch}
             addRow={addBlankRow} duplicateRow={duplicateRow} deleteRow={deleteRow}
             moveRow={moveRow} mergeDuplicates={mergeDuplicates}
+          />
+        )}
+
+        {step === "transaction" && (
+          <TransactionStep
+            saleType={saleType} setSaleType={setSaleType}
+            info={patientInfo} setInfo={setPatientInfo}
+            search={txnSearch} setSearch={setTxnSearch}
+            matches={txnMatches} searching={txnSearchBusy}
+            onPick={(p) => { pickPatient(p); setTxnMatches([]); setTxnSearch(""); }}
+            onQuickRegister={quickRegister}
           />
         )}
 
@@ -801,34 +804,38 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
       <div className="border-t border-border bg-card/80 px-4 py-3 flex items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           {step === "scan" && `${pages.length} page(s) ready`}
-          {step === "patient" && (patientGateValid() ? "Ready" : "Fill name, mobile, OP/IP no.")}
           {step === "review" && "AI prepares · Pharmacist edits · System records"}
+          {step === "transaction" && txnSaleStatus(saleType, patientInfo)}
           {step === "verify" && `${verifiedCount}/${verifiableRows.length} verified`}
           {step === "barcode" && "Barcode verification is optional"}
         </div>
         <div className="flex items-center gap-2">
           {step === "scan" && (
-            <Button disabled={pages.length === 0 || busy} onClick={() => setStep("patient")} className="gap-2">
-              Continue <ArrowRight className="h-4 w-4" />
+            <Button disabled={pages.length === 0 || busy} onClick={processPages} className="gap-2">
+              <Wand2 className="h-4 w-4" /> Process with AI
             </Button>
           )}
-          {step === "patient" && (
+          {step === "review" && (
             <>
               <Button variant="outline" onClick={() => setStep("scan")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button disabled={!patientGateValid()} onClick={processPages} className="gap-2">
-                <Wand2 className="h-4 w-4" /> Process with AI
+              <Button
+                disabled={!rows.some((r) => !r.dropped && r.matchId)}
+                onClick={() => setStep("transaction")}
+                className="gap-2"
+              >
+                Continue <ArrowRight className="h-4 w-4" />
               </Button>
             </>
           )}
-          {step === "review" && (
+          {step === "transaction" && (
             <>
-              <Button variant="outline" onClick={() => setStep("patient")} className="gap-2">
+              <Button variant="outline" onClick={() => setStep("review")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button
-                disabled={!rows.some((r) => !r.dropped && r.matchId)}
+                disabled={!txnGateValid(saleType, patientInfo)}
                 onClick={() => setStep("verify")}
                 className="gap-2"
               >
@@ -838,7 +845,7 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
           )}
           {step === "verify" && (
             <>
-              <Button variant="outline" onClick={() => setStep("review")} className="gap-2">
+              <Button variant="outline" onClick={() => setStep("transaction")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button variant="outline" disabled={!allVerified} onClick={() => setStep("barcode")} className="gap-2">
