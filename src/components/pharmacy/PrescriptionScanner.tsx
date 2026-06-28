@@ -188,6 +188,10 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
   const [rows, setRows] = useState<RowState[]>([]);
   const [corrections, setCorrections] = useState<AuditCorrection[]>([]);
   const [barcodeChecks, setBarcodeChecks] = useState<Array<{ rowId: string; scanned: string; matched: boolean; at: string }>>([]);
+  const [saleType, setSaleType] = useState<SaleType>("OP");
+  const [txnSearch, setTxnSearch] = useState("");
+  const [txnMatches, setTxnMatches] = useState<any[]>([]);
+  const [txnSearchBusy, setTxnSearchBusy] = useState(false);
 
   const [scanId, setScanId] = useState<string>("");
   const [streamingCamera, setStreamingCamera] = useState(false);
@@ -513,7 +517,7 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
   /* ── Patient gate ── */
   useEffect(() => {
     const q = patientInfo.mobile.trim();
-    if (!open || step !== "patient" || q.length < 4) { setPatientMatches([]); return; }
+    if (!open || step !== "transaction" || q.length < 4) { setPatientMatches([]); return; }
     let cancel = false;
     setPatientSearchBusy(true);
     const t = setTimeout(async () => {
@@ -525,6 +529,24 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
     }, 300);
     return () => { cancel = true; clearTimeout(t); };
   }, [patientInfo.mobile, open, step]);
+
+  // Transaction search (OP/IP) — UHID / Mobile / OP-IP no / Name / Ward
+  useEffect(() => {
+    const q = txnSearch.trim();
+    if (!open || step !== "transaction" || (saleType !== "OP" && saleType !== "IP") || q.length < 2) {
+      setTxnMatches([]); return;
+    }
+    let cancel = false;
+    setTxnSearchBusy(true);
+    const t = setTimeout(async () => {
+      try {
+        const hits = await patientService.search(q);
+        if (!cancel) setTxnMatches(hits.slice(0, 8));
+      } catch { /* */ }
+      finally { if (!cancel) setTxnSearchBusy(false); }
+    }, 250);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [txnSearch, open, step, saleType]);
 
   async function pickPatient(p: any) {
     setPatientInfo((prev) => ({
