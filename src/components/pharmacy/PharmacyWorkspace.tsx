@@ -11,6 +11,8 @@ import {
   ScanLine, Sparkles, Loader2, ChevronLeft, Plus, Trash2, X,
   CheckCircle2, Pill, ShoppingCart, CreditCard, FileText, Smartphone,
   Monitor, Camera, Upload, Printer, Package, AlertTriangle,
+  PanelLeftClose, PanelLeftOpen, Maximize2, Minimize2,
+  ZoomIn, ZoomOut, RotateCw, ChevronRight, Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
