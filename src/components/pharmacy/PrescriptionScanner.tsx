@@ -394,7 +394,15 @@ export function PrescriptionScanner({ open, onClose, patient, onApply }: Props) 
 
       setAiPayload(data);
       const aiDoctor = data?.doctor?.name?.value || patientInfo.doctor || "";
-      if (!patientInfo.doctor && aiDoctor) setPatientInfo((p) => ({ ...p, doctor: aiDoctor }));
+      const aiPatient = data?.patient || {};
+      setPatientInfo((p) => ({
+        ...p,
+        name:   p.name   || aiPatient?.name?.value   || "",
+        mobile: p.mobile || aiPatient?.mobile?.value || "",
+        age:    p.age    || aiPatient?.age?.value    || "",
+        gender: p.gender || aiPatient?.gender?.value || "",
+        doctor: p.doctor || aiDoctor,
+      }));
       setHospitalName(data?.hospital?.name?.value || "");
       setRxDate(data?.prescriptionDate?.value || new Date().toISOString().slice(0, 10));
 
