@@ -35,6 +35,31 @@ import {
 import { canvasToBlob, enhance, fileToImage, imageToCanvas, blobToBase64 } from "@/lib/docScan";
 import type { Medicine } from "@/modules/pharmacy/types";
 import { useIsMobile } from "@/hooks/use-mobile";
+import MobileScanView from "@/components/pharmacy/MobileScanView";
+
+function MobileScanViewWrapper({
+  scanId, onBack, onCompleted,
+}: { scanId: string; onBack: () => void; onCompleted: () => void }) {
+  const { user } = useAuth();
+  const { scan, loading } = useWorkspaceScan(scanId);
+  const { data: medicines = [] } = useMedicines();
+  const save = useCallback(async (patch: Partial<WorkspaceScan>) => {
+    try { await workspaceService.updateScan(scanId, patch); }
+    catch (e: any) { toast.error(e?.message || "Sync failed"); }
+  }, [scanId]);
+  if (loading) return <div className="p-8 text-center"><Loader2 className="h-5 w-5 animate-spin inline mr-1" /> Loading…</div>;
+  if (!scan || !user) return <div className="p-8 text-center text-sm text-muted-foreground">Scan not found.</div>;
+  return (
+    <MobileScanView
+      scan={scan}
+      userId={user.id}
+      medicines={medicines as any}
+      onBack={onBack}
+      onCompleted={onCompleted}
+      onSave={save}
+    />
+  );
+}
 
 /* ───────────────────── Stage helpers ───────────────────── */
 const STAGE_INDEX = Object.fromEntries(STAGE_ORDER.map((s, i) => [s, i])) as Record<WorkspaceStage, number>;
@@ -94,11 +119,10 @@ export default function PharmacyWorkspace() {
   if (isMobile) {
     if (activeId) {
       return (
-        <WorkspaceScanView
+        <MobileScanViewWrapper
           scanId={activeId}
           onBack={() => setActiveId(null)}
           onCompleted={() => setActiveId(null)}
-          isMobile
         />
       );
     }
