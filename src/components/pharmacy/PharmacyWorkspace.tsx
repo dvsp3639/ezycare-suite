@@ -786,7 +786,23 @@ function ReviewStage({
     setItems(next);
   };
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
-  const addItem = () => setItems([...items, { name: "", quantity: 1, mrp: 0, gstPercent: 12, matchStatus: "unmatched" }]);
+  const replaceItem = (i: number, next: WorkspaceItem) =>
+    setItems(items.map((it, idx) => (idx === i ? next : it)));
+  const appendItem = (next: WorkspaceItem) => setItems([...items, next]);
+
+  // UI state for new safe workflows
+  const [picker, setPicker] = useState<{ open: boolean; mode: "add" | "replace"; index?: number; seedName?: string }>({ open: false, mode: "add" });
+  const [removeIdx, setRemoveIdx] = useState<number | null>(null);
+  const [inspect, setInspect] = useState<{ kind: "inventory" | "alternatives" | "batches"; item: WorkspaceItem } | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+
+  // Append an audit entry into notes (lightweight, no migration)
+  const appendAudit = (action: string, detail: string) => {
+    const stamp = format(new Date(), "dd/MM/yyyy HH:mm");
+    const line = `[${stamp}] ${action} — ${detail}`;
+    const prev = scan.notes ? `${scan.notes}\n` : "";
+    return prev + line;
+  };
 
   const commit = async (next?: Partial<WorkspaceScan>) => {
     await onSave({
@@ -808,7 +824,25 @@ function ReviewStage({
       toast.error("Add at least one medicine");
       return;
     }
-    await commit({ stage: "billing", verification_status: "verified" });
+    // Quantity / availability guard — block billing on errors
+    const blockers = items.filter(
+      (it) => it.matchStatus === "unmatched" || it.matchStatus === "out" ||
+              (it.availableStock !== undefined && it.quantity > (it.availableStock || 0)),
+    );
+    if (blockers.length) {
+      toast.error(`${blockers.length} medicine(s) need attention before billing`);
+      return;
+    }
+    setVerifyOpen(true);
+  };
+
+  const confirmAndBill = async () => {
+    setVerifyOpen(false);
+    await commit({
+      stage: "billing",
+      verification_status: "verified",
+      notes: appendAudit("Verified", `${items.length} medicine(s) confirmed for billing`) as any,
+    });
   };
 
   const missing = (v?: string) => !v || !v.trim();
