@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { workspaceService } from "@/modules/pharmacy/workspace";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
 type Field = { value: any; confidence: number; corrected?: boolean };
@@ -175,6 +177,10 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const navigate = useNavigate();
+  /** Sticky doc type for the current scanner session — avoids re-asking AI when
+   *  the pharmacist drops more files of the same kind. Cleared on close. */
+  const sessionDocTypeRef = useRef<string | null>(null);
 
   const reset = useCallback(() => {
     setMode("menu"); setBusy(false); setExtract(null); setDocumentType("");
@@ -185,6 +191,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setSuccessInfo(null);
     setSupplier({ name: "", gst: "", address: "", contact: "" });
     setInvoiceMeta({ invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0 });
+    sessionDocTypeRef.current = null;
   }, []);
 
   function stopCamera() {
@@ -366,6 +373,71 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     }
     if (!sf.length) { setBusy(false); return; }
 
+    // ── Intelligent Document Detection ──────────────────────────────
+    // Classify the first file (reusing the session's cached type if the
+    // pharmacist already uploaded one in this same scanner open).
+    let docType = sessionDocTypeRef.current;
+    if (!docType) {
+      setMode("loading");
+      try {
+        const data = await extractOne(sf[0]);
+        const t = String(data?.documentType || "").toLowerCase();
+        if (t === "prescription") docType = "prescription";
+        else if (t === "lab_report") docType = "lab_report";
+        else if (t === "supplier_invoice" || (data?.invoice?.items?.length)) docType = "supplier_invoice";
+        else if (t === "medicine_label" || data?.medicine?.name?.value) docType = "medicine_label";
+        else docType = "other";
+        sessionDocTypeRef.current = docType;
+      } catch (e: any) {
+        toast.error(e?.message || "Could not analyze document");
+        setBusy(false); setMode("menu");
+        return;
+      }
+    }
+
+    // ── Route: Prescription → Pharmacy Workspace (one queue item per file) ──
+    if (docType === "prescription") {
+      if (!user) { toast.error("Please sign in to scan prescriptions"); setBusy(false); setMode("menu"); return; }
+      setMode("loading");
+      try {
+        let created = 0;
+        for (const f of sf) {
+          const blob = await (await fetch(`data:${f.mime};base64,${f.base64}`)).blob();
+          const scan = await workspaceService.createScan(user.id, { stage: "scan" });
+          const path = await workspaceService.uploadPage(scan.id, user.id, blob, 0);
+          await workspaceService.updateScan(scan.id, {
+            source_files: [path] as any,
+            page_count: 1,
+            stage: "ai_extraction" as any,
+          });
+          created++;
+        }
+        toast.success(
+          created > 1
+            ? `📋 ${created} prescriptions queued — opening Pharmacy Workspace`
+            : `📋 Prescription queued — opening Pharmacy Workspace`,
+        );
+        close();
+        navigate("/pharmacy");
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to queue prescription");
+        setMode("menu");
+      } finally { setBusy(false); }
+      return;
+    }
+
+    // ── Route: Lab Report → Diagnostics ──
+    if (docType === "lab_report") {
+      toast.message("Lab report detected — opening Diagnostics", {
+        description: "Upload it from the diagnostic order to attach the report.",
+      });
+      setBusy(false);
+      close();
+      navigate("/diagnostics");
+      return;
+    }
+
+    // ── Default: Purchase Invoice / Medicine Label → existing wizard ──
     // Open wizard immediately so the user sees per-file progress
     setSourceType(sf[0].mime === "application/pdf" ? "pdf" : "image");
     setSourceFiles(sf);
