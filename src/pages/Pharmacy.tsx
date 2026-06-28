@@ -794,6 +794,8 @@ const Pharmacy = () => {
           </div>
         </div>
       )}
+      </>
+      )}
     </div>
   );
 };
