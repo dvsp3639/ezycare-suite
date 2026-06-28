@@ -1,75 +1,94 @@
+
 ## Goal
-Keep the existing `PrescriptionScanner` architecture intact and layer in the 10 workflow improvements. Work splits into 5 focused passes inside `src/components/pharmacy/PrescriptionScanner.tsx` plus a few supporting files.
 
-## New Workflow
+Replace the current `PrescriptionScanner` modal with a **Pharmacy Workspace** — a per-user, real-time synced workflow where a pharmacist starts a prescription on mobile and seamlessly continues (or finishes) on desktop, WhatsApp-Web style.
+
+## Stages (single state machine per scan)
+
+`scan → ai_extraction → inventory_match → review → billing → payment → deducted → audit`
+
+Each scan row carries `stage`, `status`, `verification_status`, `billing_status`, plus full payload (patient, doctor, items, totals, payment).
+
+## Data model
+
+New table `pharmacy_workspace_scans` (per-user private queue):
+
+```text
+id, hospital_id, owner_user_id (= scanner)
+stage, verification_status, billing_status
+patient_json, doctor_json, items_json, totals_json, payment_json
+ai_confidence, page_count, source_files (urls)
+created_at, updated_at, completed_at, cancelled_at
+linked_order_id (pharmacy_orders.id once billed)
 ```
-Scan/Upload (multi-page, enhance) → Patient Gate → AI Extract
-   → Inventory Match → Edit & Add → Verify Checklist (+ optional Barcode) → Apply to Cart → Bill → Pay → Deduct
-```
 
-## Changes by area
+- RLS: only `owner_user_id = auth.uid()` can read/update; service_role full.
+- Added to `supabase_realtime` publication for live sync.
+- Stays in queue **Until completed or cancelled** (no auto-archive).
 
-### 1. Adobe-style Document Scanner (`upload` step)
-- New `ScannerCapture` sub-component handles multi-page capture.
-- Per page, run a client-side enhancement pipeline on `<canvas>`:
-  - Grayscale luminance pass → Otsu-based brightness/contrast stretch
-  - Adaptive shadow removal (subtract blurred background)
-  - Auto-rotate using EXIF orientation when present
-  - Edge detection via Sobel + largest-quad heuristic → perspective warp (4-point homography) with manual corner-drag fallback
-- Pages list with thumbnails: reorder (drag), delete, "Add page", "Retake", preview modal.
-- Merge final pages into one PDF (using existing jsPDF) before sending to `prescription-scan-ai`. (Edge function already accepts PDFs.)
-- All heavy logic runs in a new util `src/lib/docScan.ts` (pure functions, no extra deps).
-- Note: "Adobe-level" perspective warp on the web has limits — we implement a solid heuristic plus manual corner adjust, not a full ML segmenter.
+## Real-time sync
 
-### 2. Mandatory Patient Gate (new step `patient` between upload and extracting)
-- Block AI call until: Patient Name, Mobile, and OP/IP # (one of) filled.
-- Quick-search existing patients (reuses `patientService.search`); if match → auto-fill UHID, age, gender, last doctor/department. If no match → inline "Quick Register" form that calls `patientService.create`.
-- Optional fields: UHID, Age, Gender, Doctor, Department.
+- Single Supabase Realtime channel per user: `workspace:{user_id}`.
+- All edits write the full updated payload back to the row. Optimistic UI + last-write-wins with `updated_at`.
+- `useWorkspaceQueue()` hook subscribes for the list; `useWorkspaceScan(id)` subscribes for one scan and merges remote updates into local form state.
 
-### 3. Fully Editable AI Results (`review` step rewrite)
-For every row add: ✏ Edit, ➕ Add, 🗑 Delete, ⎘ Duplicate, ↕ Reorder, ⤴ Merge-with-duplicate.
-Editable fields: name, brand, generic, strength, dosage, frequency, duration, quantity, instructions.
-"Add another medicine" creates an empty row with intelligent-search field focused.
+## UI
 
-### 4. Intelligent Inventory Search (in edit mode)
-- 2-char debounced search using existing `useSmartMedicineSearch` (already wired to `searchMedicines` + `fuse`).
-- Dropdown shows top 8 with stock, batch, expiry, rack, GST.
-- Selecting a result: sets `matchId`, marks `substituted` if name differs, records correction.
+**Entry point — `/pharmacy` → "Workspace" tab (default)**
 
-### 5. AI Learning loop
-- New table `prescription_corrections` (hospital_id, doctor_name, ai_text, corrected_medicine_id, picks, last_used_at).
-- On every manual replacement, upsert a row (RPC `record_rx_correction`).
-- On next AI extraction, after we get raw AI output, query corrections for `(hospital_id, doctor_name)` and pre-apply matches where `ai_text` matches a row's AI name (case-insensitive trigram).
-- Doctor-specific only; falls back to hospital-wide then global if no hit.
+Live queue table/cards showing: Patient · Scan time · AI confidence · # medicines · Verification · Billing · Stage badge · Resume button.
 
-### 6. Verification Checklist
-Already present; keep 5-point checklist plus an explicit "Verified by Pharmacist" master checkbox (auto-checks remaining when ticked, prevents accidental skip).
+**Mobile layout (`< md`)**
+- Big "Scan Prescription" FAB
+- Queue as stacked cards
+- Stage screens are full-screen sheets, one stage per screen, large touch targets
+- Full workflow available end-to-end (scan → payment → receipt)
 
-### 7. Inventory Match Panel
-Already partially there. Add per row: Rack location, Generic equivalent badge, Alternative-brands chip list (top 3 from `searchMedicines` by generic), explicit "Out of Stock" red banner.
+**Desktop layout (`≥ md`)**
+- Two-pane: left = live queue list, right = active scan detail with all stages as a vertical stepper, edit-rich tables, keyboard shortcuts
+- Receives mobile scans instantly (toast + queue badge)
 
-### 8. Optional Barcode Verification (new step `barcode`, skippable)
-- Uses existing `@zxing` integration from `UniversalScanner` (extract to `src/lib/barcodeReader.ts` if needed).
-- For each verified row, pharmacist may scan the physical pack. If barcode matches `medicines.barcode` → ✅; mismatch → ⚠ warning, block until override or re-pick.
+Both layouts render from the **same** `WorkspaceScanProvider` so any field edit syncs immediately.
 
-### 9. Audit Trail (persist on every state change)
-Extend `prescription_scans` with: `pages` (jsonb of page metadata), `enhanced_file_path`, `corrections` (jsonb array of {field, from, to, by, at}), `barcode_verifications` (jsonb), `dispensed_by`, `dispensed_at`, `payment_id`.
-Already-present columns reused: scanned_by, verified_by, extracted_payload, verified_items.
-Hook into existing `pharmacy_orders.prescription_scan_id` link for payment + deduction trail.
+## Stage components (shared)
 
-### 10. Files touched
-- `src/components/pharmacy/PrescriptionScanner.tsx` — extend wizard with steps `patient` and `barcode`; new row editor.
-- `src/components/pharmacy/ScannerCapture.tsx` (new) — multi-page scan UI.
-- `src/lib/docScan.ts` (new) — enhancement + perspective utilities.
-- `src/lib/barcodeReader.ts` (new) — extracted ZXing helper.
-- `src/modules/pharmacy/services.ts` — `recordCorrection`, `applyLearnedCorrections` helpers.
-- DB migration — new `prescription_corrections` table + GRANT/RLS + RPC `record_rx_correction` + columns added to `prescription_scans`.
+1. **ScanStage** — reuses existing `docScan.ts` multi-page capture; uploads pages to `prescriptions` bucket; creates row with `stage=ai_extraction`.
+2. **AIExtractionStage** — calls existing `prescription-scan-ai` edge function; writes patient/doctor/items + confidence.
+3. **InventoryMatchStage** — auto-matches against `medicines` (existing fuzzy logic); flags available/low/out.
+4. **ReviewStage** — pharmacist fills gaps, picks transaction type (OP/IP/Direct/Return), resolves patient.
+5. **BillingStage** — line items, discount, GST, totals (same math as Pharmacy.tsx).
+6. **PaymentStage** — mode (Cash/UPI/Card), amount tendered, change.
+7. **DeductionStage** — calls existing `create_pharmacy_sale` RPC; stores `linked_order_id`; sets `stage=audit`.
+8. **AuditStage** — read-only summary, print/share receipt, "Done" → marks completed.
 
-## Out of scope / honest limits
-- Real handwriting-recognition model training is impossible client-side; "AI learning" is implemented as the doctor-scoped correction memory above, which materially improves repeat prescriptions without a custom ML model.
-- Perspective correction quality varies with photo quality; manual corner drag is provided.
+## File changes
 
-## Estimated size
-Sizable but contained — ~1 migration, 3 new files, 1 large edit. No new npm deps required (uses existing `jspdf`, `fuse.js`, `@zxing` if already present; otherwise we add `@zxing/browser` only for barcode step).
+**New**
+- `supabase/migrations/*_pharmacy_workspace.sql` — table + RLS + grants + realtime publication
+- `src/modules/pharmacy/workspace/types.ts`
+- `src/modules/pharmacy/workspace/service.ts` — CRUD + RPC wrappers
+- `src/modules/pharmacy/workspace/hooks.ts` — `useWorkspaceQueue`, `useWorkspaceScan`
+- `src/components/pharmacy/workspace/WorkspaceQueue.tsx`
+- `src/components/pharmacy/workspace/WorkspaceScan.tsx` (responsive container)
+- `src/components/pharmacy/workspace/stages/*.tsx` (8 stage components, mostly extracted from existing `PrescriptionScanner.tsx`)
 
-Approve to start implementation, or tell me which sections to drop/defer (e.g. skip barcode step, skip perspective warp) and I'll scope down.
+**Modified**
+- `src/pages/Pharmacy.tsx` — replace PrescriptionScanner CTA with Workspace tab as default
+- `src/components/pharmacy/PrescriptionScanner.tsx` — **deleted** (logic moved into stages)
+
+## Out of scope
+
+- Multi-pharmacist shared queues (per your answer: private per user)
+- Auto-archive / shift cutoffs
+- Offline mode (mobile requires connectivity for sync)
+
+## Implementation order
+
+1. Migration (table, RLS, realtime).
+2. Service + hooks + provider.
+3. Stage components extracted from existing scanner.
+4. Responsive WorkspaceScan + WorkspaceQueue.
+5. Wire into `Pharmacy.tsx`, delete old scanner.
+6. Manual sync test: open preview on desktop, scan on mobile viewport — confirm row appears live.
+
+Reply **approve** to proceed, or tell me what to change.

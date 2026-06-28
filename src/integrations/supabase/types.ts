@@ -1872,6 +1872,78 @@ export type Database = {
           },
         ]
       }
+      pharmacy_workspace_scans: {
+        Row: {
+          ai_confidence: number | null
+          billing_status: string
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          doctor_json: Json
+          hospital_id: string
+          id: string
+          items_json: Json
+          linked_order_id: string | null
+          notes: string | null
+          owner_user_id: string
+          page_count: number
+          patient_json: Json
+          payment_json: Json
+          sale_type: string
+          source_files: Json
+          stage: string
+          totals_json: Json
+          updated_at: string
+          verification_status: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          billing_status?: string
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          doctor_json?: Json
+          hospital_id: string
+          id?: string
+          items_json?: Json
+          linked_order_id?: string | null
+          notes?: string | null
+          owner_user_id: string
+          page_count?: number
+          patient_json?: Json
+          payment_json?: Json
+          sale_type?: string
+          source_files?: Json
+          stage?: string
+          totals_json?: Json
+          updated_at?: string
+          verification_status?: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          billing_status?: string
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          doctor_json?: Json
+          hospital_id?: string
+          id?: string
+          items_json?: Json
+          linked_order_id?: string | null
+          notes?: string | null
+          owner_user_id?: string
+          page_count?: number
+          patient_json?: Json
+          payment_json?: Json
+          sale_type?: string
+          source_files?: Json
+          stage?: string
+          totals_json?: Json
+          updated_at?: string
+          verification_status?: string
+        }
+        Relationships: []
+      }
       prescription_corrections: {
         Row: {
           ai_text: string
