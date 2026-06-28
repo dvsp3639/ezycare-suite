@@ -68,8 +68,18 @@ export interface WorkspaceItem {
   discount?: number;
   /** inventory state */
   availableStock?: number;
-  matchStatus?: "available" | "low" | "out" | "unmatched";
+  matchStatus?: "available" | "low" | "out" | "unmatched" | "pending" | "skipped";
   confidence?: number;
+  /** enriched from inventory match */
+  brandName?: string;
+  genericName?: string;
+  manufacturer?: string;
+  dosageForm?: string;
+  packSize?: string;
+  expiryDate?: string | null;
+  sellingPrice?: number;
+  reservedQty?: number;
+  matchSource?: "exact" | "brand" | "generic" | "fuzzy";
 }
 
 export interface WorkspaceTotals {
@@ -184,25 +194,53 @@ export const workspaceService = {
 /* ─── Inventory matcher ─────────────────────────────────────────────── */
 export function matchInventory(items: WorkspaceItem[], stock: Medicine[]): WorkspaceItem[] {
   const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  // FEFO helper — pick earliest non-expired batch among candidates
+  const today = new Date();
+  const fefo = (list: Medicine[]) =>
+    list
+      .filter((m) => !m.expiryDate || new Date(m.expiryDate) > today)
+      .sort((a, b) => {
+        const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+        const bx = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+        if (ax !== bx) return ax - bx;
+        return (b.stock || 0) - (a.stock || 0);
+      })[0] || list[0];
+
   return items.map((it) => {
+    // Preserve user-overridden status (pending/skipped)
+    if (it.matchStatus === "pending" || it.matchStatus === "skipped") return it;
     if (it.medicineId) {
       const m = stock.find((x) => x.id === it.medicineId);
-      if (m) return enrich(it, m);
+      if (m) return enrich(it, m, "exact");
     }
-    const q = norm(`${it.name} ${it.strength || ""}`);
-    if (!q) return { ...it, matchStatus: "unmatched" };
-    // exact then prefix then fuzzy contains
-    const exact = stock.find((m) => norm(`${m.name} ${m.strength || ""}`) === q);
-    if (exact) return enrich(it, exact);
-    const byName = stock.find((m) => norm(m.name) === norm(it.name));
-    if (byName) return enrich(it, byName);
-    const partial = stock.find((m) => norm(m.name).includes(norm(it.name)) || norm(it.name).includes(norm(m.name)));
-    if (partial) return enrich(it, partial);
+    const name = norm(it.name);
+    const strength = norm(it.strength || "");
+    if (!name) return { ...it, matchStatus: "unmatched" };
+    // 1. Brand + strength exact
+    let candidates = stock.filter(
+      (m) => norm(m.name) === name && (!strength || norm(m.strength || "") === strength),
+    );
+    if (candidates.length) return enrich(it, fefo(candidates), "exact");
+    // 2. Same brand, any batch
+    candidates = stock.filter((m) => norm(m.name) === name);
+    if (candidates.length) return enrich(it, fefo(candidates), "brand");
+    // 3. Generic equivalent
+    candidates = stock.filter(
+      (m) =>
+        (norm(m.genericName || "") && norm(m.genericName || "") === name) ||
+        (norm(m.saltName || "") && norm(m.saltName || "") === name),
+    );
+    if (candidates.length) return enrich(it, fefo(candidates), "generic");
+    // 4. Fuzzy contains
+    const partial = stock.find(
+      (m) => norm(m.name).includes(name) || name.includes(norm(m.name)),
+    );
+    if (partial) return enrich(it, partial, "fuzzy");
     return { ...it, matchStatus: "unmatched" };
   });
 }
 
-function enrich(it: WorkspaceItem, m: Medicine): WorkspaceItem {
+function enrich(it: WorkspaceItem, m: Medicine, source: "exact" | "brand" | "generic" | "fuzzy" = "exact"): WorkspaceItem {
   const stock = m.stock || 0;
   const status: WorkspaceItem["matchStatus"] =
     stock <= 0 ? "out" : stock < it.quantity ? "low" : "available";
@@ -212,10 +250,32 @@ function enrich(it: WorkspaceItem, m: Medicine): WorkspaceItem {
     medicineName: m.name,
     batchNo: m.batchNo || "",
     mrp: m.mrp || it.mrp || 0,
+    sellingPrice: m.sellingPrice || m.mrp || it.mrp || 0,
+    expiryDate: m.expiryDate || null,
+    brandName: m.brandName || m.name,
+    genericName: m.genericName || "",
+    manufacturer: m.manufacturer || "",
+    dosageForm: m.dosageForm || "",
     gstPercent: m.gstPercent ?? it.gstPercent ?? 12,
     availableStock: stock,
     matchStatus: status,
+    matchSource: source,
   };
+}
+
+/** Return all in-stock batches for a medicine name, FEFO-sorted. */
+export function batchesFor(name: string, stock: Medicine[]): Medicine[] {
+  const n = (s?: string) => (s || "").toLowerCase().trim();
+  const target = n(name);
+  const today = new Date();
+  return stock
+    .filter((m) => n(m.name) === target && (m.stock || 0) > 0)
+    .filter((m) => !m.expiryDate || new Date(m.expiryDate) > today)
+    .sort((a, b) => {
+      const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+      const bx = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+      return ax - bx;
+    });
 }
 
 export function recomputeTotals(items: WorkspaceItem[], discountPercent = 0): WorkspaceTotals {
