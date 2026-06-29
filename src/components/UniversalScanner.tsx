@@ -980,7 +980,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         {mode === "loading" && (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Reading document with AI…</p>
+            <p className="text-sm text-muted-foreground">{loadingLabel}</p>
+            <p className="text-[11px] text-muted-foreground/70">Please keep this screen open.</p>
           </div>
         )}
 
