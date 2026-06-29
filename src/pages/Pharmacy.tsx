@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,7 @@ import { toast } from "sonner";
 import {
   Pill, Search, ShoppingCart, Plus, Minus, Trash2, CreditCard,
   Banknote, FileText, User, Package, Printer, CheckCircle2, ClipboardList,
-  ScanLine, Sparkles,
+
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
@@ -32,7 +31,6 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
-import PharmacyWorkspace from "@/components/pharmacy/PharmacyWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
@@ -76,7 +74,6 @@ const Pharmacy = () => {
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
   const [activeScanId, setActiveScanId] = useState<string>("");
-  const [workspaceMode, setWorkspaceMode] = useState<"workspace" | "classic">("workspace");
 
   // Search patients
   const searchResults = useMemo(() => {
@@ -340,28 +337,6 @@ const Pharmacy = () => {
         </h1>
         <p className="text-sm text-muted-foreground">Issue medicines, process prescriptions & manage returns</p>
       </div>
-
-      {/* Primary AI Prescription Scanner CTA */}
-      <Tabs value={workspaceMode} onValueChange={(v) => setWorkspaceMode(v as any)} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="workspace" className="gap-1.5">
-            <ScanLine className="h-3.5 w-3.5" /> AI Workspace
-            <Sparkles className="h-3 w-3 text-primary" />
-          </TabsTrigger>
-          <TabsTrigger value="classic" className="gap-1.5">
-            <Pill className="h-3.5 w-3.5" /> Manual Billing
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="workspace" className="mt-3 -mx-6 lg:-mx-8">
-          <PharmacyWorkspace />
-        </TabsContent>
-        <TabsContent value="classic" className="mt-3 text-xs text-muted-foreground">
-          Manual billing form is below.
-        </TabsContent>
-      </Tabs>
-
-      {workspaceMode === "workspace" ? null : (
-      <>
 
       {/* Issue Type Selector */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
@@ -754,8 +729,6 @@ const Pharmacy = () => {
             </Button>
           </div>
         </div>
-      )}
-      </>
       )}
     </div>
   );
