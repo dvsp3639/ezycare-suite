@@ -1685,6 +1685,9 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
+      {/* AI Invoice Scanner */}
+      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
+
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
