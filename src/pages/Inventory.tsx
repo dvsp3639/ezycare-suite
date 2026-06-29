@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Receipt } from "lucide-react";
 import { PurchaseInvoiceRepository } from "@/components/inventory/PurchaseInvoiceRepository";
+import { UniversalScanner } from "@/components/UniversalScanner";
 import { cn } from "@/lib/utils";
 import {
   inventoryCategories, departments, categoryColors,
@@ -182,6 +183,7 @@ const Inventory = () => {
   const [showAddItem, setShowAddItem] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showAIScanner, setShowAIScanner] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
 
   // Transfer form
@@ -654,6 +656,9 @@ const Inventory = () => {
           <p className="text-sm text-muted-foreground">Manage hospital stock, transfers, and reports</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="default" size="sm" onClick={() => setShowAIScanner(true)} className="bg-gradient-to-r from-primary to-primary/80">
+            <Scan className="h-4 w-4 mr-1" /> AI Scan Invoice
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowBarcodeScanner(true)}>
             <QrCode className="h-4 w-4 mr-1" /> Scan
           </Button>
@@ -1679,6 +1684,9 @@ const Inventory = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Invoice Scanner */}
+      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
