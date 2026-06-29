@@ -78,6 +78,7 @@ type SourceFile = {
   error?: string;
   storagePath?: string;
   itemCount?: number;
+  _hash?: string;
 };
 
 type Correction = {
