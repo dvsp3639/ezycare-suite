@@ -30,7 +30,7 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
-import { VoiceMedicineInput } from "@/components/pharmacy/VoiceMedicineInput";
+import { MedicineInputBar } from "@/components/pharmacy/MedicineInputBar";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
@@ -535,9 +535,9 @@ const Pharmacy = () => {
                     <Badge variant="outline" className="text-xs">Loaded from prescription</Badge>
                   )}
                 </div>
-                <VoiceMedicineInput
-                  medicines={allMedicines}
-                  onAdd={(m, qty) => addMedicineWithQty(m as Medicine, qty)}
+                <MedicineInputBar
+                  medicines={allMedicines as any}
+                  onAdd={(m, qty) => addMedicineWithQty(m as unknown as Medicine, qty)}
                 />
               </div>
 
