@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
+import { compressImageFile, fileHash, extractionCache } from "@/lib/mobileScanHelpers";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
 type Field = { value: any; confidence: number; corrected?: boolean };
@@ -77,6 +78,7 @@ type SourceFile = {
   error?: string;
   storagePath?: string;
   itemCount?: number;
+  _hash?: string;
 };
 
 type Correction = {
@@ -181,6 +183,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   /** Sticky doc type for the current scanner session — avoids re-asking AI when
    *  the pharmacist drops more files of the same kind. Cleared on close. */
   const sessionDocTypeRef = useRef<string | null>(null);
+  const [loadingLabel, setLoadingLabel] = useState<string>("Reading document with AI…");
 
   const reset = useCallback(() => {
     setMode("menu"); setBusy(false); setExtract(null); setDocumentType("");
@@ -266,6 +269,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
   /** Extract a single file via the AI edge function. Returns merged invoice or medicine label data. */
   async function extractOne(f: SourceFile) {
+    // Dedup: same bytes already extracted this session → reuse, no AI call.
+    const cached = f._hash ? extractionCache.get(f._hash) : null;
+    if (cached) return cached;
     const { data, error } = await supabase.functions.invoke("medicine-scan-ai", {
       body: { fileBase64: f.base64, mimeType: f.mime },
     });
@@ -274,6 +280,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       data.error === "credits_exhausted" ? "AI credits exhausted."
       : data.error === "rate_limited" ? "Rate limited — retry shortly." : data.error
     );
+    if (f._hash) extractionCache.set(f._hash, data);
     return data;
   }
 
@@ -355,6 +362,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
     // Build queue
     const sf: SourceFile[] = [];
+    setLoadingLabel("Uploading…");
+    setMode("loading");
     for (const file of files) {
       const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
       const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
@@ -362,14 +371,18 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         toast.error(`Unsupported file: ${file.name}`);
         continue;
       }
+      // Resize/compress huge phone photos before they ever hit the AI gateway.
+      const compressed = isImage ? await compressImageFile(file) : file;
+      const hash = await fileHash(compressed);
       sf.push({
         id: crypto.randomUUID(),
         name: file.name,
-        size: file.size,
-        mime: file.type || (isPdf ? "application/pdf" : "image/jpeg"),
-        base64: await fileToBase64(file),
+        size: compressed.size,
+        mime: compressed.type || (isPdf ? "application/pdf" : "image/jpeg"),
+        base64: await fileToBase64(compressed),
         status: "queued",
-      });
+        _hash: hash,
+      } as any);
     }
     if (!sf.length) { setBusy(false); return; }
 
@@ -378,6 +391,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     // pharmacist already uploaded one in this same scanner open).
     let docType = sessionDocTypeRef.current;
     if (!docType) {
+      setLoadingLabel("AI processing…");
       setMode("loading");
       try {
         const data = await extractOne(sf[0]);
@@ -966,7 +980,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         {mode === "loading" && (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Reading document with AI…</p>
+            <p className="text-sm text-muted-foreground">{loadingLabel}</p>
+            <p className="text-[11px] text-muted-foreground/70">Please keep this screen open.</p>
           </div>
         )}
 

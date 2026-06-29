@@ -207,9 +207,10 @@ function ScanTab({
         let blob: Blob = f;
         if (f.type.startsWith("image/")) {
           const img = await fileToImage(f);
-          const c = imageToCanvas(img, 1800);
+          // Cap at 1400px — same recognition quality, ~40% less payload/tokens.
+          const c = imageToCanvas(img, 1400);
           enhance(c);
-          blob = await canvasToBlob(c, "image/jpeg", 0.85);
+          blob = await canvasToBlob(c, "image/jpeg", 0.78);
         }
         const path = await workspaceService.uploadPage(scan.id, userId, blob, i++);
         paths.push(path);
