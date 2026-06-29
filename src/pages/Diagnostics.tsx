@@ -891,28 +891,16 @@ const Diagnostics = () => {
                     <Label className="text-sm font-semibold flex items-center gap-1.5">
                       <Beaker className="h-4 w-4" /> Test Parameters
                     </Label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        setResultValues((prev) => [
-                          ...prev,
-                          { parameter: "", value: "", unit: "", normalRange: "", isAbnormal: false },
-                        ])
-                      }
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                    </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Enter values manually — a PDF report will be generated automatically on save.
+                    Enter values for the predefined parameters — a PDF report will be generated automatically on save.
                   </p>
-                  <div className="grid grid-cols-[1fr_90px_70px_110px_70px_24px] gap-1.5 text-[10px] font-medium text-muted-foreground px-1">
-                    <span>Parameter</span><span>Value</span><span>Unit</span><span>Normal Range</span><span>Abnormal</span><span></span>
+                  <div className="grid grid-cols-[1fr_90px_70px_110px_70px] gap-1.5 text-[10px] font-medium text-muted-foreground px-1">
+                    <span>Parameter</span><span>Value</span><span>Unit</span><span>Normal Range</span><span>Abnormal</span>
                   </div>
                   <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
                     {resultValues.map((r, idx) => (
-                      <div key={idx} className="grid grid-cols-[1fr_90px_70px_110px_70px_24px] gap-1.5 items-center">
+                      <div key={idx} className="grid grid-cols-[1fr_90px_70px_110px_70px] gap-1.5 items-center">
                         <Input
                           className="h-8 text-xs"
                           placeholder="Parameter"
@@ -953,14 +941,6 @@ const Diagnostics = () => {
                             }
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setResultValues((prev) => prev.filter((_, i) => i !== idx))}
-                          className="text-destructive/60 hover:text-destructive"
-                          aria-label="Remove parameter"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                     ))}
                   </div>
