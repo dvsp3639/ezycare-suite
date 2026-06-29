@@ -30,7 +30,7 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
-import { SmartMedicineSearch } from "@/components/pharmacy/SmartMedicineSearch";
+import { VoiceMedicineInput } from "@/components/pharmacy/VoiceMedicineInput";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
@@ -201,6 +201,33 @@ const Pharmacy = () => {
   const addMedicineFromSmart = (m: DbMedicine) => {
     const local = allMedicines.find((x) => x.id === m.id);
     if (local) addMedicine(local);
+  };
+
+  const addMedicineWithQty = (med: Medicine, qty: number) => {
+    const existing = orderItems.find((i) => i.medicineId === med.id);
+    if (existing) {
+      setOrderItems((prev) =>
+        prev.map((i) =>
+          i.medicineId === med.id
+            ? { ...i, quantity: i.quantity + qty, amount: i.mrp * (i.quantity + qty) }
+            : i,
+        ),
+      );
+    } else {
+      setOrderItems((prev) => [
+        ...prev,
+        {
+          medicineId: med.id,
+          medicineName: med.name,
+          batchNo: med.batchNo,
+          quantity: qty,
+          mrp: med.mrp,
+          discount: 0,
+          gstPercent: med.gstPercent,
+          amount: med.mrp * qty,
+        },
+      ]);
+    }
   };
 
   const updateItemQty = (medId: string, delta: number) => {
@@ -508,23 +535,10 @@ const Pharmacy = () => {
                     <Badge variant="outline" className="text-xs">Loaded from prescription</Badge>
                   )}
                 </div>
-                <div className="relative mb-3">
-                  <SmartMedicineSearch
-                    placeholder="Search medicines — name, salt, brand, strength, barcode…"
-                    onSelect={(m, action) => {
-                      if (action === "issue") {
-                        addMedicineFromSmart(m);
-                        toast.success(`${m.name} added`);
-                      } else if (action === "details") {
-                        toast.info(`${m.name} · ${m.genericName || ""} · Batch ${m.batchNo || "—"}`);
-                      } else if (action === "alternatives") {
-                        toast.info(`Alternatives for ${m.genericName || m.name} — coming soon`);
-                      } else if (action === "stock") {
-                        toast.info(`Stock: ${m.stock} ${m.unit || ""} · Rack ${m.rackLocation || "—"}`);
-                      }
-                    }}
-                  />
-                </div>
+                <VoiceMedicineInput
+                  medicines={allMedicines}
+                  onAdd={(m, qty) => addMedicineWithQty(m as Medicine, qty)}
+                />
               </div>
 
               {/* Cart Table */}
