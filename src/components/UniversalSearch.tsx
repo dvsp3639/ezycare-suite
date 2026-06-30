@@ -111,7 +111,7 @@ export function UniversalSearch() {
         inputRef.current?.focus();
         setOpen(true);
       }
-      if (e.key === "Escape") { setOpen(false); setScanOpen(false); }
+      if (e.key === "Escape") { setOpen(false); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
