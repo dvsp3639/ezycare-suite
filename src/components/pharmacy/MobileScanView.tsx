@@ -24,6 +24,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { canvasToBlob, enhance, fileToImage, imageToCanvas, blobToBase64 } from "@/lib/docScan";
+import { fileDebugInfo, installMobileLifecycleTrace, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 import {
   workspaceService, matchInventory, recomputeTotals,
   type WorkspaceScan, type WorkspaceItem, type SaleType,
@@ -197,10 +198,38 @@ function ScanTab({
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    traceUpload("1 Scanner opened", {
+      file: "src/components/pharmacy/MobileScanView.tsx",
+      component: "ScanTab",
+      function: "ScanTab.useEffect",
+      block: "mobile prescription scan tab mounted",
+      scanId: scan.id,
+      existingPages: scan.source_files?.length || 0,
+    });
+    return installMobileLifecycleTrace("MobileScanView.ScanTab");
+  }, [scan.id, scan.source_files?.length]);
+
   async function ingest(files: FileList | null) {
-    if (!files?.length) return;
-    const log = (...a: any[]) => console.log("[MobileScan:ingest]", ...a);
-    log("files selected", Array.from(files).map((f) => ({ name: f.name, size: f.size, type: f.type })));
+    if (!files?.length) {
+      traceFailure("3 File selected", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "ingest",
+        block: "FileList was empty before upload pipeline",
+        scanId: scan.id,
+        stopReason: "No File object reached ingest(); upload cannot start.",
+      }, new Error("Empty FileList"));
+      return;
+    }
+    traceUpload("3 File selected", {
+      file: "src/components/pharmacy/MobileScanView.tsx",
+      component: "ScanTab",
+      function: "ingest",
+      block: "ingest received FileList",
+      scanId: scan.id,
+      files: Array.from(files).map(fileDebugInfo),
+    });
     setBusy(true);
     setErr(null);
     try {
@@ -208,22 +237,70 @@ function ScanTab({
       let i = paths.length;
       for (const f of Array.from(files)) {
         try {
+          traceUpload("5 File object created", {
+            file: "src/components/pharmacy/MobileScanView.tsx",
+            component: "ScanTab",
+            function: "ingest",
+            block: "for-of FileList item verified",
+            scanId: scan.id,
+            selectedFile: fileDebugInfo(f),
+          });
           let blob: Blob = f;
           if (f.type.startsWith("image/")) {
-            log("decoding", f.name);
+            traceUpload("6 Compression started", {
+              file: "src/components/pharmacy/MobileScanView.tsx",
+              component: "ScanTab",
+              function: "ingest",
+              block: "fileToImage -> canvas enhance -> canvasToBlob",
+              scanId: scan.id,
+              selectedFile: fileDebugInfo(f),
+            });
             const img = await fileToImage(f);
             const c = imageToCanvas(img, 1400);
             enhance(c);
             blob = await canvasToBlob(c, "image/jpeg", 0.78);
-            log("compressed", f.name, { toKB: Math.round(blob.size / 1024) });
+            traceUpload("7 Compression completed", {
+              file: "src/components/pharmacy/MobileScanView.tsx",
+              component: "ScanTab",
+              function: "ingest",
+              block: "canvasToBlob returned upload blob",
+              scanId: scan.id,
+              original: fileDebugInfo(f),
+              compressed: fileDebugInfo(blob),
+            });
+          } else {
+            traceUpload("6 Compression started", {
+              file: "src/components/pharmacy/MobileScanView.tsx",
+              component: "ScanTab",
+              function: "ingest",
+              block: "non-image file bypasses compression",
+              scanId: scan.id,
+              selectedFile: fileDebugInfo(f),
+              skipped: true,
+            });
+            traceUpload("7 Compression completed", {
+              file: "src/components/pharmacy/MobileScanView.tsx",
+              component: "ScanTab",
+              function: "ingest",
+              block: "original non-image file retained",
+              scanId: scan.id,
+              selectedFile: fileDebugInfo(f),
+              skipped: true,
+            });
           }
-          log("uploading", f.name);
           const path = await workspaceService.uploadPage(scan.id, userId, blob, i++);
-          log("uploaded", f.name, path);
           paths.push(path);
         } catch (perFileErr: any) {
-          console.error("[MobileScan:ingest] file failed", f.name, perFileErr);
-          toast.error(`${f.name}: ${perFileErr?.message || "upload failed"}`);
+          traceFailure("Upload pipeline stopped", {
+            file: "src/components/pharmacy/MobileScanView.tsx",
+            component: "ScanTab",
+            function: "ingest",
+            block: "per-file compression/upload loop",
+            scanId: scan.id,
+            selectedFile: fileDebugInfo(f),
+            stopReason: "A selected prescription page failed before it could be saved to storage.",
+          }, perFileErr);
+          throw perFileErr;
         }
       }
       if (paths.length === scan.source_files.length) {
@@ -233,7 +310,14 @@ function ScanTab({
       await onSave({ source_files: paths as any, page_count: paths.length });
       toast.success(`${paths.length - scan.source_files.length} page(s) added`);
     } catch (e: any) {
-      console.error("[MobileScan:ingest] failed", e);
+      traceFailure("Upload pipeline stopped", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "ingest",
+        block: "outer upload pipeline catch",
+        scanId: scan.id,
+        stopReason: "Prescription page upload did not complete; AI was not started.",
+      }, e);
       setErr(e?.message || "Upload failed");
       toast.error(e?.message || "Upload failed");
     }
@@ -245,13 +329,39 @@ function ScanTab({
     try {
       const path = scan.source_files[0];
       if (!path) throw new Error("Capture a page first");
+      traceUpload("12 Edge Function triggered", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "download stored page before prescription-scan-ai",
+        scanId: scan.id,
+        path,
+      });
       const { data: blob, error } = await supabase.storage.from("prescriptions").download(path);
       if (error || !blob) throw error || new Error("Failed to load page");
       const b64 = await blobToBase64(blob);
+      traceUpload("13 OCR started", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "invoke prescription-scan-ai with stored page base64",
+        scanId: scan.id,
+        path,
+        mimeType: blob.type || "image/jpeg",
+        base64Length: b64.length,
+      });
       const { data, error: fnErr } = await supabase.functions.invoke("prescription-scan-ai", {
         body: { fileBase64: b64, mimeType: blob.type || "image/jpeg" },
       });
       if (fnErr) throw fnErr;
+      traceUpload("14 OCR completed", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "prescription-scan-ai returned response",
+        scanId: scan.id,
+        documentType: (data as any)?.documentType,
+      });
       const items: WorkspaceItem[] = (data?.medicines || []).map((m: any) => ({
         aiText: m.name,
         name: m.brandName || m.name || "",
@@ -265,6 +375,15 @@ function ScanTab({
         confidence: m.confidence ?? data?.confidence ?? 0.7,
       }));
       const matched = matchInventory(items, medicines);
+      traceUpload("15 AI extraction completed", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "mapped OCR response to workspace medicines",
+        scanId: scan.id,
+        itemCount: matched.length,
+        confidence: data?.confidence ?? null,
+      });
       await onSave({
         stage: "review",
         ai_confidence: data?.confidence ?? null,
@@ -283,8 +402,25 @@ function ScanTab({
         totals_json: recomputeTotals(matched) as any,
       });
       toast.success("AI extraction complete");
+      traceUpload("16 Verification screen opened", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "onNext() opens medicines/verification tab",
+        scanId: scan.id,
+      });
       onNext();
-    } catch (e: any) { setErr(e?.message || "AI extraction failed"); }
+    } catch (e: any) {
+      traceFailure("AI pipeline stopped", {
+        file: "src/components/pharmacy/MobileScanView.tsx",
+        component: "ScanTab",
+        function: "runAI",
+        block: "download -> base64 -> prescription-scan-ai -> map medicines",
+        scanId: scan.id,
+        stopReason: "Prescription AI extraction failed; verification screen cannot open.",
+      }, e);
+      setErr(e?.message || "AI extraction failed");
+    }
     finally { setAiBusy(false); }
   }, [scan, onSave, medicines, onNext]);
 
@@ -300,14 +436,56 @@ function ScanTab({
         </p>
       </div>
 
-      <input ref={camRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => ingest(e.target.files)} />
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => ingest(e.target.files)} />
+      <input ref={camRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => {
+        traceUpload("4 onChange fired", {
+          file: "src/components/pharmacy/MobileScanView.tsx",
+          component: "ScanTab",
+          function: "cameraInput.onChange",
+          block: "camera file input onChange entry",
+          scanId: scan.id,
+          filesLength: e.target.files?.length || 0,
+          files: Array.from(e.target.files || []).map(fileDebugInfo),
+        });
+        ingest(e.target.files);
+      }} />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => {
+        traceUpload("4 onChange fired", {
+          file: "src/components/pharmacy/MobileScanView.tsx",
+          component: "ScanTab",
+          function: "fileInput.onChange",
+          block: "gallery/pdf file input onChange entry",
+          scanId: scan.id,
+          filesLength: e.target.files?.length || 0,
+          files: Array.from(e.target.files || []).map(fileDebugInfo),
+        });
+        ingest(e.target.files);
+      }} />
 
       <div className="grid grid-cols-2 gap-3">
-        <Button disabled={busy} onClick={() => camRef.current?.click()} className="h-20 flex-col gap-1 text-base">
+        <Button disabled={busy} onClick={() => {
+          traceUpload("2 Camera / Gallery opened", {
+            file: "src/components/pharmacy/MobileScanView.tsx",
+            component: "ScanTab",
+            function: "TakePhotoButton.onClick",
+            block: "Take Photo button -> hidden capture input click",
+            scanId: scan.id,
+            source: "camera",
+          });
+          camRef.current?.click();
+        }} className="h-20 flex-col gap-1 text-base">
           <Camera className="h-6 w-6" /> Take Photo
         </Button>
-        <Button disabled={busy} variant="outline" onClick={() => fileRef.current?.click()} className="h-20 flex-col gap-1 text-base">
+        <Button disabled={busy} variant="outline" onClick={() => {
+          traceUpload("2 Camera / Gallery opened", {
+            file: "src/components/pharmacy/MobileScanView.tsx",
+            component: "ScanTab",
+            function: "UploadButton.onClick",
+            block: "Upload button -> hidden gallery/pdf input click",
+            scanId: scan.id,
+            source: "gallery_or_pdf",
+          });
+          fileRef.current?.click();
+        }} className="h-20 flex-col gap-1 text-base">
           <Upload className="h-6 w-6" /> Upload
         </Button>
       </div>
