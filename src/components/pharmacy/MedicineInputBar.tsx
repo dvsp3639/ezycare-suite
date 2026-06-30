@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { compressImageFile } from "@/lib/mobileScanHelpers";
+import { fileDebugInfo, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 export type MedicineLike = {
   id: string;
@@ -198,24 +199,117 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
   };
 
   /* --- image scan --- */
-  const onPickImage = () => fileRef.current?.click();
+  const onPickImage = () => {
+    traceUpload("2 Camera / Gallery opened", {
+      file: "src/components/pharmacy/MedicineInputBar.tsx",
+      component: "MedicineInputBar",
+      function: "onPickImage",
+      block: "camera icon -> hidden image/pdf input click",
+      source: "medicine_input_bar",
+    });
+    fileRef.current?.click();
+  };
   const onImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    traceUpload("4 onChange fired", {
+      file: "src/components/pharmacy/MedicineInputBar.tsx",
+      component: "MedicineInputBar",
+      function: "onImageChange",
+      block: "native file input onChange entry",
+      filesLength: e.target.files?.length || 0,
+      files: Array.from(e.target.files || []).map(fileDebugInfo),
+    });
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
-    const log = (...a: any[]) => console.log("[MedInputBar:scan]", ...a);
-    log("file selected", { name: file.name, size: file.size, type: file.type });
+    if (!file) {
+      traceFailure("3 File selected", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "event.target.files[0] missing",
+        stopReason: "No File object returned from picker; image scan cannot start.",
+      }, new Error("No File returned from image input"));
+      return;
+    }
+    traceUpload("3 File selected", {
+      file: "src/components/pharmacy/MedicineInputBar.tsx",
+      component: "MedicineInputBar",
+      function: "onImageChange",
+      block: "read event.target.files[0]",
+      selectedFile: fileDebugInfo(file),
+    });
+    traceUpload("5 File object created", {
+      file: "src/components/pharmacy/MedicineInputBar.tsx",
+      component: "MedicineInputBar",
+      function: "onImageChange",
+      block: "verified selected object is File/Blob",
+      selectedFile: fileDebugInfo(file),
+    });
     setScanBusy(true);
     try {
+      traceUpload("6 Compression started", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "compressImageFile(file)",
+        selectedFile: fileDebugInfo(file),
+      });
       const compressed = await compressImageFile(file);
-      log("compressed", { fromKB: Math.round(file.size / 1024), toKB: Math.round(compressed.size / 1024) });
+      traceUpload("7 Compression completed", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "compressImageFile returned",
+        original: fileDebugInfo(file),
+        compressed: fileDebugInfo(compressed),
+      });
       const base64 = await blobToBase64(compressed);
-      log("base64 ready", "len=", base64.length, "→ invoking medicine-scan-ai");
+      traceUpload("8 Upload request created", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "skipped by design: medicine image scan sends base64 directly to AI",
+        skipped: true,
+        base64Length: base64.length,
+      });
+      traceUpload("9 Upload request sent", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "skipped by design before AI extraction",
+        skipped: true,
+      });
+      traceUpload("10 Supabase Storage response", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "skipped by design before AI extraction",
+        skipped: true,
+      });
+      traceUpload("12 Edge Function triggered", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "invoke medicine-scan-ai",
+        mimeType: compressed.type || "image/jpeg",
+        base64Length: base64.length,
+      });
+      traceUpload("13 OCR started", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "medicine-scan-ai processing base64 image",
+      });
       const { data, error } = await supabase.functions.invoke("medicine-scan-ai", {
         body: { fileBase64: base64, mimeType: compressed.type || "image/jpeg" },
       });
-      log("ai response", { hasError: !!error, items: (data as any)?.invoice?.items?.length });
       if (error) throw error;
+      traceUpload("14 OCR completed", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "medicine-scan-ai returned response",
+        documentType: (data as any)?.documentType,
+      });
       const tokens: { token: string; qty: number }[] = [];
       const inv = (data as any)?.invoice?.items as any[] | undefined;
       if (inv?.length) {
@@ -229,6 +323,13 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
         if (t) tokens.push({ token: String(t), qty: 1 });
       }
       if (!tokens.length) { toast.error("Couldn't read medicines from image"); return; }
+      traceUpload("15 AI extraction completed", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "tokens extracted from AI response",
+        tokenCount: tokens.length,
+      });
       const added: { name: string; qty: number }[] = [];
       const missed: string[] = [];
       for (const it of tokens) {
@@ -240,7 +341,14 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
       if (added.length) toast.success(`Added ${added.length} from image`);
       if (missed.length) toast.warning(`Not found: ${missed.join(", ")}`);
     } catch (err: any) {
-      console.error("[MedInputBar:scan] failed", err);
+      traceFailure("AI pipeline stopped", {
+        file: "src/components/pharmacy/MedicineInputBar.tsx",
+        component: "MedicineInputBar",
+        function: "onImageChange",
+        block: "compress -> base64 -> medicine-scan-ai -> add medicines",
+        selectedFile: fileDebugInfo(file),
+        stopReason: "Medicine image scan failed before medicines could be added.",
+      }, err);
       toast.error(err?.message || "Image scan failed");
     } finally {
       setScanBusy(false);

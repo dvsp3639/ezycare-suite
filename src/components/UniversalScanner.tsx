@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
 import { compressImageFile, fileHash, extractionCache } from "@/lib/mobileScanHelpers";
+import { fileDebugInfo, installMobileLifecycleTrace, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
 type Field = { value: any; confidence: number; corrected?: boolean };
@@ -209,6 +210,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   useEffect(() => () => stopCamera(), []);
   useEffect(() => {
     if (!open) return;
+    traceUpload("1 Scanner opened", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "openEffect",
+      block: "scanner portal opened",
+      deviceInfo: deviceInfo(),
+    });
+    return installMobileLifecycleTrace("UniversalScanner");
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -259,10 +271,46 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       try {
         const blob = await (await fetch(`data:${f.mime};base64,${f.base64}`)).blob();
         const path = `${user.id}/${Date.now()}-${f.id}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        traceUpload("8 Upload request created", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "uploadOriginals",
+          block: "create purchase invoice original storage upload request",
+          bucket: "purchase-invoices",
+          path,
+          sourceFile: { name: f.name, size: f.size, mime: f.mime },
+        });
+        traceUpload("9 Upload request sent", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "uploadOriginals",
+          block: "supabase.storage.from('purchase-invoices').upload(path, blob)",
+          bucket: "purchase-invoices",
+          path,
+        });
         const { error } = await supabase.storage.from("purchase-invoices").upload(path, blob, { contentType: f.mime, upsert: false });
+        traceUpload("10 Supabase Storage response", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "uploadOriginals",
+          block: "purchase invoice original storage response",
+          ok: !error,
+          error: error ? { name: error.name, message: error.message } : null,
+          path,
+        });
         if (error) { out.push(f); continue; }
         out.push({ ...f, storagePath: path });
-      } catch { out.push(f); }
+      } catch (error) {
+        traceFailure("10 Supabase Storage response", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "uploadOriginals",
+          block: "purchase invoice original upload catch",
+          sourceFile: { name: f.name, size: f.size, mime: f.mime },
+          stopReason: "Original invoice audit upload failed; the existing import flow keeps going, but storage failure is now visible.",
+        }, error);
+        out.push(f);
+      }
     }
     return out;
   }
@@ -272,14 +320,55 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     // Dedup: same bytes already extracted this session → reuse, no AI call.
     const cached = f._hash ? extractionCache.get(f._hash) : null;
     if (cached) return cached;
+    traceUpload("12 Edge Function triggered", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "extractOne",
+      block: "invoke medicine-scan-ai",
+      sourceFile: { name: f.name, size: f.size, mime: f.mime, base64Length: f.base64.length },
+    });
+    traceUpload("13 OCR started", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "extractOne",
+      block: "medicine-scan-ai received base64 payload",
+      sourceFile: { name: f.name, mime: f.mime },
+    });
     const { data, error } = await supabase.functions.invoke("medicine-scan-ai", {
       body: { fileBase64: f.base64, mimeType: f.mime },
     });
-    if (error) throw error;
+    if (error) {
+      traceFailure("12 Edge Function triggered", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "extractOne",
+        block: "medicine-scan-ai invoke returned client error",
+        sourceFile: { name: f.name, size: f.size, mime: f.mime },
+        stopReason: "The backend AI function call failed before OCR/extraction completed.",
+      }, error);
+      throw error;
+    }
     if (data?.error) throw new Error(
       data.error === "credits_exhausted" ? "AI credits exhausted."
       : data.error === "rate_limited" ? "Rate limited — retry shortly." : data.error
     );
+    traceUpload("14 OCR completed", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "extractOne",
+      block: "medicine-scan-ai returned parseable response",
+      documentType: data?.documentType,
+      sourceFile: { name: f.name, mime: f.mime },
+    });
+    traceUpload("15 AI extraction completed", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "extractOne",
+      block: "structured extraction data available",
+      documentType: data?.documentType,
+      invoiceItems: data?.invoice?.items?.length || 0,
+      medicines: data?.medicines?.length || 0,
+    });
     if (f._hash) extractionCache.set(f._hash, data);
     return data;
   }
@@ -340,8 +429,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   /** Handle multiple files; if any looks like an invoice, route to wizard; else single-medicine flow. */
   async function handleFiles(files: File[]) {
     if (!files.length) return;
-    const trace = (...a: any[]) => console.log("[UniversalScanner]", ...a);
-    trace("files selected", files.map((f) => ({ name: f.name, size: f.size, type: f.type })));
+    traceUpload("3 File selected", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "handleFiles",
+      block: "handleFiles received File[]",
+      files: files.map(fileDebugInfo),
+    });
     setBusy(true);
 
     // Excel shortcut — only single excel at a time
@@ -371,16 +465,66 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
       if (!isImage && !isPdf) {
         toast.error(`Unsupported file: ${file.name}`);
-        trace("skip unsupported", file.name, file.type);
+        traceFailure("5 File object created", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "unsupported file type check",
+          selectedFile: fileDebugInfo(file),
+          stopReason: "Unsupported file type; scanner will not process this file.",
+        }, new Error(`Unsupported file: ${file.name} (${file.type})`));
         continue;
       }
       try {
-        trace("prepare", file.name);
+        traceUpload("5 File object created", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "for-of selected File verified",
+          selectedFile: fileDebugInfo(file),
+        });
+        traceUpload("6 Compression started", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "compressImageFile(file) or bypass for PDF",
+          selectedFile: fileDebugInfo(file),
+          skipped: !isImage,
+        });
         const compressed = isImage ? await compressImageFile(file) : file;
-        trace("compressed", file.name, { fromKB: Math.round(file.size / 1024), toKB: Math.round(compressed.size / 1024) });
+        traceUpload("7 Compression completed", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "compressImageFile returned",
+          original: fileDebugInfo(file),
+          compressed: fileDebugInfo(compressed),
+        });
         const hash = await fileHash(compressed);
         const base64 = await fileToBase64(compressed);
-        trace("base64 ready", file.name, "len=", base64.length);
+        traceUpload("8 Upload request created", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "skipped by design: Universal scanner sends base64 directly to AI before final invoice import",
+          selectedFile: fileDebugInfo(compressed),
+          base64Length: base64.length,
+          skipped: true,
+        });
+        traceUpload("9 Upload request sent", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "skipped by design before AI extraction",
+          skipped: true,
+        });
+        traceUpload("10 Supabase Storage response", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "skipped by design before AI extraction",
+          skipped: true,
+        });
         sf.push({
           id: crypto.randomUUID(),
           name: file.name,
@@ -391,12 +535,25 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           _hash: hash,
         } as any);
       } catch (err: any) {
-        console.error("[UniversalScanner] prepare failed", file.name, err);
+        traceFailure("Upload pipeline stopped", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "prepare selected file: compression/hash/base64",
+          selectedFile: fileDebugInfo(file),
+          stopReason: "The selected file failed before AI extraction; no request was sent.",
+        }, err);
         toast.error(`Could not read ${file.name}: ${err?.message || "unknown error"}`);
       }
     }
     if (!sf.length) {
-      trace("no files prepared, returning to menu");
+      traceFailure("Upload pipeline stopped", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "handleFiles",
+        block: "prepared source file queue empty",
+        stopReason: "No readable files were prepared; AI/upload pipeline cannot start.",
+      }, new Error("No readable files prepared"));
       toast.error("No readable files. Please try a JPG/PNG or PDF.");
       setBusy(false); setMode("menu");
       return;
@@ -410,9 +567,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       setLoadingLabel("AI processing…");
       setMode("loading");
       try {
-        trace("AI extract start", sf[0].name);
         const data = await extractOne(sf[0]);
-        trace("AI extract done", { documentType: data?.documentType, items: data?.invoice?.items?.length });
         const t = String(data?.documentType || "").toLowerCase();
         if (t === "prescription") docType = "prescription";
         else if (t === "lab_report") docType = "lab_report";
@@ -421,7 +576,14 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         else docType = "other";
         sessionDocTypeRef.current = docType;
       } catch (e: any) {
-        console.error("[UniversalScanner] AI extract failed", e);
+        traceFailure("AI pipeline stopped", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "document type detection with first file",
+          sourceFile: { name: sf[0]?.name, mime: sf[0]?.mime },
+          stopReason: "Document classification failed; routing to pharmacy/inventory/diagnostics cannot continue.",
+        }, e);
         toast.error(e?.message || "Could not analyze document");
         setBusy(false); setMode("menu");
         return;
@@ -452,13 +614,48 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           try {
             const path = await workspaceService.uploadPage(scan.id, user.id, blob, i);
             paths.push(path);
-          } catch (e) { /* upload failure is non-fatal for extraction */ }
+          } catch (e) {
+            traceFailure("Upload pipeline stopped", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "prescription route uploadPage(scan.id, user.id, blob, index)",
+              scanId: scan.id,
+              sourceFile: { name: f.name, mime: f.mime, size: f.size },
+              stopReason: "Prescription page upload failed before workspace verification could open.",
+            }, e);
+            throw e;
+          }
 
           try {
+            traceUpload("12 Edge Function triggered", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "invoke prescription-scan-ai for prescription route",
+              scanId: scan.id,
+              sourceFile: { name: f.name, mime: f.mime, base64Length: f.base64.length },
+            });
+            traceUpload("13 OCR started", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "prescription-scan-ai processing uploaded prescription page",
+              scanId: scan.id,
+              sourceFile: { name: f.name, mime: f.mime },
+            });
             const { data, error } = await supabase.functions.invoke("prescription-scan-ai", {
               body: { fileBase64: f.base64, mimeType: f.mime },
             });
-            if (error || data?.error) continue;
+            if (error || data?.error) throw error || new Error(data.error);
+            traceUpload("14 OCR completed", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "prescription-scan-ai returned response",
+              scanId: scan.id,
+              documentType: data?.documentType,
+            });
             const p = data?.patient || {};
             const d = data?.doctor || {};
             patient.name      ||= p.name?.value || "";
@@ -494,7 +691,26 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
                 matchStatus: "unmatched",
               });
             });
-          } catch { /* per-page extraction failure ignored */ }
+            traceUpload("15 AI extraction completed", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "prescription extraction merged into workspace payload",
+              scanId: scan.id,
+              totalItemsSoFar: items.length,
+            });
+          } catch (error) {
+            traceFailure("AI pipeline stopped", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "handleFiles",
+              block: "prescription route per-page extraction",
+              scanId: scan.id,
+              sourceFile: { name: f.name, mime: f.mime, size: f.size },
+              stopReason: "Prescription OCR/AI extraction failed for this selected page.",
+            }, error);
+            throw error;
+          }
         }
 
         await workspaceService.updateScan(scan.id, {
@@ -512,9 +728,25 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             ? `📋 ${items.length} medicines extracted — opening Pharmacy Workspace`
             : `📋 Prescription queued — opening Pharmacy Workspace`,
         );
+        traceUpload("16 Verification screen opened", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "navigate('/pharmacy') after workspace scan update",
+          scanId: scan.id,
+          itemCount: items.length,
+          pathsCount: paths.length,
+        });
         close();
         navigate("/pharmacy");
       } catch (e: any) {
+        traceFailure("Upload pipeline stopped", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "handleFiles",
+          block: "prescription route outer catch",
+          stopReason: "Prescription routing failed before Pharmacy Workspace could open.",
+        }, e);
         toast.error(e?.message || "Failed to queue prescription");
         setMode("menu");
       } finally { setBusy(false); }
@@ -537,6 +769,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setSourceType(sf[0].mime === "application/pdf" ? "pdf" : "image");
     setSourceFiles(sf);
     setMode("invoice");
+    traceUpload("16 Verification screen opened", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "handleFiles",
+      block: "purchase invoice wizard opened for AI extraction/human verification",
+      sourceFiles: sf.map((f) => ({ name: f.name, size: f.size, mime: f.mime })),
+    });
     setInvoiceStep(1);
     setBusy(false);
 
@@ -563,6 +802,14 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           setSourceFiles((prev) => prev.map((p) => p.id === f.id ? { ...p, status: "error", error: "No medicine data detected" } : p));
         }
       } catch (e: any) {
+        traceFailure("AI pipeline stopped", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "runExtraction",
+          block: "extractOne per source file",
+          sourceFile: { name: f.name, size: f.size, mime: f.mime },
+          stopReason: "AI extraction failed for this source file.",
+        }, e);
         setSourceFiles((prev) => prev.map((p) => p.id === f.id ? { ...p, status: "error", error: e?.message || "AI failed" } : p));
       }
     }
@@ -573,6 +820,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       setExtract(firstMedicineLabel as MedicineExtract);
       await lookupExisting(firstMedicineLabel?.name?.value, firstMedicineLabel?.barcode?.value);
       setMode("verify");
+      traceUpload("16 Verification screen opened", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "runExtraction",
+        block: "single medicine label verification view opened",
+        documentType: "medicine_label",
+      });
       return;
     }
     if (results.length === 0) {
@@ -616,6 +870,14 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         newResults.push({ file: f, data });
         setSourceFiles((prev) => prev.map((p) => p.id === f.id ? { ...p, status: "done", itemCount: items.length } : p));
       } catch (e: any) {
+        traceFailure("AI pipeline stopped", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "addMoreFiles",
+          block: "extractOne for additional invoice page",
+          sourceFile: { name: f.name, size: f.size, mime: f.mime },
+          stopReason: "AI extraction failed for an additional invoice page.",
+        }, e);
         setSourceFiles((prev) => prev.map((p) => p.id === f.id ? { ...p, status: "error", error: e?.message || "AI failed" } : p));
       }
     }
@@ -643,6 +905,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
   // -------- Camera (barcode-only) --------
   async function startCamera() {
+    traceUpload("2 Camera / Gallery opened", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "startCamera",
+      block: "live camera requested via getUserMedia",
+      source: "live_camera",
+    });
     if (!navigator.mediaDevices?.getUserMedia) { toast.info("Camera not available on this device."); return; }
     setMode("camera");
     try {
@@ -665,7 +934,16 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         };
         rafRef.current = requestAnimationFrame(loop);
       }
-    } catch { toast.error("Camera permission denied"); reset(); }
+    } catch (error) {
+      traceFailure("2 Camera / Gallery opened", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "startCamera",
+        block: "navigator.mediaDevices.getUserMedia",
+        stopReason: "Live camera permission/request failed.",
+      }, error);
+      toast.error("Camera permission denied"); reset();
+    }
   }
 
   async function captureFromCamera() {
@@ -991,7 +1269,16 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             dragActive={dragActive}
             onDrag={setDragActive}
             onDrop={(fs) => handleFiles(fs)}
-            onPickFile={() => fileInputRef.current?.click()}
+            onPickFile={(source) => {
+              traceUpload("2 Camera / Gallery opened", {
+                file: "src/components/UniversalScanner.tsx",
+                component: "UniversalScanner",
+                function: "MenuView.onPickFile",
+                block: "hidden file input click",
+                source,
+              });
+              fileInputRef.current?.click();
+            }}
             onCamera={startCamera}
           />
         )}
@@ -1080,7 +1367,26 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       <input
         ref={fileInputRef} type="file" hidden multiple
         accept="image/*,.pdf,.xls,.xlsx,.csv,.heic"
-        onChange={(e) => { const fs = Array.from(e.target.files || []); if (fs.length) handleFiles(fs); e.target.value = ""; }}
+        onChange={(e) => {
+          traceUpload("4 onChange fired", {
+            file: "src/components/UniversalScanner.tsx",
+            component: "UniversalScanner",
+            function: "fileInput.onChange",
+            block: "native hidden file input onChange entry",
+            filesLength: e.target.files?.length || 0,
+            files: Array.from(e.target.files || []).map(fileDebugInfo),
+          });
+          const fs = Array.from(e.target.files || []);
+          if (fs.length) handleFiles(fs);
+          else traceUpload("3 File selected", {
+            file: "src/components/UniversalScanner.tsx",
+            component: "UniversalScanner",
+            function: "fileInput.onChange",
+            block: "onChange fired but FileList was empty",
+            filesLength: 0,
+          });
+          e.target.value = "";
+        }}
       />
     </div>
   );
@@ -1094,7 +1400,7 @@ function MenuView({ dragActive, onDrag, onDrop, onPickFile, onCamera }: {
   dragActive: boolean;
   onDrag: (b: boolean) => void;
   onDrop: (fs: File[]) => void;
-  onPickFile: () => void;
+  onPickFile: (source: string) => void;
   onCamera: () => void;
 }) {
   return (
@@ -1105,7 +1411,16 @@ function MenuView({ dragActive, onDrag, onDrop, onPickFile, onCamera }: {
         onDrop={(e) => {
           e.preventDefault(); onDrag(false);
           const fs = Array.from(e.dataTransfer.files || []);
-          if (fs.length) onDrop(fs);
+          if (fs.length) {
+            traceUpload("3 File selected", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "MenuView",
+              function: "dropZone.onDrop",
+              block: "drag/drop file selection",
+              files: fs.map(fileDebugInfo),
+            });
+            onDrop(fs);
+          }
         }}
         className={cn(
           "rounded-3xl border-2 border-dashed p-10 text-center transition-all",
@@ -1118,16 +1433,16 @@ function MenuView({ dragActive, onDrag, onDrop, onPickFile, onCamera }: {
           Drop multiple images or PDFs of the same purchase invoice — they'll be merged
         </p>
         <p className="text-[11px] text-muted-foreground mt-1">JPG · PNG · HEIC · PDF · XLSX · CSV</p>
-        <Button className="mt-4" onClick={onPickFile}>
+        <Button className="mt-4" onClick={() => onPickFile("drop_zone_choose_files")}>
           <Upload className="h-4 w-4 mr-2" /> Choose files
         </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
         <ActionTile icon={Camera} label="Camera" subtitle="Live scan" onClick={onCamera} />
-        <ActionTile icon={ImageIcon} label="Images" subtitle="JPG / PNG" onClick={onPickFile} />
-        <ActionTile icon={FileText} label="PDFs" subtitle="Invoice / report" onClick={onPickFile} />
-        <ActionTile icon={FileSpreadsheet} label="Excel" subtitle="Bulk import" onClick={onPickFile} />
+        <ActionTile icon={ImageIcon} label="Images" subtitle="JPG / PNG" onClick={() => onPickFile("images_tile")} />
+        <ActionTile icon={FileText} label="PDFs" subtitle="Invoice / report" onClick={() => onPickFile("pdf_tile")} />
+        <ActionTile icon={FileSpreadsheet} label="Excel" subtitle="Bulk import" onClick={() => onPickFile("excel_tile")} />
       </div>
 
       <div className="mt-6 rounded-xl bg-muted/30 p-4 text-xs text-muted-foreground">

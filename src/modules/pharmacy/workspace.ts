@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine } from "@/modules/pharmacy/types";
+import { fileDebugInfo, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 export type WorkspaceStage =
   | "scan"
@@ -138,14 +139,64 @@ export const workspaceService = {
       page_count: 0,
       ...payload,
     };
+    traceUpload("11 Database record created", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "createScan",
+      block: "insert pharmacy_workspace_scans row",
+      ownerUserId,
+      requestedStage: insert.stage,
+    });
     const { data, error } = await supabase.from(TABLE as any).insert(insert).select().single();
-    if (error) throw error;
+    if (error) {
+      traceFailure("11 Database record created", {
+        file: "src/modules/pharmacy/workspace.ts",
+        component: "workspaceService",
+        function: "createScan",
+        block: "insert pharmacy_workspace_scans row",
+        stopReason: "The pharmacy workspace database row could not be created; upload cannot be linked to a scan.",
+      }, error);
+      throw error;
+    }
+    traceUpload("11 Database record created: success", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "createScan",
+      block: "insert pharmacy_workspace_scans row response",
+      scanId: (data as any)?.id,
+      stage: (data as any)?.stage,
+    });
     return data as any as WorkspaceScan;
   },
 
   async updateScan(id: string, patch: Partial<WorkspaceScan>): Promise<void> {
+    traceUpload("11 Database record created: update sent", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "updateScan",
+      block: "update pharmacy_workspace_scans row",
+      scanId: id,
+      patchKeys: Object.keys(patch || {}),
+    });
     const { error } = await supabase.from(TABLE as any).update(patch as any).eq("id", id);
-    if (error) throw error;
+    if (error) {
+      traceFailure("11 Database record created: update failed", {
+        file: "src/modules/pharmacy/workspace.ts",
+        component: "workspaceService",
+        function: "updateScan",
+        block: "update pharmacy_workspace_scans row",
+        scanId: id,
+        stopReason: "The pharmacy workspace database row could not be updated after upload/extraction.",
+      }, error);
+      throw error;
+    }
+    traceUpload("11 Database record created: update success", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "updateScan",
+      block: "update pharmacy_workspace_scans row response",
+      scanId: id,
+    });
   },
 
   async listActive(ownerUserId: string): Promise<WorkspaceScan[]> {
@@ -177,11 +228,50 @@ export const workspaceService = {
   /** Upload a page blob to the prescriptions bucket; returns the storage path. */
   async uploadPage(scanId: string, ownerUserId: string, blob: Blob, idx: number): Promise<string> {
     const path = `${ownerUserId}/${scanId}/page-${idx}-${Date.now()}.jpg`;
+    traceUpload("8 Upload request created", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "uploadPage",
+      block: "create prescriptions storage upload request",
+      scanId,
+      ownerUserId,
+      pageIndex: idx,
+      bucket: "prescriptions",
+      path,
+      blob: fileDebugInfo(blob),
+    });
+    traceUpload("9 Upload request sent", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "uploadPage",
+      block: "supabase.storage.from('prescriptions').upload(path, blob)",
+      bucket: "prescriptions",
+      path,
+    });
     const { error } = await supabase.storage.from("prescriptions").upload(path, blob, {
       contentType: blob.type || "image/jpeg",
       upsert: false,
     });
-    if (error) throw error;
+    traceUpload("10 Supabase Storage response", {
+      file: "src/modules/pharmacy/workspace.ts",
+      component: "workspaceService",
+      function: "uploadPage",
+      block: "prescriptions storage upload response",
+      ok: !error,
+      error: error ? { name: error.name, message: error.message } : null,
+      path,
+    });
+    if (error) {
+      traceFailure("10 Supabase Storage response", {
+        file: "src/modules/pharmacy/workspace.ts",
+        component: "workspaceService",
+        function: "uploadPage",
+        block: "prescriptions storage upload response",
+        path,
+        stopReason: "Storage rejected or did not receive the prescription page upload.",
+      }, error);
+      throw error;
+    }
     return path;
   },
 
