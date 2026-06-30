@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { compressImageFile } from "@/lib/mobileScanHelpers";
 
 export type MedicineLike = {
   id: string;
@@ -70,12 +71,15 @@ function findBestMatch(token: string, medicines: MedicineLike[]): MedicineLike |
   return null;
 }
 
+/** FileReader-based base64. Char-by-char loops on 5–12 MP phone photos
+ * stall or OOM mobile Chrome silently. */
 async function blobToBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const s = String(r.result); res(s.split(",")[1] || s); };
+    r.onerror = () => rej(r.error || new Error("read failed"));
+    r.readAsDataURL(blob);
+  });
 }
 
 /* ---------------- component ---------------- */
@@ -199,13 +203,18 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+    const log = (...a: any[]) => console.log("[MedInputBar:scan]", ...a);
+    log("file selected", { name: file.name, size: file.size, type: file.type });
     setScanBusy(true);
     try {
-      const base64 = await blobToBase64(file);
+      const compressed = await compressImageFile(file);
+      log("compressed", { fromKB: Math.round(file.size / 1024), toKB: Math.round(compressed.size / 1024) });
+      const base64 = await blobToBase64(compressed);
+      log("base64 ready", "len=", base64.length, "→ invoking medicine-scan-ai");
       const { data, error } = await supabase.functions.invoke("medicine-scan-ai", {
-        body: { fileBase64: base64, mimeType: file.type || "image/jpeg" },
+        body: { fileBase64: base64, mimeType: compressed.type || "image/jpeg" },
       });
+      log("ai response", { hasError: !!error, items: (data as any)?.invoice?.items?.length });
       if (error) throw error;
       const tokens: { token: string; qty: number }[] = [];
       const inv = (data as any)?.invoice?.items as any[] | undefined;
@@ -231,6 +240,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
       if (added.length) toast.success(`Added ${added.length} from image`);
       if (missed.length) toast.warning(`Not found: ${missed.join(", ")}`);
     } catch (err: any) {
+      console.error("[MedInputBar:scan] failed", err);
       toast.error(err?.message || "Image scan failed");
     } finally {
       setScanBusy(false);
