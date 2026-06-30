@@ -262,6 +262,21 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const releaseOnReturn = () => {
+      if (document.visibilityState === "visible") releaseNativeFilePickerGuard();
+    };
+    window.addEventListener("focus", releaseNativeFilePickerGuard);
+    window.addEventListener("pageshow", releaseNativeFilePickerGuard);
+    document.addEventListener("visibilitychange", releaseOnReturn);
+    return () => {
+      window.removeEventListener("focus", releaseNativeFilePickerGuard);
+      window.removeEventListener("pageshow", releaseNativeFilePickerGuard);
+      document.removeEventListener("visibilitychange", releaseOnReturn);
+    };
+  }, [open, releaseNativeFilePickerGuard]);
+
   async function lookupExisting(name?: string, barcode?: string) {
     if (!name && !barcode) return;
     let q = supabase.from("medicines").select("id,name,stock").limit(1);
