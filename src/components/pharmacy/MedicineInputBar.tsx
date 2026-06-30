@@ -295,7 +295,6 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
           ref={fileRef}
           type="file"
           accept="image/*,application/pdf"
-          capture="environment"
           className="hidden"
           onChange={onImageChange}
         />
