@@ -199,25 +199,44 @@ function ScanTab({
 
   async function ingest(files: FileList | null) {
     if (!files?.length) return;
+    const log = (...a: any[]) => console.log("[MobileScan:ingest]", ...a);
+    log("files selected", Array.from(files).map((f) => ({ name: f.name, size: f.size, type: f.type })));
     setBusy(true);
+    setErr(null);
     try {
       const paths = [...scan.source_files];
       let i = paths.length;
       for (const f of Array.from(files)) {
-        let blob: Blob = f;
-        if (f.type.startsWith("image/")) {
-          const img = await fileToImage(f);
-          // Cap at 1400px — same recognition quality, ~40% less payload/tokens.
-          const c = imageToCanvas(img, 1400);
-          enhance(c);
-          blob = await canvasToBlob(c, "image/jpeg", 0.78);
+        try {
+          let blob: Blob = f;
+          if (f.type.startsWith("image/")) {
+            log("decoding", f.name);
+            const img = await fileToImage(f);
+            const c = imageToCanvas(img, 1400);
+            enhance(c);
+            blob = await canvasToBlob(c, "image/jpeg", 0.78);
+            log("compressed", f.name, { toKB: Math.round(blob.size / 1024) });
+          }
+          log("uploading", f.name);
+          const path = await workspaceService.uploadPage(scan.id, userId, blob, i++);
+          log("uploaded", f.name, path);
+          paths.push(path);
+        } catch (perFileErr: any) {
+          console.error("[MobileScan:ingest] file failed", f.name, perFileErr);
+          toast.error(`${f.name}: ${perFileErr?.message || "upload failed"}`);
         }
-        const path = await workspaceService.uploadPage(scan.id, userId, blob, i++);
-        paths.push(path);
+      }
+      if (paths.length === scan.source_files.length) {
+        setErr("No pages could be uploaded. Check your connection and try again.");
+        return;
       }
       await onSave({ source_files: paths as any, page_count: paths.length });
-      toast.success(`${files.length} page(s) added`);
-    } catch (e: any) { toast.error(e?.message || "Upload failed"); }
+      toast.success(`${paths.length - scan.source_files.length} page(s) added`);
+    } catch (e: any) {
+      console.error("[MobileScan:ingest] failed", e);
+      setErr(e?.message || "Upload failed");
+      toast.error(e?.message || "Upload failed");
+    }
     finally { setBusy(false); }
   }
 
