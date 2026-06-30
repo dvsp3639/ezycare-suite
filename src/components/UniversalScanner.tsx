@@ -340,6 +340,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   /** Handle multiple files; if any looks like an invoice, route to wizard; else single-medicine flow. */
   async function handleFiles(files: File[]) {
     if (!files.length) return;
+    const trace = (...a: any[]) => console.log("[UniversalScanner]", ...a);
+    trace("files selected", files.map((f) => ({ name: f.name, size: f.size, type: f.type })));
     setBusy(true);
 
     // Excel shortcut — only single excel at a time
@@ -369,22 +371,36 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
       if (!isImage && !isPdf) {
         toast.error(`Unsupported file: ${file.name}`);
+        trace("skip unsupported", file.name, file.type);
         continue;
       }
-      // Resize/compress huge phone photos before they ever hit the AI gateway.
-      const compressed = isImage ? await compressImageFile(file) : file;
-      const hash = await fileHash(compressed);
-      sf.push({
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: compressed.size,
-        mime: compressed.type || (isPdf ? "application/pdf" : "image/jpeg"),
-        base64: await fileToBase64(compressed),
-        status: "queued",
-        _hash: hash,
-      } as any);
+      try {
+        trace("prepare", file.name);
+        const compressed = isImage ? await compressImageFile(file) : file;
+        trace("compressed", file.name, { fromKB: Math.round(file.size / 1024), toKB: Math.round(compressed.size / 1024) });
+        const hash = await fileHash(compressed);
+        const base64 = await fileToBase64(compressed);
+        trace("base64 ready", file.name, "len=", base64.length);
+        sf.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: compressed.size,
+          mime: compressed.type || (isPdf ? "application/pdf" : "image/jpeg"),
+          base64,
+          status: "queued",
+          _hash: hash,
+        } as any);
+      } catch (err: any) {
+        console.error("[UniversalScanner] prepare failed", file.name, err);
+        toast.error(`Could not read ${file.name}: ${err?.message || "unknown error"}`);
+      }
     }
-    if (!sf.length) { setBusy(false); return; }
+    if (!sf.length) {
+      trace("no files prepared, returning to menu");
+      toast.error("No readable files. Please try a JPG/PNG or PDF.");
+      setBusy(false); setMode("menu");
+      return;
+    }
 
     // ── Intelligent Document Detection ──────────────────────────────
     // Classify the first file (reusing the session's cached type if the
@@ -394,7 +410,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       setLoadingLabel("AI processing…");
       setMode("loading");
       try {
+        trace("AI extract start", sf[0].name);
         const data = await extractOne(sf[0]);
+        trace("AI extract done", { documentType: data?.documentType, items: data?.invoice?.items?.length });
         const t = String(data?.documentType || "").toLowerCase();
         if (t === "prescription") docType = "prescription";
         else if (t === "lab_report") docType = "lab_report";
@@ -403,6 +421,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         else docType = "other";
         sessionDocTypeRef.current = docType;
       } catch (e: any) {
+        console.error("[UniversalScanner] AI extract failed", e);
         toast.error(e?.message || "Could not analyze document");
         setBusy(false); setMode("menu");
         return;
