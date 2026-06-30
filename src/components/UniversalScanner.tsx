@@ -180,6 +180,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const nativeFilePickerOpenRef = useRef(false);
+  const nativeFilePickerReleaseTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   /** Sticky doc type for the current scanner session — avoids re-asking AI when
    *  the pharmacist drops more files of the same kind. Cleared on close. */
@@ -207,6 +209,16 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
   const close = useCallback(() => { stopCamera(); reset(); onClose(); }, [onClose, reset]);
 
+  const releaseNativeFilePickerGuard = useCallback(() => {
+    if (nativeFilePickerReleaseTimerRef.current) {
+      window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
+    }
+    nativeFilePickerReleaseTimerRef.current = window.setTimeout(() => {
+      nativeFilePickerOpenRef.current = false;
+      nativeFilePickerReleaseTimerRef.current = null;
+    }, 1200);
+  }, []);
+
   useEffect(() => () => stopCamera(), []);
   useEffect(() => {
     if (!open) return;
@@ -221,11 +233,49 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   }, [open]);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    document.addEventListener("keydown", onKey);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Android Chrome/WebView can emit an Escape/Back key event when the
+      // native camera/gallery picker returns. That event was closing the
+      // scanner before the input onChange pipeline could start.
+      if (nativeFilePickerOpenRef.current || busy) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      close();
+    };
+    document.addEventListener("keydown", onKey, true);
     document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
-  }, [open, close]);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.body.style.overflow = "";
+    };
+  }, [open, close, busy]);
+
+  useEffect(() => {
+    if (open) return;
+    nativeFilePickerOpenRef.current = false;
+    if (nativeFilePickerReleaseTimerRef.current) {
+      window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
+      nativeFilePickerReleaseTimerRef.current = null;
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const releaseOnReturn = () => {
+      if (document.visibilityState === "visible") releaseNativeFilePickerGuard();
+    };
+    window.addEventListener("focus", releaseNativeFilePickerGuard);
+    window.addEventListener("pageshow", releaseNativeFilePickerGuard);
+    document.addEventListener("visibilitychange", releaseOnReturn);
+    return () => {
+      window.removeEventListener("focus", releaseNativeFilePickerGuard);
+      window.removeEventListener("pageshow", releaseNativeFilePickerGuard);
+      document.removeEventListener("visibilitychange", releaseOnReturn);
+    };
+  }, [open, releaseNativeFilePickerGuard]);
 
   async function lookupExisting(name?: string, barcode?: string) {
     if (!name && !barcode) return;
@@ -1270,6 +1320,11 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             onDrag={setDragActive}
             onDrop={(fs) => handleFiles(fs)}
             onPickFile={(source) => {
+              nativeFilePickerOpenRef.current = true;
+              if (nativeFilePickerReleaseTimerRef.current) {
+                window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
+                nativeFilePickerReleaseTimerRef.current = null;
+              }
               traceUpload("2 Camera / Gallery opened", {
                 file: "src/components/UniversalScanner.tsx",
                 component: "UniversalScanner",
@@ -1377,14 +1432,18 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             files: Array.from(e.target.files || []).map(fileDebugInfo),
           });
           const fs = Array.from(e.target.files || []);
-          if (fs.length) handleFiles(fs);
-          else traceUpload("3 File selected", {
-            file: "src/components/UniversalScanner.tsx",
-            component: "UniversalScanner",
-            function: "fileInput.onChange",
-            block: "onChange fired but FileList was empty",
-            filesLength: 0,
-          });
+          if (fs.length) {
+            void handleFiles(fs).finally(releaseNativeFilePickerGuard);
+          } else {
+            traceUpload("3 File selected", {
+              file: "src/components/UniversalScanner.tsx",
+              component: "UniversalScanner",
+              function: "fileInput.onChange",
+              block: "onChange fired but FileList was empty",
+              filesLength: 0,
+            });
+            releaseNativeFilePickerGuard();
+          }
           e.target.value = "";
         }}
       />
