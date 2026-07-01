@@ -613,6 +613,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     // Classify the first file (reusing the session's cached type if the
     // pharmacist already uploaded one in this same scanner open).
     let docType = sessionDocTypeRef.current;
+    // Route-scoped shortcut: on /inventory the scanner is always used for
+    // purchase invoices. Skip the extra classification round-trip (which
+    // was misclassifying on mobile and dumping the user back to the picker).
+    if (!docType && typeof window !== "undefined" && window.location?.pathname?.startsWith("/inventory")) {
+      docType = "supplier_invoice";
+      sessionDocTypeRef.current = docType;
+    }
     if (!docType) {
       setLoadingLabel("AI processing…");
       setMode("loading");
@@ -634,9 +641,13 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           sourceFile: { name: sf[0]?.name, mime: sf[0]?.mime },
           stopReason: "Document classification failed; routing to pharmacy/inventory/diagnostics cannot continue.",
         }, e);
-        toast.error(e?.message || "Could not analyze document");
-        setBusy(false); setMode("menu");
-        return;
+        // Mobile networks often stall this pre-classification call. Rather
+        // than dumping the user back to the picker, assume the most common
+        // case for the surface they're on and let the wizard run its own
+        // per-file extraction with visible progress + retry.
+        toast.message("AI classifier is slow — continuing as purchase invoice");
+        docType = "supplier_invoice";
+        sessionDocTypeRef.current = docType;
       }
     }
 
