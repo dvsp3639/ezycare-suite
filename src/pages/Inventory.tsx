@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import { Receipt } from "lucide-react";
 import { PurchaseInvoiceRepository } from "@/components/inventory/PurchaseInvoiceRepository";
-import { UniversalScanner } from "@/components/UniversalScanner";
-import { persistScannerOpen, readScannerOpen } from "@/lib/mobileScanHelpers";
+import { SharedAiScanFlow } from "@/ai-engine-v2";
 import { cn } from "@/lib/utils";
 import {
   inventoryCategories, departments, categoryColors,
