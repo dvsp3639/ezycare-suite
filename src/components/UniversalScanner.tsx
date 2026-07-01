@@ -226,6 +226,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const nativeFilePickerOpenRef = useRef(false);
+  const fileProcessingRef = useRef(false);
   const nativeFilePickerReleaseTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   /** Sticky doc type for the current scanner session — avoids re-asking AI when
@@ -283,7 +284,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       // Android Chrome/WebView can emit an Escape/Back key event when the
       // native camera/gallery picker returns. That event was closing the
       // scanner before the input onChange pipeline could start.
-      if (nativeFilePickerOpenRef.current || busy) {
+      if (nativeFilePickerOpenRef.current || fileProcessingRef.current || busy) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -306,21 +307,6 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       nativeFilePickerReleaseTimerRef.current = null;
     }
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const releaseOnReturn = () => {
-      if (document.visibilityState === "visible") releaseNativeFilePickerGuard();
-    };
-    window.addEventListener("focus", releaseNativeFilePickerGuard);
-    window.addEventListener("pageshow", releaseNativeFilePickerGuard);
-    document.addEventListener("visibilitychange", releaseOnReturn);
-    return () => {
-      window.removeEventListener("focus", releaseNativeFilePickerGuard);
-      window.removeEventListener("pageshow", releaseNativeFilePickerGuard);
-      document.removeEventListener("visibilitychange", releaseOnReturn);
-    };
-  }, [open, releaseNativeFilePickerGuard]);
 
   async function lookupExisting(name?: string, barcode?: string) {
     if (!name && !barcode) return;
