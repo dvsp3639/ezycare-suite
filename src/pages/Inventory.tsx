@@ -183,18 +183,7 @@ const Inventory = () => {
   const [showAddItem, setShowAddItem] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  // Initialise from sessionStorage so that Android Chrome — which can suspend
-  // the tab while the OS camera/file picker is active — reopens the scanner
-  // automatically when the user returns with a captured photo.
-  const [showAIScanner, setShowAIScanner] = useState<boolean>(() => readScannerOpen("scanner:inventory"));
-  useEffect(() => { persistScannerOpen("scanner:inventory", showAIScanner); }, [showAIScanner]);
-  useEffect(() => {
-    const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted && readScannerOpen("scanner:inventory")) setShowAIScanner(true);
-    };
-    window.addEventListener("pageshow", onShow);
-    return () => window.removeEventListener("pageshow", onShow);
-  }, []);
+  const [showAIScanner, setShowAIScanner] = useState<boolean>(false);
   const [barcodeInput, setBarcodeInput] = useState("");
 
   // Transfer form
@@ -1696,8 +1685,12 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* AI Invoice Scanner */}
-      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
+      {/* AI Invoice Scanner — shared engine */}
+      <SharedAiScanFlow
+        open={showAIScanner}
+        onClose={() => setShowAIScanner(false)}
+        mode="inventory"
+      />
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
