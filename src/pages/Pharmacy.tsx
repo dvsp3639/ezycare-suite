@@ -31,6 +31,8 @@ import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { MedicineInputBar } from "@/components/pharmacy/MedicineInputBar";
+import { SharedAiScanFlow } from "@/ai-engine-v2";
+import { ScanLine } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
 
@@ -40,6 +42,7 @@ type OrderSource = "doctor" | "manual" | null;
 const Pharmacy = () => {
   const { roles } = useAuth();
   const hospitalId = roles?.[0]?.hospital_id || "";
+  const [showAIScanner, setShowAIScanner] = useState(false);
   const { data: dbPatients } = usePatients();
   const { data: dbMedicines, refetch: refetchMedicines } = useMedicines();
 
@@ -531,9 +534,14 @@ const Pharmacy = () => {
               <div className="bg-card rounded-xl border border-border p-4">
                 <div className="flex items-center justify-between mb-3">
                   <Label className="text-sm font-medium text-foreground">Add Medicines</Label>
-                  {orderSource === "doctor" && (
-                    <Badge variant="outline" className="text-xs">Loaded from prescription</Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {orderSource === "doctor" && (
+                      <Badge variant="outline" className="text-xs">Loaded from prescription</Badge>
+                    )}
+                    <Button type="button" size="sm" variant="outline" onClick={() => setShowAIScanner(true)}>
+                      <ScanLine className="h-4 w-4 mr-1.5" /> AI Scanner
+                    </Button>
+                  </div>
                 </div>
                 <MedicineInputBar
                   medicines={allMedicines as any}
