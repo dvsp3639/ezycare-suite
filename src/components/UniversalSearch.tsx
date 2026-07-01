@@ -76,6 +76,7 @@ export function UniversalSearch() {
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
+  const scanOpenRef = useRef(false);
   const [sheetDrag, setSheetDrag] = useState(0);
 
   const inPharmacy = location.pathname === "/pharmacy";
@@ -103,6 +104,10 @@ export function UniversalSearch() {
   const showVoice = toolContext.voice;
   const showScan = toolContext.scan;
 
+  useEffect(() => {
+    scanOpenRef.current = scanOpen;
+  }, [scanOpen]);
+
   // ⌘K / Ctrl+K to focus, Escape closes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -111,7 +116,7 @@ export function UniversalSearch() {
         inputRef.current?.focus();
         setOpen(true);
       }
-      if (e.key === "Escape") { setOpen(false); }
+      if (e.key === "Escape" && !scanOpenRef.current) { setOpen(false); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -123,13 +128,16 @@ export function UniversalSearch() {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.history.pushState({ ezyopSearch: true }, "");
-    const onPop = () => { setOpen(false); };
+    const onPop = () => {
+      if (scanOpenRef.current) return;
+      setOpen(false);
+    };
     window.addEventListener("popstate", onPop);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("popstate", onPop);
       // pop our own state entry if still present
-      if ((window.history.state as any)?.ezyopSearch) window.history.back();
+      if ((window.history.state as any)?.ezyopSearch && !scanOpenRef.current) window.history.back();
     };
   }, [isMobile, open]);
 
