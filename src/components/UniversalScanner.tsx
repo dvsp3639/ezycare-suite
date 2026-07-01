@@ -302,6 +302,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   useEffect(() => {
     if (open) return;
     nativeFilePickerOpenRef.current = false;
+    fileProcessingRef.current = false;
     if (nativeFilePickerReleaseTimerRef.current) {
       window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
       nativeFilePickerReleaseTimerRef.current = null;
