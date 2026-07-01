@@ -166,9 +166,16 @@ function inferPickedFileKind(file: File, pickerSource?: string): PickedFileKind 
 
 function mimeForPickedFile(file: File, kind: PickedFileKind) {
   if (file.type && file.type !== "application/octet-stream") return file.type;
+  const name = (file.name || "").toLowerCase();
   if (kind === "pdf") return "application/pdf";
   if (kind === "excel") return file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (kind === "image") return "image/jpeg";
+  if (kind === "image") {
+    if (name.endsWith(".png")) return "image/png";
+    if (name.endsWith(".webp")) return "image/webp";
+    if (name.endsWith(".heic")) return "image/heic";
+    if (name.endsWith(".heif")) return "image/heif";
+    return "image/jpeg";
+  }
   return file.type || "application/octet-stream";
 }
 
@@ -1461,7 +1468,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
       <input
         ref={fileInputRef} type="file" hidden multiple
-        accept="image/*,.pdf,.xls,.xlsx,.csv,.heic"
+        accept="image/*,.pdf,.xls,.xlsx,.csv,.heic,.heif"
         onChange={(e) => {
           traceUpload("4 onChange fired", {
             file: "src/components/UniversalScanner.tsx",
