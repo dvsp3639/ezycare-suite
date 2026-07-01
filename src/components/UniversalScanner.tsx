@@ -82,6 +82,8 @@ type SourceFile = {
   _hash?: string;
 };
 
+type PickedFileKind = "image" | "pdf" | "excel" | "unknown";
+
 type Correction = {
   ts: string;
   scope: "supplier" | "invoice" | "line";
@@ -147,6 +149,38 @@ function lineKey(l: InvoiceLine, i: number) {
   return `${i}-${(l.name || "").slice(0, 40)}-${l.batchNo || ""}`;
 }
 
+function inferPickedFileKind(file: File, pickerSource?: string): PickedFileKind {
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  if (type === "application/pdf" || /\.pdf$/i.test(name)) return "pdf";
+  if (type.includes("sheet") || type === "text/csv" || /\.(xlsx?|csv)$/i.test(name)) return "excel";
+  if (type.startsWith("image/") || /\.(jpe?g|png|heic|heif|webp)$/i.test(name)) return "image";
+  if ((!type || type === "application/octet-stream") && pickerSource === "pdf_tile") return "pdf";
+  if ((!type || type === "application/octet-stream") && pickerSource === "excel_tile") return "excel";
+  // Android document/gallery providers sometimes return camera images as
+  // application/octet-stream or with an empty MIME/name. If the user entered
+  // through an image-capable picker, keep the pipeline alive as an image.
+  if ((!type || type === "application/octet-stream") && pickerSource && pickerSource !== "pdf_tile" && pickerSource !== "excel_tile") {
+    return "image";
+  }
+  return "unknown";
+}
+
+function mimeForPickedFile(file: File, kind: PickedFileKind) {
+  if (file.type && file.type !== "application/octet-stream") return file.type;
+  const name = (file.name || "").toLowerCase();
+  if (kind === "pdf") return "application/pdf";
+  if (kind === "excel") return file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (kind === "image") {
+    if (name.endsWith(".png")) return "image/png";
+    if (name.endsWith(".webp")) return "image/webp";
+    if (name.endsWith(".heic")) return "image/heic";
+    if (name.endsWith(".heif")) return "image/heif";
+    return "image/jpeg";
+  }
+  return file.type || "application/octet-stream";
+}
+
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const { user, profile } = useAuth();
   const [mode, setMode] = useState<Mode>("menu");
@@ -177,6 +211,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const [successInfo, setSuccessInfo] = useState<{ billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickerSourceRef = useRef<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -511,8 +546,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setLoadingLabel("Uploading…");
     setMode("loading");
     for (const file of files) {
-      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
+      const kind = inferPickedFileKind(file, pickerSourceRef.current);
+      const isPdf = kind === "pdf";
+      const isImage = kind === "image";
       if (!isImage && !isPdf) {
         toast.error(`Unsupported file: ${file.name}`);
         traceFailure("5 File object created", {
@@ -579,7 +615,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           id: crypto.randomUUID(),
           name: file.name,
           size: compressed.size,
-          mime: compressed.type || (isPdf ? "application/pdf" : "image/jpeg"),
+          mime: mimeForPickedFile(compressed, kind),
           base64,
           status: "queued",
           _hash: hash,
@@ -908,13 +944,14 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     if (!files.length) return;
     const sf: SourceFile[] = [];
     for (const file of files) {
-      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
+      const kind = inferPickedFileKind(file, pickerSourceRef.current);
+      const isPdf = kind === "pdf";
+      const isImage = kind === "image";
       if (!isImage && !isPdf) { toast.error(`Unsupported: ${file.name}`); continue; }
       sf.push({
         id: crypto.randomUUID(),
         name: file.name, size: file.size,
-        mime: file.type || (isPdf ? "application/pdf" : "image/jpeg"),
+        mime: mimeForPickedFile(file, kind),
         base64: await fileToBase64(file),
         status: "queued",
       });
@@ -1331,6 +1368,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             onDrag={setDragActive}
             onDrop={(fs) => handleFiles(fs)}
             onPickFile={(source) => {
+              pickerSourceRef.current = source;
               nativeFilePickerOpenRef.current = true;
               if (nativeFilePickerReleaseTimerRef.current) {
                 window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
@@ -1432,7 +1470,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
       <input
         ref={fileInputRef} type="file" hidden multiple
-        accept="image/*,.pdf,.xls,.xlsx,.csv,.heic"
+        accept="image/*,.pdf,.xls,.xlsx,.csv,.heic,.heif"
         onChange={(e) => {
           traceUpload("4 onChange fired", {
             file: "src/components/UniversalScanner.tsx",
