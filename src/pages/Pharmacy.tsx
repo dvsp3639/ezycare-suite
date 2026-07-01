@@ -752,6 +752,11 @@ const Pharmacy = () => {
           </div>
         </div>
       )}
+      <SharedAiScanFlow
+        open={showAIScanner}
+        onClose={() => setShowAIScanner(false)}
+        mode="pharmacy"
+      />
     </div>
   );
 };
