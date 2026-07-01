@@ -1481,7 +1481,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           });
           const fs = Array.from(e.target.files || []);
           if (fs.length) {
+            fileProcessingRef.current = true;
             void handleFiles(fs).finally(() => {
+              fileProcessingRef.current = false;
               releaseNativeFilePickerGuard();
               pickerSourceRef.current = "";
               // Android file pickers often expose selected files through a
@@ -1499,6 +1501,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               filesLength: 0,
             });
             releaseNativeFilePickerGuard();
+            fileProcessingRef.current = false;
             pickerSourceRef.current = "";
             input.value = "";
           }
