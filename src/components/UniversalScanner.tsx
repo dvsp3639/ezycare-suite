@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
-import { compressImageFile, fileHash, extractionCache } from "@/lib/mobileScanHelpers";
+import { compressImageFile, extractionCache } from "@/lib/mobileScanHelpers";
 import { fileDebugInfo, installMobileLifecycleTrace, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
@@ -181,6 +181,29 @@ function mimeForPickedFile(file: File, kind: PickedFileKind) {
   return file.type || "application/octet-stream";
 }
 
+function normalizePickedImageFile(file: File, kind: PickedFileKind) {
+  if (kind !== "image") return file;
+  const mime = mimeForPickedFile(file, kind);
+  if (file.type && file.type !== "application/octet-stream") return file;
+  return new File([file], file.name || `scan-${Date.now()}.jpg`, {
+    type: mime,
+    lastModified: file.lastModified || Date.now(),
+  });
+}
+
+function sourceFileHash(file: File, base64: string) {
+  // Android content-provider files may fail when read twice. Compute a stable
+  // session hash from the already-read base64 instead of calling arrayBuffer()
+  // before FileReader.
+  let h = 2166136261;
+  const seed = `${file.name}|${file.size}|${file.type}|${base64.length}|${base64.slice(0, 256)}|${base64.slice(-256)}`;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return `b64-${h.toString(16)}`;
+}
+
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const { user, profile } = useAuth();
   const [mode, setMode] = useState<Mode>("menu");
@@ -216,6 +239,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const nativeFilePickerOpenRef = useRef(false);
+  const fileProcessingRef = useRef(false);
   const nativeFilePickerReleaseTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   /** Sticky doc type for the current scanner session — avoids re-asking AI when
@@ -273,7 +297,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       // Android Chrome/WebView can emit an Escape/Back key event when the
       // native camera/gallery picker returns. That event was closing the
       // scanner before the input onChange pipeline could start.
-      if (nativeFilePickerOpenRef.current || busy) {
+      if (nativeFilePickerOpenRef.current || fileProcessingRef.current || busy) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -291,26 +315,12 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   useEffect(() => {
     if (open) return;
     nativeFilePickerOpenRef.current = false;
+    fileProcessingRef.current = false;
     if (nativeFilePickerReleaseTimerRef.current) {
       window.clearTimeout(nativeFilePickerReleaseTimerRef.current);
       nativeFilePickerReleaseTimerRef.current = null;
     }
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const releaseOnReturn = () => {
-      if (document.visibilityState === "visible") releaseNativeFilePickerGuard();
-    };
-    window.addEventListener("focus", releaseNativeFilePickerGuard);
-    window.addEventListener("pageshow", releaseNativeFilePickerGuard);
-    document.addEventListener("visibilitychange", releaseOnReturn);
-    return () => {
-      window.removeEventListener("focus", releaseNativeFilePickerGuard);
-      window.removeEventListener("pageshow", releaseNativeFilePickerGuard);
-      document.removeEventListener("visibilitychange", releaseOnReturn);
-    };
-  }, [open, releaseNativeFilePickerGuard]);
 
   async function lookupExisting(name?: string, barcode?: string) {
     if (!name && !barcode) return;
@@ -577,7 +587,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           selectedFile: fileDebugInfo(file),
           skipped: !isImage,
         });
-        const compressed = isImage ? await compressImageFile(file) : file;
+        const normalized = normalizePickedImageFile(file, kind);
+        const compressed = isImage ? await compressImageFile(normalized, 1280, 0.72) : file;
         traceUpload("7 Compression completed", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
@@ -586,8 +597,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           original: fileDebugInfo(file),
           compressed: fileDebugInfo(compressed),
         });
-        const hash = await fileHash(compressed);
         const base64 = await fileToBase64(compressed);
+        const hash = sourceFileHash(compressed, base64);
         traceUpload("8 Upload request created", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
@@ -721,7 +732,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               sourceFile: { name: f.name, mime: f.mime, size: f.size },
               stopReason: "Prescription page upload failed before workspace verification could open.",
             }, e);
-            throw e;
+            toast.warning(`Could not store ${f.name}, continuing AI extraction for manual review.`);
           }
 
           try {
@@ -806,7 +817,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               sourceFile: { name: f.name, mime: f.mime, size: f.size },
               stopReason: "Prescription OCR/AI extraction failed for this selected page.",
             }, error);
-            throw error;
+            toast.warning(`Uploaded ${f.name}, but AI extraction failed. Opened for manual review.`);
+            continue;
           }
         }
 
@@ -944,15 +956,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     if (!files.length) return;
     const sf: SourceFile[] = [];
     for (const file of files) {
-      const kind = inferPickedFileKind(file, pickerSourceRef.current);
+      const kind = inferPickedFileKind(file, pickerSourceRef.current || "add_more_pages");
       const isPdf = kind === "pdf";
       const isImage = kind === "image";
       if (!isImage && !isPdf) { toast.error(`Unsupported: ${file.name}`); continue; }
+      const normalized = normalizePickedImageFile(file, kind);
+      const prepared = isImage ? await compressImageFile(normalized, 1280, 0.72) : file;
       sf.push({
         id: crypto.randomUUID(),
-        name: file.name, size: file.size,
-        mime: mimeForPickedFile(file, kind),
-        base64: await fileToBase64(file),
+        name: file.name, size: prepared.size,
+        mime: mimeForPickedFile(prepared, kind),
+        base64: await fileToBase64(prepared),
         status: "queued",
       });
     }
@@ -1472,6 +1486,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         ref={fileInputRef} type="file" hidden multiple
         accept="image/*,.pdf,.xls,.xlsx,.csv,.heic,.heif"
         onChange={(e) => {
+          const input = e.currentTarget;
           traceUpload("4 onChange fired", {
             file: "src/components/UniversalScanner.tsx",
             component: "UniversalScanner",
@@ -1482,7 +1497,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           });
           const fs = Array.from(e.target.files || []);
           if (fs.length) {
-            void handleFiles(fs).finally(releaseNativeFilePickerGuard);
+            fileProcessingRef.current = true;
+            void handleFiles(fs).finally(() => {
+              fileProcessingRef.current = false;
+              releaseNativeFilePickerGuard();
+              pickerSourceRef.current = "";
+              // Android file pickers often expose selected files through a
+              // temporary content:// handle owned by this input. Clearing the
+              // input before FileReader/arrayBuffer finishes can invalidate the
+              // handle, causing the scanner to fall back to the chooser.
+              input.value = "";
+            });
           } else {
             traceUpload("3 File selected", {
               file: "src/components/UniversalScanner.tsx",
@@ -1492,8 +1517,10 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               filesLength: 0,
             });
             releaseNativeFilePickerGuard();
+            fileProcessingRef.current = false;
+            pickerSourceRef.current = "";
+            input.value = "";
           }
-          e.target.value = "";
         }}
       />
     </div>
@@ -1829,8 +1856,13 @@ function InvoiceWizard(props: {
                 <p className="font-semibold text-sm">Uploaded pages ({sourceFiles.length})</p>
               </div>
               <div className="flex items-center gap-2">
-                <input ref={addRef} type="file" multiple hidden accept="image/*,.pdf,.heic"
-                  onChange={(e) => { const fs = Array.from(e.target.files || []); if (fs.length) onAddMore(fs); e.target.value = ""; }} />
+                <input ref={addRef} type="file" multiple hidden accept="image/*,.pdf,.heic,.heif"
+                  onChange={(e) => {
+                    const input = e.currentTarget;
+                    const fs = Array.from(e.target.files || []);
+                    if (fs.length) void onAddMore(fs).finally(() => { input.value = ""; });
+                    else input.value = "";
+                  }} />
                 <Button variant="outline" size="sm" onClick={() => addRef.current?.click()}>
                   <Plus className="h-4 w-4 mr-1" /> Add more pages
                 </Button>
