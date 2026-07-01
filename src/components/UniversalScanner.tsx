@@ -181,6 +181,16 @@ function mimeForPickedFile(file: File, kind: PickedFileKind) {
   return file.type || "application/octet-stream";
 }
 
+function normalizePickedImageFile(file: File, kind: PickedFileKind) {
+  if (kind !== "image") return file;
+  const mime = mimeForPickedFile(file, kind);
+  if (file.type && file.type !== "application/octet-stream") return file;
+  return new File([file], file.name || `scan-${Date.now()}.jpg`, {
+    type: mime,
+    lastModified: file.lastModified || Date.now(),
+  });
+}
+
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const { user, profile } = useAuth();
   const [mode, setMode] = useState<Mode>("menu");
@@ -577,7 +587,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           selectedFile: fileDebugInfo(file),
           skipped: !isImage,
         });
-        const compressed = isImage ? await compressImageFile(file) : file;
+        const normalized = normalizePickedImageFile(file, kind);
+        const compressed = isImage ? await compressImageFile(normalized, 1280, 0.72) : file;
         traceUpload("7 Compression completed", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
@@ -806,7 +817,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               sourceFile: { name: f.name, mime: f.mime, size: f.size },
               stopReason: "Prescription OCR/AI extraction failed for this selected page.",
             }, error);
-            throw error;
+            toast.warning(`Uploaded ${f.name}, but AI extraction failed. Opened for manual review.`);
+            continue;
           }
         }
 
