@@ -732,7 +732,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               sourceFile: { name: f.name, mime: f.mime, size: f.size },
               stopReason: "Prescription page upload failed before workspace verification could open.",
             }, e);
-            throw e;
+            toast.warning(`Could not store ${f.name}, continuing AI extraction for manual review.`);
           }
 
           try {
