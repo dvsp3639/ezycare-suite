@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Mic, Square, Loader2, Camera, X } from "lucide-react";
+import { Search, Mic, Square, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { compressImageFile } from "@/lib/mobileScanHelpers";
-import { fileDebugInfo, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 export type MedicineLike = {
   id: string;
