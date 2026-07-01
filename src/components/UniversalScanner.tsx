@@ -943,15 +943,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     if (!files.length) return;
     const sf: SourceFile[] = [];
     for (const file of files) {
-      const kind = inferPickedFileKind(file, pickerSourceRef.current);
+      const kind = inferPickedFileKind(file, pickerSourceRef.current || "add_more_pages");
       const isPdf = kind === "pdf";
       const isImage = kind === "image";
       if (!isImage && !isPdf) { toast.error(`Unsupported: ${file.name}`); continue; }
+      const normalized = normalizePickedImageFile(file, kind);
+      const prepared = isImage ? await compressImageFile(normalized, 1280, 0.72) : file;
       sf.push({
         id: crypto.randomUUID(),
-        name: file.name, size: file.size,
-        mime: mimeForPickedFile(file, kind),
-        base64: await fileToBase64(file),
+        name: file.name, size: prepared.size,
+        mime: mimeForPickedFile(prepared, kind),
+        base64: await fileToBase64(prepared),
         status: "queued",
       });
     }
@@ -1841,8 +1843,13 @@ function InvoiceWizard(props: {
                 <p className="font-semibold text-sm">Uploaded pages ({sourceFiles.length})</p>
               </div>
               <div className="flex items-center gap-2">
-                <input ref={addRef} type="file" multiple hidden accept="image/*,.pdf,.heic"
-                  onChange={(e) => { const fs = Array.from(e.target.files || []); if (fs.length) onAddMore(fs); e.target.value = ""; }} />
+                <input ref={addRef} type="file" multiple hidden accept="image/*,.pdf,.heic,.heif"
+                  onChange={(e) => {
+                    const input = e.currentTarget;
+                    const fs = Array.from(e.target.files || []);
+                    if (fs.length) void onAddMore(fs).finally(() => { input.value = ""; });
+                    else input.value = "";
+                  }} />
                 <Button variant="outline" size="sm" onClick={() => addRef.current?.click()}>
                   <Plus className="h-4 w-4 mr-1" /> Add more pages
                 </Button>
