@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
-import { compressImageFile, fileHash, extractionCache } from "@/lib/mobileScanHelpers";
+import { compressImageFile, extractionCache } from "@/lib/mobileScanHelpers";
 import { fileDebugInfo, installMobileLifecycleTrace, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 type Mode = "menu" | "camera" | "verify" | "invoice" | "excel" | "loading" | "success";
@@ -189,6 +189,19 @@ function normalizePickedImageFile(file: File, kind: PickedFileKind) {
     type: mime,
     lastModified: file.lastModified || Date.now(),
   });
+}
+
+function sourceFileHash(file: File, base64: string) {
+  // Android content-provider files may fail when read twice. Compute a stable
+  // session hash from the already-read base64 instead of calling arrayBuffer()
+  // before FileReader.
+  let h = 2166136261;
+  const seed = `${file.name}|${file.size}|${file.type}|${base64.length}|${base64.slice(0, 256)}|${base64.slice(-256)}`;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return `b64-${h.toString(16)}`;
 }
 
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
@@ -584,8 +597,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           original: fileDebugInfo(file),
           compressed: fileDebugInfo(compressed),
         });
-        const hash = await fileHash(compressed);
         const base64 = await fileToBase64(compressed);
+        const hash = sourceFileHash(compressed, base64);
         traceUpload("8 Upload request created", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
