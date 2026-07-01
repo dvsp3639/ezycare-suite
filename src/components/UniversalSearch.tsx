@@ -325,6 +325,7 @@ export function UniversalSearch() {
   };
 
   const openScanner = async () => {
+    scanOpenRef.current = true;
     setScanOpen(true);
   };
 
