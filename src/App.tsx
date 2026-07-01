@@ -18,8 +18,6 @@ import DayCare from "./pages/DayCare";
 import IPD from "./pages/IPD";
 import StaffPayroll from "./pages/StaffPayroll";
 import Accounts from "./pages/Accounts";
-import DebugUpload from "./pages/DebugUpload";
-import AiCoreTestUpload from "./pages/AiCoreTestUpload";
 import AiEngineV2Test from "./pages/AiEngineV2Test";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
 import UsersRoles from "./pages/UsersRoles";
@@ -63,8 +61,6 @@ const AppRoutes = () => (
     <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
     <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
     <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-    <Route path="/debug-upload" element={<ProtectedRoute><DebugUpload /></ProtectedRoute>} />
-    <Route path="/ai-core/test-upload" element={<ProtectedRoute><AiCoreTestUpload /></ProtectedRoute>} />
     <Route path="/ai-engine-v2/test" element={<ProtectedRoute><AiEngineV2Test /></ProtectedRoute>} />
     <Route path="/users-roles" element={<AdminRoute><UsersRoles /></AdminRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />

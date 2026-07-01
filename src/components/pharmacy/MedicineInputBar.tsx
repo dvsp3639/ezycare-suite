@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Mic, Square, Loader2, Camera, X } from "lucide-react";
+import { Search, Mic, Square, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { compressImageFile } from "@/lib/mobileScanHelpers";
-import { fileDebugInfo, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
 
 export type MedicineLike = {
   id: string;
@@ -72,18 +70,7 @@ function findBestMatch(token: string, medicines: MedicineLike[]): MedicineLike |
   return null;
 }
 
-/** FileReader-based base64. Char-by-char loops on 5–12 MP phone photos
- * stall or OOM mobile Chrome silently. */
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => { const s = String(r.result); res(s.split(",")[1] || s); };
-    r.onerror = () => rej(r.error || new Error("read failed"));
-    r.readAsDataURL(blob);
-  });
-}
-
-/* ---------------- component ---------------- */
+/* ---------------- component (text + voice only) ---------------- */
 
 export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
   const [query, setQuery] = useState("");
@@ -91,20 +78,17 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
-  const [scanBusy, setScanBusy] = useState(false);
   const [lastAdded, setLastAdded] = useState<{ name: string; qty: number }[]>([]);
 
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
-  // close suggestions on outside click
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
@@ -144,7 +128,6 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
     else if (e.key === "Escape") { setOpen(false); }
   };
 
-  /* --- voice --- */
   const startVoice = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -198,163 +181,6 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
     }
   };
 
-  /* --- image scan --- */
-  const onPickImage = () => {
-    traceUpload("2 Camera / Gallery opened", {
-      file: "src/components/pharmacy/MedicineInputBar.tsx",
-      component: "MedicineInputBar",
-      function: "onPickImage",
-      block: "camera icon -> hidden image/pdf input click",
-      source: "medicine_input_bar",
-    });
-    fileRef.current?.click();
-  };
-  const onImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    traceUpload("4 onChange fired", {
-      file: "src/components/pharmacy/MedicineInputBar.tsx",
-      component: "MedicineInputBar",
-      function: "onImageChange",
-      block: "native file input onChange entry",
-      filesLength: e.target.files?.length || 0,
-      files: Array.from(e.target.files || []).map(fileDebugInfo),
-    });
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) {
-      traceFailure("3 File selected", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "event.target.files[0] missing",
-        stopReason: "No File object returned from picker; image scan cannot start.",
-      }, new Error("No File returned from image input"));
-      return;
-    }
-    traceUpload("3 File selected", {
-      file: "src/components/pharmacy/MedicineInputBar.tsx",
-      component: "MedicineInputBar",
-      function: "onImageChange",
-      block: "read event.target.files[0]",
-      selectedFile: fileDebugInfo(file),
-    });
-    traceUpload("5 File object created", {
-      file: "src/components/pharmacy/MedicineInputBar.tsx",
-      component: "MedicineInputBar",
-      function: "onImageChange",
-      block: "verified selected object is File/Blob",
-      selectedFile: fileDebugInfo(file),
-    });
-    setScanBusy(true);
-    try {
-      traceUpload("6 Compression started", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "compressImageFile(file)",
-        selectedFile: fileDebugInfo(file),
-      });
-      const compressed = await compressImageFile(file);
-      traceUpload("7 Compression completed", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "compressImageFile returned",
-        original: fileDebugInfo(file),
-        compressed: fileDebugInfo(compressed),
-      });
-      const base64 = await blobToBase64(compressed);
-      traceUpload("8 Upload request created", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "skipped by design: medicine image scan sends base64 directly to AI",
-        skipped: true,
-        base64Length: base64.length,
-      });
-      traceUpload("9 Upload request sent", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "skipped by design before AI extraction",
-        skipped: true,
-      });
-      traceUpload("10 Supabase Storage response", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "skipped by design before AI extraction",
-        skipped: true,
-      });
-      traceUpload("12 Edge Function triggered", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "invoke medicine-scan-ai",
-        mimeType: compressed.type || "image/jpeg",
-        base64Length: base64.length,
-      });
-      traceUpload("13 OCR started", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "medicine-scan-ai processing base64 image",
-      });
-      const { data, error } = await supabase.functions.invoke("medicine-scan-ai", {
-        body: { fileBase64: base64, mimeType: compressed.type || "image/jpeg" },
-      });
-      if (error) throw error;
-      traceUpload("14 OCR completed", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "medicine-scan-ai returned response",
-        documentType: (data as any)?.documentType,
-      });
-      const tokens: { token: string; qty: number }[] = [];
-      const inv = (data as any)?.invoice?.items as any[] | undefined;
-      if (inv?.length) {
-        for (const it of inv) {
-          const t = it?.brandName || it?.name || it?.genericName;
-          if (t) tokens.push({ token: String(t), qty: Number(it?.quantity) > 0 ? Number(it.quantity) : 1 });
-        }
-      } else {
-        const med = (data as any)?.medicine;
-        const t = med?.brandName?.value || med?.name?.value || med?.genericName?.value;
-        if (t) tokens.push({ token: String(t), qty: 1 });
-      }
-      if (!tokens.length) { toast.error("Couldn't read medicines from image"); return; }
-      traceUpload("15 AI extraction completed", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "tokens extracted from AI response",
-        tokenCount: tokens.length,
-      });
-      const added: { name: string; qty: number }[] = [];
-      const missed: string[] = [];
-      for (const it of tokens) {
-        const m = findBestMatch(it.token, medicines);
-        if (m) { onAdd(m, it.qty); added.push({ name: m.name, qty: it.qty }); }
-        else missed.push(it.token);
-      }
-      setLastAdded(added);
-      if (added.length) toast.success(`Added ${added.length} from image`);
-      if (missed.length) toast.warning(`Not found: ${missed.join(", ")}`);
-    } catch (err: any) {
-      traceFailure("AI pipeline stopped", {
-        file: "src/components/pharmacy/MedicineInputBar.tsx",
-        component: "MedicineInputBar",
-        function: "onImageChange",
-        block: "compress -> base64 -> medicine-scan-ai -> add medicines",
-        selectedFile: fileDebugInfo(file),
-        stopReason: "Medicine image scan failed before medicines could be added.",
-      }, err);
-      toast.error(err?.message || "Image scan failed");
-    } finally {
-      setScanBusy(false);
-    }
-  };
-
   return (
     <div className="space-y-2" ref={wrapRef}>
       <div className="relative">
@@ -365,7 +191,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
           onFocus={() => setOpen(true)}
           onKeyDown={onKey}
           placeholder="Search medicine by name, salt or brand…"
-          className="pl-10 pr-28 h-11"
+          className="pl-10 pr-24 h-11"
         />
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {query && (
@@ -386,26 +212,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
           >
             {voiceBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={onPickImage}
-            disabled={scanBusy}
-            aria-label="Scan image"
-            title="Scan medicine / prescription image"
-          >
-            {scanBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          </Button>
         </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,application/pdf"
-          className="hidden"
-          onChange={onImageChange}
-        />
 
         {open && suggestions.length > 0 && (
           <div className="absolute z-20 left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-72 overflow-y-auto">
@@ -440,8 +247,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>
           {recording ? "Listening… speak names with quantity (e.g. \"Dolo 650 two, Augmentin one\")"
-            : scanBusy ? "Reading image…"
-            : "Type to search, press Enter to add. Use mic for voice or camera to scan."}
+            : "Type to search, press Enter to add. Use mic for voice. For prescription scans use the AI Scanner button."}
         </span>
         {lastAdded.length > 0 && (
           <div className="flex flex-wrap gap-1 justify-end">
