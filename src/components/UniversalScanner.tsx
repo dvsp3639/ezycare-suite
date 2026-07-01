@@ -1472,6 +1472,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         ref={fileInputRef} type="file" hidden multiple
         accept="image/*,.pdf,.xls,.xlsx,.csv,.heic,.heif"
         onChange={(e) => {
+          const input = e.currentTarget;
           traceUpload("4 onChange fired", {
             file: "src/components/UniversalScanner.tsx",
             component: "UniversalScanner",
@@ -1482,7 +1483,15 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
           });
           const fs = Array.from(e.target.files || []);
           if (fs.length) {
-            void handleFiles(fs).finally(releaseNativeFilePickerGuard);
+            void handleFiles(fs).finally(() => {
+              releaseNativeFilePickerGuard();
+              pickerSourceRef.current = "";
+              // Android file pickers often expose selected files through a
+              // temporary content:// handle owned by this input. Clearing the
+              // input before FileReader/arrayBuffer finishes can invalidate the
+              // handle, causing the scanner to fall back to the chooser.
+              input.value = "";
+            });
           } else {
             traceUpload("3 File selected", {
               file: "src/components/UniversalScanner.tsx",
@@ -1492,8 +1501,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
               filesLength: 0,
             });
             releaseNativeFilePickerGuard();
+            pickerSourceRef.current = "";
+            input.value = "";
           }
-          e.target.value = "";
         }}
       />
     </div>
