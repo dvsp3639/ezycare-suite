@@ -155,6 +155,8 @@ function inferPickedFileKind(file: File, pickerSource?: string): PickedFileKind 
   if (type === "application/pdf" || /\.pdf$/i.test(name)) return "pdf";
   if (type.includes("sheet") || type === "text/csv" || /\.(xlsx?|csv)$/i.test(name)) return "excel";
   if (type.startsWith("image/") || /\.(jpe?g|png|heic|heif|webp)$/i.test(name)) return "image";
+  if ((!type || type === "application/octet-stream") && pickerSource === "pdf_tile") return "pdf";
+  if ((!type || type === "application/octet-stream") && pickerSource === "excel_tile") return "excel";
   // Android document/gallery providers sometimes return camera images as
   // application/octet-stream or with an empty MIME/name. If the user entered
   // through an image-capable picker, keep the pipeline alive as an image.
