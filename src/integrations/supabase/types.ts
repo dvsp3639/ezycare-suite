@@ -808,6 +808,74 @@ export type Database = {
           },
         ]
       }
+      hospital_profiles: {
+        Row: {
+          basic: Json
+          branding: Json
+          compliance: Json
+          contact: Json
+          created_at: string
+          departments: Json
+          doctors: Json
+          documents: Json
+          facilities: Json
+          gallery: Json
+          hospital_id: string
+          id: string
+          patient_app: Json
+          published: boolean
+          signatures: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          basic?: Json
+          branding?: Json
+          compliance?: Json
+          contact?: Json
+          created_at?: string
+          departments?: Json
+          doctors?: Json
+          documents?: Json
+          facilities?: Json
+          gallery?: Json
+          hospital_id: string
+          id?: string
+          patient_app?: Json
+          published?: boolean
+          signatures?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          basic?: Json
+          branding?: Json
+          compliance?: Json
+          contact?: Json
+          created_at?: string
+          departments?: Json
+          doctors?: Json
+          documents?: Json
+          facilities?: Json
+          gallery?: Json
+          hospital_id?: string
+          id?: string
+          patient_app?: Json
+          published?: boolean
+          signatures?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_profiles_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: true
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hospitals: {
         Row: {
           address: string | null
