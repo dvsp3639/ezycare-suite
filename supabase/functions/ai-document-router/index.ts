@@ -25,7 +25,6 @@ type Body = {
   fileBase64?: string;
   mimeType?: string;
   hint?: "pharmacy" | "inventory" | "auto";
-  signedUrl?: string;
 };
 
 function json(status: number, body: unknown) {
@@ -120,32 +119,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); }
   catch { return json(400, { error: "invalid_json" }); }
 
-  let { fileBase64, mimeType, hint = "auto", signedUrl } = body;
-
-  // Preferred path: client sends a signed URL, we download server-side.
-  // Avoids the ~6MB edge-function request-body limit that base64 images blow past on mobile.
-  if (!fileBase64 && signedUrl) {
-    console.log("[ai-document-router] fetching signedUrl server-side");
-    try {
-      const r = await fetch(signedUrl);
-      if (!r.ok) return json(400, { error: "fetch_signed_url_failed", status: r.status });
-      const ab = await r.arrayBuffer();
-      const bytes = new Uint8Array(ab);
-      // chunked base64 to avoid stack overflow on large buffers
-      let bin = "";
-      const CHUNK = 0x8000;
-      for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-      }
-      fileBase64 = btoa(bin);
-      mimeType = mimeType || r.headers.get("content-type") || "application/octet-stream";
-      console.log("[ai-document-router] fetched bytes=", bytes.length, "mime=", mimeType);
-    } catch (e) {
-      console.error("[ai-document-router] signed_url_fetch_error", e);
-      return json(400, { error: "signed_url_fetch_error", detail: String((e as any)?.message || e) });
-    }
-  }
-
+  const { fileBase64, mimeType, hint = "auto" } = body;
   if (!fileBase64 || !mimeType) return json(400, { error: "missing_file" });
 
   const messages = [
