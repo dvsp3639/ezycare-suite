@@ -53,6 +53,7 @@ export function SharedAiScanFlow({
 
   const onUploadComplete = useCallback(async (results: UploadResult[]) => {
     const ok = results.filter((r) => r.signedUrl);
+    console.info("[ai-flow] step=upload:complete", { uploaded: ok.length, total: results.length });
     if (!ok.length) {
       toast.error("No files were uploaded");
       return;
@@ -61,9 +62,9 @@ export function SharedAiScanFlow({
     setPhase("processing");
     setErrorMsg(null);
     try {
-      // Route the FIRST file (typical prescription/invoice/lab-report is one doc).
-      // Additional pages remain uploaded and available in downstream verify.
+      console.info("[ai-flow] step=route:start", { file: ok[0].name, size: ok[0].size, mime: ok[0].mime });
       const r = await routeDocument(ok[0].signedUrl, mode);
+      console.info("[ai-flow] step=extract:done", { documentType: r.documentType, confidence: r.confidence });
       if (r.documentType === "unknown") {
         setErrorMsg("Could not identify this document as a prescription, purchase invoice, or lab report.");
         setPhase("error");
@@ -71,14 +72,16 @@ export function SharedAiScanFlow({
       }
       setRouted(r);
       setPhase("verify");
+      console.info("[ai-flow] step=verify:open", { documentType: r.documentType });
     } catch (e: any) {
-      console.error("[SharedAiScanFlow] routing failed", e);
+      console.error("[ai-flow] step=route:failed", e);
       setErrorMsg(e?.message || "AI classification failed");
       setPhase("error");
     }
   }, [mode]);
 
   const handleDone = useCallback((id?: string) => {
+    console.info("[ai-flow] step=save:done", { documentType: routed?.documentType, id });
     if (routed) onDone?.({ documentType: routed.documentType, id });
     resetAll();
     onClose();
