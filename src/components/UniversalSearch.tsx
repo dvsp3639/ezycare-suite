@@ -12,7 +12,7 @@ import { modules } from "@/data/modules";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { SharedAiScanFlow } from "@/ai-engine-v2";
+import { UniversalScanner } from "@/components/UniversalScanner";
 
 type Kind = "module" | "medicine" | "patient" | "ai" | "recent";
 interface Result {
@@ -661,11 +661,11 @@ export function UniversalSearch() {
       </div>
     )}
 
-    {/* Shared AI Scanner — one engine for prescriptions, invoices and lab reports */}
-    <SharedAiScanFlow
+    {/* Universal Scanner: camera + image + pdf + excel + drag-drop */}
+    <UniversalScanner
       open={scanOpen}
       onClose={() => setScanOpen(false)}
-      mode="auto"
+      onScannedBarcode={(code) => handleScannedCode(code)}
     />
 
     {/* AI confirmation card */}

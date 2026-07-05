@@ -1,60 +1,72 @@
-## Sprint 1 — One Upload Engine, One AI Engine
+## Goal
 
-Goal: Every AI Scanner entry (Pharmacy + Inventory) uses the exact same code path — MobileUploadEngine for picking/uploading, one edge function for classify + extract, then a routed verification step. No two upload paths, no two classifiers.
+Replace the current ad-hoc scanner stack (`UniversalScanner`, `MedicineInputBar` camera, `MobileScanView`, scattered AI calls) with a **single AI Core Engine** that every HMS module reuses. Existing Pharmacy, Inventory, Diagnostics, Billing, Patients, Auth flows stay untouched — only their AI entry points are rewired to the new engine.
 
-Nothing outside this pipeline is touched. No new features. No design changes to Pharmacy or Inventory pages beyond swapping the scanner entry.
+Build strictly **one layer at a time**. Ship Layer 1, verify on Android + desktop, then move on. This plan describes the full target; we will only execute Layer 1 after you approve.
 
----
+## Target architecture
 
-### 1. Shared components (new)
+```text
+src/ai-core/
+  upload/          Layer 1 — Universal Upload Engine
+    UploadEngine.tsx        mobile-first picker (camera/gallery/files/drag-drop)
+    enhance.ts              crop, deskew, shadow-remove, compress (reuses docScan.ts)
+    uploader.ts             chunked upload to `ai-core-uploads` bucket + retry + progress
+    types.ts                UploadedFile, UploadProgress, UploadResult
+    hooks.ts                useUploadEngine()
+  classify/        Layer 2 — Document Classification Engine
+    classifier.ts           calls edge fn `ai-classify`, returns DocumentKind
+    types.ts                DocumentKind = prescription|purchase_invoice|lab_report|medicine_label|barcode|qr|unknown
+  extract/         Layer 3 — AI Extraction Engine
+    extractors/             one schema + prompt per DocumentKind
+    extractEngine.ts        single entry: extract(kind, files) -> StructuredPayload
+    schemas.ts              zod schemas per kind
+  verify/          Layer 4 — Human Verification
+    VerifyShell.tsx         shared editable shell (mobile sheet / desktop dialog)
+    renderers/              kind-specific editable tables (Prescription, Invoice, LabReport)
+  connector/       Layer 5 — HMS Connector
+    routes.ts               kind -> module handler map
+    handlers/               prescriptionToPharmacy.ts, invoiceToInventory.ts, labToDiagnostics.ts
+  memory/          Learning loop
+    corrections.ts          wraps existing record_rx_correction + new generic table
+  AiCoreProvider.tsx        single context exposing openAiCore({ accept?, hintKind? })
+  index.ts
+supabase/functions/
+  ai-classify/            new — fast classifier (Gemini Flash, low tokens)
+  ai-extract/             new — kind-routed extractor (replaces prescription-scan-ai + medicine-scan-ai usage from the engine)
+```
 
-- `src/ai-engine-v2/SharedAiScanFlow.tsx` — the single orchestrator used by both Pharmacy and Inventory. Renders `MobileUploadEngine`, then on `onComplete` calls the router, then mounts the correct verification screen.
-- `src/ai-engine-v2/verify/InvoiceVerify.tsx` — editable table for a purchase invoice; approve → `import_purchase_invoice` RPC (existing) → updates inventory + creates purchase bill + audit fields (already in RPC).
-- `src/ai-engine-v2/verify/PrescriptionVerify.tsx` — editable list of extracted medicines/patient/doctor; approve → enqueues into existing `workspaceService` so pharmacist can complete billing / stock deduction / patient history exactly like today.
-- `src/ai-engine-v2/verify/LabReportVerify.tsx` — minimal: shows classification, links the uploaded file to a `lab_orders` row on approve. (Kept intentionally small; can grow later.)
-- `src/ai-engine-v2/router.ts` — thin client that invokes the router edge function and normalises the payload for the verify screens.
+Existing edge functions stay deployed for back-compat until Layer 3 is live; then `UniversalScanner.tsx`, `MobileScanView.tsx`, the camera button inside `MedicineInputBar.tsx`, and the inventory "Scan Invoice" wizard are rewired to call `openAiCore()`.
 
-### 2. Shared AI edge function (new)
+## Phased delivery
 
-- `supabase/functions/ai-document-router/index.ts` — accepts `{ fileBase64, mimeType }` (already-uploaded file is passed in as base64 to avoid a second network round-trip on mobile).
-  1. Runs a Lovable AI Gateway call (Gemini) with a classification prompt → `documentType: "prescription" | "purchase_invoice" | "lab_report"`.
-  2. Immediately runs a second Gemini call with a doc-type-specific extraction prompt, returning structured JSON matching the verify screens.
-  3. Returns `{ documentType, data, confidence }`.
-  Uses `auth.getClaims(token)` per project convention.
+**Phase 1 — Layer 1 only (this turn if approved)**
+- Scaffold `src/ai-core/upload/` with `UploadEngine.tsx`, `enhance.ts` (thin wrapper around existing `docScan.ts` + `mobileScanHelpers.ts`), `uploader.ts`, `hooks.ts`, `types.ts`.
+- Create private storage bucket `ai-core-uploads` (path: `{hospital_id}/{user_id}/{yyyy-mm-dd}/{uuid}.{ext}`) with RLS: insert/select/update/delete restricted to uploader's folder; service_role full.
+- Mobile-first UI: full-screen sheet, big Camera / Gallery / Files buttons, multi-file thumbnails, per-file progress, retry, remove. Desktop: same component with drag-and-drop zone.
+- Logging via existing `mobileUploadDiagnostics.ts`.
+- Demo route `/ai-core/test-upload` (dev only) to verify end-to-end on Android.
+- **No classification, no AI, no HMS writes in this phase.**
 
-### 3. Wire into Pharmacy and Inventory
+**Phase 2 — Layer 2** Classifier edge fn + `classify/` module. Hook into UploadEngine `onComplete`. Show detected kind chip.
 
-- `src/pages/Pharmacy.tsx` — remove the `<MedicineInputBar>` camera path (voice + text search stay). Add a single "AI Scanner" button that opens `<SharedAiScanFlow mode="pharmacy" />`.
-- `src/pages/Inventory.tsx` — replace `<UniversalScanner … />` with `<SharedAiScanFlow mode="inventory" />`. The "Scan Invoice" button keeps its label and position.
-- `src/components/UniversalSearch.tsx` — the global scanner button mounts `<SharedAiScanFlow mode="auto" />` instead of `<UniversalScanner />`.
+**Phase 3 — Layer 3** Extractor edge fn with per-kind schemas. Stream structured JSON back.
 
-`mode` is a hint only; the router edge function is the source of truth for `documentType`.
+**Phase 4 — Layer 4** VerifyShell + per-kind editable renderers.
 
-### 4. Retire legacy code
+**Phase 5 — Layer 5** HMS connector handlers. Rewire Pharmacy / Inventory / Diagnostics entry points to `openAiCore()`. Retire `UniversalScanner`, old `MobileScanView`, `MedicineInputBar` camera path (text + voice stay). Old edge fns kept one release for safety, then removed.
 
-Deleted files (moved out with `git rm`-equivalent shell `rm`):
-- `src/components/UniversalScanner.tsx`
-- `src/components/pharmacy/MobileScanView.tsx`
-- `src/components/pharmacy/MedicineInputBar.tsx` (rebuilt as `MedicineSearchBar.tsx` — text + voice only, no camera)
-- `src/lib/mobileScanHelpers.ts` (compression now lives inside MobileUploadEngine)
-- `src/lib/mobileUploadDiagnostics.ts` (diagnostic wrapper — no longer needed once one path exists)
-- `src/pages/AiCoreTestUpload.tsx` + `src/ai-core/` directory (older prototype, superseded by ai-engine-v2)
-- `src/pages/DebugUpload.tsx` if present (temporary diagnostic page)
+**Phase 6 — Memory** Generic `ai_corrections` table (kind, field, before, after, hospital_id, user_id) feeding back into extractor prompts.
 
-References cleaned up in `App.tsx` routes, `PharmacyWorkspace.tsx` (its embedded `MobileScanView` becomes a call to `SharedAiScanFlow`), and any leftover imports.
+## Out of scope
 
-### 5. Acceptance checks
+- Changing HMS business logic, schemas, billing math, RLS on existing tables.
+- Offline mode.
+- Replacing voice input or smart medicine search.
+- Touching Auth, Patients, IPD, Day Care, Accounts, Staff.
 
-After implementation, verify via Playwright + manual:
-- Camera / Gallery / PDF / multi-image / desktop drop → all go through one code path.
-- MobileUploadEngine already blocks Android Escape/back and swallows picker cancel — carried forward unchanged, so scanner cannot self-close on file select.
-- `ai-document-router` returns a `documentType` on every real medical doc → verification screen opens.
-- Approve on verify screen → `import_purchase_invoice` (inventory + audit), or `workspaceService.enqueue` (pharmacy billing + patient history), or `lab_orders` insert.
-- Confirm `rg "UniversalScanner|MobileScanView|MedicineInputBar|ai-core/"` returns zero matches.
+## Confirmation needed
 
-### Deliberately out of scope
-Reports, MFA, notifications, billing redesign, Pharmacy/Inventory redesign, lab report deep extraction, offline queueing. All Sprint 2+.
+Reply **approve** and I will implement **Phase 1 (Layer 1 — Universal Upload Engine) only**, including the storage bucket, the mobile-first uploader, and the `/ai-core/test-upload` verification page. I will not touch any existing module in this phase.
 
----
-
-Reply **go** and I will execute end-to-end in one pass: create the router function, build SharedAiScanFlow + 3 verify screens, wire Pharmacy + Inventory + UniversalSearch, delete the six legacy files, then run typecheck.
+Tell me if you want any layer reordered, dropped, or scoped differently before I start.

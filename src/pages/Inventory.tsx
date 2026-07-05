@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { Receipt } from "lucide-react";
 import { PurchaseInvoiceRepository } from "@/components/inventory/PurchaseInvoiceRepository";
-import { SharedAiScanFlow } from "@/ai-engine-v2";
+import { UniversalScanner } from "@/components/UniversalScanner";
+import { persistScannerOpen, readScannerOpen } from "@/lib/mobileScanHelpers";
 import { cn } from "@/lib/utils";
 import {
   inventoryCategories, departments, categoryColors,
@@ -183,7 +184,18 @@ const Inventory = () => {
   const [showAddItem, setShowAddItem] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [showAIScanner, setShowAIScanner] = useState<boolean>(false);
+  // Initialise from sessionStorage so that Android Chrome — which can suspend
+  // the tab while the OS camera/file picker is active — reopens the scanner
+  // automatically when the user returns with a captured photo.
+  const [showAIScanner, setShowAIScanner] = useState<boolean>(() => readScannerOpen("scanner:inventory"));
+  useEffect(() => { persistScannerOpen("scanner:inventory", showAIScanner); }, [showAIScanner]);
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted && readScannerOpen("scanner:inventory")) setShowAIScanner(true);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
   const [barcodeInput, setBarcodeInput] = useState("");
 
   // Transfer form
@@ -1685,12 +1697,8 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* AI Invoice Scanner — shared engine */}
-      <SharedAiScanFlow
-        open={showAIScanner}
-        onClose={() => setShowAIScanner(false)}
-        mode="inventory"
-      />
+      {/* AI Invoice Scanner */}
+      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
