@@ -21,7 +21,6 @@ import Accounts from "./pages/Accounts";
 import AiEngineV2Test from "./pages/AiEngineV2Test";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
 import UsersRoles from "./pages/UsersRoles";
-import HospitalProfile from "./pages/HospitalProfile";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -64,7 +63,6 @@ const AppRoutes = () => (
     <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
     <Route path="/ai-engine-v2/test" element={<ProtectedRoute><AiEngineV2Test /></ProtectedRoute>} />
     <Route path="/users-roles" element={<AdminRoute><UsersRoles /></AdminRoute>} />
-    <Route path="/hospital-profile" element={<AdminRoute><HospitalProfile /></AdminRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />
