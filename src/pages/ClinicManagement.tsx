@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { format, startOfDay, isBefore, isToday } from "date-fns";
+import { format, startOfDay, isBefore, isToday, addDays, isSameDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -604,26 +604,52 @@ const ClinicManagement = () => {
 
         {/* ─── Doctor Slot Management ─── */}
         <TabsContent value="slots">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => setSlotDate(addDays(slotDate, -1))} disabled={isBefore(startOfDay(addDays(slotDate, -1)), startOfDay(new Date()))}>
+              ‹ Prev
+            </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
-                  <CalendarDays className="h-4 w-4 mr-2" />{format(slotDate, "dd/MM/yyyy")}
+                <Button variant="outline" className="w-[220px] justify-start text-left font-normal">
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  {format(slotDate, "EEE, dd/MM/yyyy")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent mode="single" selected={slotDate} onSelect={(d) => d && setSlotDate(d)} initialFocus className="p-3 pointer-events-auto" />
+                <CalendarComponent
+                  mode="single"
+                  selected={slotDate}
+                  onSelect={(d) => d && setSlotDate(d)}
+                  disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
               </PopoverContent>
             </Popover>
+            <Button variant="outline" size="sm" onClick={() => setSlotDate(addDays(slotDate, 1))}>
+              Next ›
+            </Button>
+            <div className="flex items-center gap-1 ml-1">
+              <Button variant={isTodayDate ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(new Date())}>Today</Button>
+              <Button variant={isSameDay(slotDate, addDays(new Date(), 1)) ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(addDays(new Date(), 1))}>Tomorrow</Button>
+              <Button variant={isSameDay(slotDate, addDays(new Date(), 7)) ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(addDays(new Date(), 7))}>+7 days</Button>
+            </div>
+            {!isTodayDate && !isPastDate && (
+              <Badge variant="outline" className="text-xs text-primary border-primary/30 bg-primary/5">
+                Creating slots for {format(slotDate, "dd MMM yyyy")}
+              </Badge>
+            )}
             <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-              <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filter by doctor" /></SelectTrigger>
+              <SelectTrigger className="w-[220px] ml-auto"><SelectValue placeholder="Filter by doctor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Doctors</SelectItem>
                 {dateSchedules.map((d) => (<SelectItem key={d.id} value={d.id}>{d.doctorName}</SelectItem>))}
               </SelectContent>
             </Select>
-            {/* Doctors are auto-pulled from Staff & Payroll */}
           </div>
+          {autoCreating && (
+            <p className="text-xs text-muted-foreground mb-3">Preparing schedules for {format(slotDate, "dd MMM yyyy")}…</p>
+          )}
 
           <div className="space-y-4">
             {dateSchedules.filter((d) => selectedDoctor === "all" || d.id === selectedDoctor).map((doc) => (
