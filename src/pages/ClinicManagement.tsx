@@ -632,7 +632,6 @@ const ClinicManagement = () => {
             <div className="flex items-center gap-1 ml-1">
               <Button variant={isTodayDate ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(new Date())}>Today</Button>
               <Button variant={isSameDay(slotDate, addDays(new Date(), 1)) ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(addDays(new Date(), 1))}>Tomorrow</Button>
-              <Button variant={isSameDay(slotDate, addDays(new Date(), 7)) ? "default" : "ghost"} size="sm" onClick={() => setSlotDate(addDays(new Date(), 7))}>+7 days</Button>
             </div>
             {!isTodayDate && !isPastDate && (
               <Badge variant="outline" className="text-xs text-primary border-primary/30 bg-primary/5">
