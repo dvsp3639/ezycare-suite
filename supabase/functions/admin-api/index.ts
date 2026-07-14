@@ -482,6 +482,31 @@ serve(async (req) => {
       });
     }
 
+    // ---------- SUPER ADMIN: Reset password for any user ----------
+    const userPasswordMatch = path.match(/^users\/([a-f0-9-]+)\/password$/);
+    if (userPasswordMatch && method === "POST") {
+      const roleId = userPasswordMatch[1];
+      const body = await req.json();
+      const { password } = body;
+      if (!password || password.length < 6) {
+        throw new Error("Password must be at least 6 characters");
+      }
+      const { data: roleRecord } = await adminClient
+        .from("user_roles")
+        .select("user_id")
+        .eq("id", roleId)
+        .single();
+      if (!roleRecord) throw new Error("User role not found");
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(
+        roleRecord.user_id,
+        { password }
+      );
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ---------- ANALYTICS ----------
     if (path === "analytics" && method === "GET") {
       const { count: hospitalCount } = await adminClient
