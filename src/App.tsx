@@ -53,9 +53,12 @@ const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isSuperAdmin, isHospitalAdmin } = useAuth();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated) {
+    if (isSuperAdmin && !isHospitalAdmin) return <Navigate to="/super-admin" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 };
 
