@@ -710,6 +710,188 @@ export type Database = {
           },
         ]
       }
+      doctor_daily_overrides: {
+        Row: {
+          created_at: string
+          doctor_name: string
+          hospital_id: string
+          id: string
+          override_date: string
+          override_type: string
+          reason: string | null
+          sessions: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name: string
+          hospital_id: string
+          id?: string
+          override_date: string
+          override_type?: string
+          reason?: string | null
+          sessions?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string
+          hospital_id?: string
+          id?: string
+          override_date?: string
+          override_type?: string
+          reason?: string | null
+          sessions?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      doctor_leaves: {
+        Row: {
+          created_at: string
+          doctor_name: string
+          from_date: string
+          half_day_period: string | null
+          hospital_id: string
+          id: string
+          leave_type: string
+          reason: string | null
+          status: string
+          to_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name: string
+          from_date: string
+          half_day_period?: string | null
+          hospital_id: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          status?: string
+          to_date: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string
+          from_date?: string
+          half_day_period?: string | null
+          hospital_id?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          status?: string
+          to_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      doctor_live_status: {
+        Row: {
+          created_at: string
+          delay_minutes: number | null
+          doctor_name: string
+          hospital_id: string
+          id: string
+          message: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delay_minutes?: number | null
+          doctor_name: string
+          hospital_id: string
+          id?: string
+          message?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delay_minutes?: number | null
+          doctor_name?: string
+          hospital_id?: string
+          id?: string
+          message?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      doctor_op_sessions: {
+        Row: {
+          booking_window_days: number
+          buffer_min: number
+          consultation_fee: number
+          created_at: string
+          end_time: string
+          hospital_id: string
+          id: string
+          max_online: number
+          max_walkin: number
+          online_enabled: boolean
+          session_name: string
+          slot_duration_min: number
+          sort_order: number
+          start_time: string
+          token_capacity: number
+          updated_at: string
+          walkin_enabled: boolean
+          weekly_schedule_id: string
+        }
+        Insert: {
+          booking_window_days?: number
+          buffer_min?: number
+          consultation_fee?: number
+          created_at?: string
+          end_time: string
+          hospital_id: string
+          id?: string
+          max_online?: number
+          max_walkin?: number
+          online_enabled?: boolean
+          session_name?: string
+          slot_duration_min?: number
+          sort_order?: number
+          start_time: string
+          token_capacity?: number
+          updated_at?: string
+          walkin_enabled?: boolean
+          weekly_schedule_id: string
+        }
+        Update: {
+          booking_window_days?: number
+          buffer_min?: number
+          consultation_fee?: number
+          created_at?: string
+          end_time?: string
+          hospital_id?: string
+          id?: string
+          max_online?: number
+          max_walkin?: number
+          online_enabled?: boolean
+          session_name?: string
+          slot_duration_min?: number
+          sort_order?: number
+          start_time?: string
+          token_capacity?: number
+          updated_at?: string
+          walkin_enabled?: boolean
+          weekly_schedule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_op_sessions_weekly_schedule_id_fkey"
+            columns: ["weekly_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_weekly_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doctor_schedules: {
         Row: {
           available_from: string | null
@@ -807,6 +989,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      doctor_weekly_schedules: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          doctor_name: string
+          hospital_id: string
+          id: string
+          is_working: boolean
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          doctor_name: string
+          hospital_id: string
+          id?: string
+          is_working?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          doctor_name?: string
+          hospital_id?: string
+          id?: string
+          is_working?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hospital_holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          hospital_id: string
+          id: string
+          is_recurring_yearly: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          hospital_id: string
+          id?: string
+          is_recurring_yearly?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          hospital_id?: string
+          id?: string
+          is_recurring_yearly?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       hospital_profiles: {
         Row: {
@@ -3116,6 +3361,10 @@ export type Database = {
       create_pharmacy_sale: {
         Args: { _items: Json; _order: Json }
         Returns: Json
+      }
+      generate_doctor_slots: {
+        Args: { _doctor_name: string; _from_date: string; _to_date: string }
+        Returns: number
       }
       get_user_hospital_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
