@@ -839,90 +839,16 @@ const ClinicManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* ─── Manage Slots Dialog ─── */}
-      <Dialog open={!!editSlotDoctorId} onOpenChange={(v) => !v && setEditSlotDoctorId(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-display">Manage Slots — {editSlotDoctor?.doctorName}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{editSlotDoctor?.specialization}</p>
-          </DialogHeader>
-          {editSlotDoctor && (
-            <>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><ClockIcon className="h-4 w-4" /> Availability Ranges</h4>
-                  <Button size="sm" variant="outline" onClick={addSlotRange}><Plus className="h-3.5 w-3.5 mr-1" /> Add Range</Button>
-                </div>
-                <div className="space-y-3 max-h-[260px] overflow-y-auto">
-                  {slotRanges.map((range, idx) => (
-                    <div key={idx} className="bg-muted/50 rounded-lg p-3 space-y-2 border border-border">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">Range {idx + 1}</span>
-                        {slotRanges.length > 1 && (
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeSlotRange(idx)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-[10px] text-muted-foreground mb-0.5 block">From</label>
-                          <Select value={range.from} onValueChange={(v) => updateSlotRange(idx, "from", v)}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground mb-0.5 block">To</label>
-                          <Select value={range.to} onValueChange={(v) => updateSlotRange(idx, "to", v)}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground mb-0.5 block">Tokens / 30 min</label>
-                          <div className="flex items-center gap-1">
-                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", Math.max(1, range.tokensPerSlot - 1))}>
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-8 text-center font-semibold text-foreground text-sm">{range.tokensPerSlot}</span>
-                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", range.tokensPerSlot + 1)}>
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Preview generated slots */}
-              {slotRanges.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-medium text-muted-foreground">Preview — {generateSlotsFromRanges(slotRanges).length} slots</h4>
-                  <div className="grid grid-cols-4 gap-1.5 max-h-[160px] overflow-y-auto">
-                    {generateSlotsFromRanges(slotRanges).map((slot) => {
-                      const past = isSlotPast(slot.time);
-                      const existing = editSlotDoctor.timeSlots.find(es => es.time === slot.time);
-                      return (
-                        <div key={slot.time} className={cn("rounded-md border p-2 text-center text-xs", past ? "border-border/50 bg-muted/40 opacity-50" : "border-border bg-card")}>
-                          <p className="font-medium text-foreground">{slot.time}</p>
-                          <p className="text-muted-foreground">{existing ? `${existing.bookedPatients}/` : "0/"}{slot.maxPatients}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <Button onClick={handleSaveSlotConfig} disabled={savingSlots} className="w-full mt-2">
-                {savingSlots ? <><Clock className="h-4 w-4 mr-1.5 animate-spin" /> Saving...</> : <><Save className="h-4 w-4 mr-1.5" /> Save Configuration</>}
-              </Button>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* ─── Doctor Availability Engine ─── */}
+      {engineDoctor && (
+        <DoctorAvailabilityEngine
+          open={!!engineDoctor}
+          onClose={() => setEngineDoctor(null)}
+          doctorName={engineDoctor.name}
+          specialization={engineDoctor.specialization}
+          onSlotsRegenerated={() => { refetchDateSchedules(); refreshData(); }}
+        />
+      )}
 
       {/* ─── Nurse Vitals Entry Dialog ─── */}
       <Dialog open={!!vitalsPatient} onOpenChange={(v) => !v && setVitalsPatient(null)}>
