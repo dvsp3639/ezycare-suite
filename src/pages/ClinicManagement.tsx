@@ -661,8 +661,8 @@ const ClinicManagement = () => {
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
                   {!isPastDate && (
-                    <Button variant="outline" size="sm" onClick={() => openManageSlots(doc.id)}>
-                      <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
+                    <Button variant="outline" size="sm" onClick={() => setEngineDoctor({ name: doc.doctorName, specialization: doc.specialization })}>
+                      <Settings2 className="h-4 w-4 mr-1.5" /> Availability Engine
                     </Button>
                   )}
                 </div>
