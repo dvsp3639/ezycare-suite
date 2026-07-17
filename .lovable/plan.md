@@ -1,72 +1,66 @@
-## Goal
+## Doctor Availability Engine — Implementation Plan
 
-Replace the current ad-hoc scanner stack (`UniversalScanner`, `MedicineInputBar` camera, `MobileScanView`, scattered AI calls) with a **single AI Core Engine** that every HMS module reuses. Existing Pharmacy, Inventory, Diagnostics, Billing, Patients, Auth flows stay untouched — only their AI entry points are rewired to the new engine.
+Replace the current "Manage Slots" popup in Clinic Management with a full **Doctor Availability Engine** while preserving EzyOp's existing sidebar, header, teal theme, typography, and shadcn component library.
 
-Build strictly **one layer at a time**. Ship Layer 1, verify on Android + desktop, then move on. This plan describes the full target; we will only execute Layer 1 after you approve.
+### Scope
+Only the slot-management surface inside `src/pages/ClinicManagement.tsx` changes. All other modules, routes, and design tokens remain untouched.
 
-## Target architecture
+### 1. Database (single migration)
+New tables (all hospital-scoped, RLS by `hospital_id` via `get_user_hospital_id`, GRANT to authenticated + service_role):
 
-```text
-src/ai-core/
-  upload/          Layer 1 — Universal Upload Engine
-    UploadEngine.tsx        mobile-first picker (camera/gallery/files/drag-drop)
-    enhance.ts              crop, deskew, shadow-remove, compress (reuses docScan.ts)
-    uploader.ts             chunked upload to `ai-core-uploads` bucket + retry + progress
-    types.ts                UploadedFile, UploadProgress, UploadResult
-    hooks.ts                useUploadEngine()
-  classify/        Layer 2 — Document Classification Engine
-    classifier.ts           calls edge fn `ai-classify`, returns DocumentKind
-    types.ts                DocumentKind = prescription|purchase_invoice|lab_report|medicine_label|barcode|qr|unknown
-  extract/         Layer 3 — AI Extraction Engine
-    extractors/             one schema + prompt per DocumentKind
-    extractEngine.ts        single entry: extract(kind, files) -> StructuredPayload
-    schemas.ts              zod schemas per kind
-  verify/          Layer 4 — Human Verification
-    VerifyShell.tsx         shared editable shell (mobile sheet / desktop dialog)
-    renderers/              kind-specific editable tables (Prescription, Invoice, LabReport)
-  connector/       Layer 5 — HMS Connector
-    routes.ts               kind -> module handler map
-    handlers/               prescriptionToPharmacy.ts, invoiceToInventory.ts, labToDiagnostics.ts
-  memory/          Learning loop
-    corrections.ts          wraps existing record_rx_correction + new generic table
-  AiCoreProvider.tsx        single context exposing openAiCore({ accept?, hintKind? })
-  index.ts
-supabase/functions/
-  ai-classify/            new — fast classifier (Gemini Flash, low tokens)
-  ai-extract/             new — kind-routed extractor (replaces prescription-scan-ai + medicine-scan-ai usage from the engine)
-```
+- `doctor_weekly_schedules` — doctor_id, day_of_week (0–6), is_working, notes
+- `doctor_op_sessions` — weekly_schedule_id, session_name, start_time, end_time, slot_duration_min, buffer_min, token_capacity, max_online, max_walkin, consultation_fee, booking_window_days, online_enabled, walkin_enabled
+- `doctor_daily_overrides` — doctor_id, override_date, override_type (custom/closed/half-day), sessions jsonb, reason
+- `doctor_leaves` — doctor_id, from_date, to_date, leave_type (single/half/vacation/conference/emergency), half_day_period, reason, status
+- `hospital_holidays` — holiday_date, name, is_recurring_yearly
+- `doctor_live_status` — doctor_id, status (available/late/consulting/in_ot/emergency/closed/leave), delay_minutes, message, updated_at
 
-Existing edge functions stay deployed for back-compat until Layer 3 is live; then `UniversalScanner.tsx`, `MobileScanView.tsx`, the camera button inside `MedicineInputBar.tsx`, and the inventory "Scan Invoice" wizard are rewired to call `openAiCore()`.
+Extend existing `doctor_schedules` + `time_slots` as the **materialized** day view generated from weekly schedule + overrides + leaves + holidays (server-side generator function `generate_doctor_slots(doctor_id, date)`).
 
-## Phased delivery
+### 2. UI — Replace "Manage Slots" dialog
+New component `src/components/clinic/DoctorAvailabilityEngine.tsx` opened in a large Sheet from the doctor card. Tabs (using existing shadcn Tabs):
 
-**Phase 1 — Layer 1 only (this turn if approved)**
-- Scaffold `src/ai-core/upload/` with `UploadEngine.tsx`, `enhance.ts` (thin wrapper around existing `docScan.ts` + `mobileScanHelpers.ts`), `uploader.ts`, `hooks.ts`, `types.ts`.
-- Create private storage bucket `ai-core-uploads` (path: `{hospital_id}/{user_id}/{yyyy-mm-dd}/{uuid}.{ext}`) with RLS: insert/select/update/delete restricted to uploader's folder; service_role full.
-- Mobile-first UI: full-screen sheet, big Camera / Gallery / Files buttons, multi-file thumbnails, per-file progress, retry, remove. Desktop: same component with drag-and-drop zone.
-- Logging via existing `mobileUploadDiagnostics.ts`.
-- Demo route `/ai-core/test-upload` (dev only) to verify end-to-end on Android.
-- **No classification, no AI, no HMS writes in this phase.**
+1. **Weekly Schedule** — 7-day grid; per-day toggle Working/Off; add multiple OP sessions per day with time, duration, capacity, fees, online/walk-in toggles.
+2. **7-Day Calendar** — cards for today + next 6 days showing sessions, available/booked/blocked counts, live status chip; actions Edit / Pause / Resume / Close / Duplicate.
+3. **Live Status** — one-click chips (Available / Running Late +N min / Consulting / In OT / Emergency / OP Closed / On Leave) writing to `doctor_live_status`.
+4. **Leave Management** — list + add leave (single/half/range/recurring); auto-blocks affected days.
+5. **Holidays** — hospital holiday calendar (add / recurring yearly).
+6. **Appointment & Queue Rules** — buffer, lunch break, max online, max walk-ins, booking window.
+7. **Exceptions (Daily Override)** — pick date → override times/close/half-day without touching weekly template.
+8. **Analytics** — today's OP status: available, late, in OT, on leave, waiting patients, bookings, walk-ins, completion rate, avg wait (reads existing appointments).
 
-**Phase 2 — Layer 2** Classifier edge fn + `classify/` module. Hook into UploadEngine `onComplete`. Show detected kind chip.
+Bulk actions bar: Copy Monday→Weekdays, Copy Today, Copy This Week→Next Week.
 
-**Phase 3 — Layer 3** Extractor edge fn with per-kind schemas. Stream structured JSON back.
+### 3. Slot generation
+`clinicService.generateSlotsForRange(doctorId, fromDate, toDate)` computes materialized `doctor_schedules` + `time_slots` rows from weekly template minus leaves/holidays/overrides. Runs:
+- On weekly schedule save (regenerates next 7 days)
+- On override/leave/holiday change (regenerates affected dates)
+- Nightly-safe: idempotent upsert keyed by (doctor_name, schedule_date)
 
-**Phase 4 — Layer 4** VerifyShell + per-kind editable renderers.
+Existing booking flow (`OP Queue`) continues reading `doctor_schedules` + `time_slots`, so no downstream changes.
 
-**Phase 5 — Layer 5** HMS connector handlers. Rewire Pharmacy / Inventory / Diagnostics entry points to `openAiCore()`. Retire `UniversalScanner`, old `MobileScanView`, `MedicineInputBar` camera path (text + voice stay). Old edge fns kept one release for safety, then removed.
+### 4. Live sync
+Enable Realtime on `doctor_live_status`, `time_slots`, `doctor_schedules`. `ClinicDataContext` subscribes and refreshes queue + status chips. Patient/Partner apps (future) read the same tables.
 
-**Phase 6 — Memory** Generic `ai_corrections` table (kind, field, before, after, hospital_id, user_id) feeding back into extractor prompts.
+### 5. Design system compliance
+- All colors via existing tokens (`--primary` teal, status semantic tokens); no hardcoded hex.
+- Reuse Card, Tabs, Sheet, Dialog, Badge, Button, Calendar, Popover, Select, Switch, Input.
+- Sidebar, header, typography untouched.
+- Status colors mapped to existing semantic tokens (success/warning/destructive/info/muted).
 
-## Out of scope
+### Technical notes
+- Data isolation via `hospital_id` + RLS on every new table.
+- `dd/mm/yyyy` date display via `date-fns` `format(d, "dd/MM/yyyy")`.
+- All new UI in `src/pages/ClinicManagement.tsx` + `src/components/clinic/*`; services in `src/modules/clinic/availability.ts`; hooks in `src/modules/clinic/availabilityHooks.ts`.
+- Old "Manage Slots" dialog code removed; existing `TimeSlotPicker` retained for booking-side use.
+- Future-ready: sessions table already carries `booking_window_days`, `online_enabled` — teleconsult/multi-branch can add columns without redesign.
 
-- Changing HMS business logic, schemas, billing math, RLS on existing tables.
-- Offline mode.
-- Replacing voice input or smart medicine search.
-- Touching Auth, Patients, IPD, Day Care, Accounts, Staff.
+### Delivery order
+1. Migration (new tables + RLS + GRANTs + generator function).
+2. Services + hooks (`availability.ts`, `availabilityHooks.ts`).
+3. `DoctorAvailabilityEngine` component with all 8 tabs.
+4. Wire into `ClinicManagement.tsx`, remove old Manage Slots dialog.
+5. Realtime subscriptions in `ClinicDataContext`.
+6. Verify: build passes, Playwright open engine → set weekly schedule → verify slots appear on OP Queue.
 
-## Confirmation needed
-
-Reply **approve** and I will implement **Phase 1 (Layer 1 — Universal Upload Engine) only**, including the storage bucket, the mobile-first uploader, and the `/ai-core/test-upload` verification page. I will not touch any existing module in this phase.
-
-Tell me if you want any layer reordered, dropped, or scoped differently before I start.
+Ready to proceed?
