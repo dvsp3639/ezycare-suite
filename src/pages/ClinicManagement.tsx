@@ -38,6 +38,7 @@ import {
 } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import { useLabTestCatalog, useLabOrders } from "@/modules/diagnostics/hooks";
+import DoctorAvailabilityEngine from "@/components/clinic/DoctorAvailabilityEngine";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
