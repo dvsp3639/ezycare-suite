@@ -96,6 +96,7 @@ const ClinicManagement = () => {
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
+  const [engineDoctor, setEngineDoctor] = useState<{ name: string; specialization?: string } | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
