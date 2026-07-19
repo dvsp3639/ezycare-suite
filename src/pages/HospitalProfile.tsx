@@ -153,9 +153,12 @@ const HospitalProfilePage = () => {
       }).eq("id", hospitalId);
 
       // Upsert hospital_profiles
-      const payload = {
+      const payload: any = {
         hospital_id: hospitalId,
-        branding, contact, compliance, signatures,
+        branding: branding as any,
+        contact: contact as any,
+        compliance: compliance as any,
+        signatures: signatures as any,
         published,
         updated_by: user?.id,
       };
