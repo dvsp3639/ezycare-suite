@@ -30,6 +30,7 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { MedicineInputBar } from "@/components/pharmacy/MedicineInputBar";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
@@ -39,6 +40,7 @@ type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
   const { roles } = useAuth();
+  const { data: hospitalProfile } = useHospitalProfile();
   const hospitalId = roles?.[0]?.hospital_id || "";
   const { data: dbPatients } = usePatients();
   const { data: dbMedicines, refetch: refetchMedicines } = useMedicines();
@@ -335,7 +337,14 @@ const Pharmacy = () => {
         .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #888; }
         @media print { body { padding: 16px; } }
       </style></head><body>
-      <div class="header"><h1>EzyOp Pharmacy</h1><p>${e(issueType)} Receipt</p></div>
+      <div class="header">
+        ${hospitalProfile?.logoUrl ? `<img src="${e(hospitalProfile.logoUrl)}" style="height:48px;margin-bottom:6px;" />` : ""}
+        <h1>${e(hospitalProfile?.name || "EzyOp Pharmacy")}</h1>
+        ${hospitalProfile?.tagline ? `<p>${e(hospitalProfile.tagline)}</p>` : ""}
+        <p>${[hospitalProfile?.address, hospitalProfile?.city, hospitalProfile?.state].filter(Boolean).map(e).join(", ")}</p>
+        <p>${hospitalProfile?.phone ? `Tel: ${e(hospitalProfile.phone)}` : ""} ${hospitalProfile?.email ? `• ${e(hospitalProfile.email)}` : ""}</p>
+        <p><strong>${e(issueType)} Receipt</strong></p>
+      </div>
       <div class="info-row">
         <div><strong>Customer:</strong> ${e(activeCustomerName)}<br/><strong>Ref:</strong> ${e(activeRegistration)}<br/><strong>Mobile:</strong> ${e(activeCustomerMobile || "—")}</div>
         <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${e(selectedPatient?.doctor || "—")}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${e(selectedPatient.age)}/${e(selectedPatient.gender)}` : "—"}</div>

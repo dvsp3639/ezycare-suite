@@ -24,6 +24,7 @@ import AiEngineV2Test from "./pages/AiEngineV2Test";
 import ModulePlaceholder from "./pages/ModulePlaceholder";
 import UsersRoles from "./pages/UsersRoles";
 import SuperAdminConsole from "./pages/SuperAdminConsole";
+import HospitalProfilePage from "./pages/HospitalProfile";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -79,6 +80,7 @@ const AppRoutes = () => (
     <Route path="/ai-core/test-upload" element={<ProtectedRoute><AiCoreTestUpload /></ProtectedRoute>} />
     <Route path="/ai-engine-v2/test" element={<ProtectedRoute><AiEngineV2Test /></ProtectedRoute>} />
     <Route path="/users-roles" element={<AdminRoute><UsersRoles /></AdminRoute>} />
+    <Route path="/hospital-profile" element={<AdminRoute><HospitalProfilePage /></AdminRoute>} />
     <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminConsole /></SuperAdminRoute>} />
     <Route path="/:moduleId" element={<ProtectedRoute><ModulePlaceholder /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/login" replace />} />
