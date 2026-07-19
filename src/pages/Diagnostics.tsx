@@ -293,7 +293,7 @@ const Diagnostics = () => {
           testName: resultOrder.testName,
           category: resultOrder.category,
           hospital: hospitalProfile,
-          config: loadLabReportConfig(),
+          config: { ...loadLabReportConfig(), ...(hospitalProfile?.reportConfig || {}) },
           patientName: resultOrder.patientName,
           patientRegNo: resultOrder.patientRegNo,
           uhid: resultOrder.patientRegNo,
