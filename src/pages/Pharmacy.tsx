@@ -337,7 +337,14 @@ const Pharmacy = () => {
         .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #888; }
         @media print { body { padding: 16px; } }
       </style></head><body>
-      <div class="header"><h1>EzyOp Pharmacy</h1><p>${e(issueType)} Receipt</p></div>
+      <div class="header">
+        ${hospitalProfile?.logoUrl ? `<img src="${e(hospitalProfile.logoUrl)}" style="height:48px;margin-bottom:6px;" />` : ""}
+        <h1>${e(hospitalProfile?.name || "EzyOp Pharmacy")}</h1>
+        ${hospitalProfile?.tagline ? `<p>${e(hospitalProfile.tagline)}</p>` : ""}
+        <p>${[hospitalProfile?.address, hospitalProfile?.city, hospitalProfile?.state].filter(Boolean).map(e).join(", ")}</p>
+        <p>${hospitalProfile?.phone ? `Tel: ${e(hospitalProfile.phone)}` : ""} ${hospitalProfile?.email ? `• ${e(hospitalProfile.email)}` : ""}</p>
+        <p><strong>${e(issueType)} Receipt</strong></p>
+      </div>
       <div class="info-row">
         <div><strong>Customer:</strong> ${e(activeCustomerName)}<br/><strong>Ref:</strong> ${e(activeRegistration)}<br/><strong>Mobile:</strong> ${e(activeCustomerMobile || "—")}</div>
         <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${e(selectedPatient?.doctor || "—")}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${e(selectedPatient.age)}/${e(selectedPatient.gender)}` : "—"}</div>
