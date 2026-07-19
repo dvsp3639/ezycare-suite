@@ -11,6 +11,7 @@ import {
   Package,
   Pill,
   Users,
+  Building,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,4 +36,5 @@ export const modules: ModuleItem[] = [
   { id: "pharmacy", title: "Pharmacy", icon: Pill, description: "Pharmacy management", route: "/pharmacy", color: "bg-info/10 text-info" },
   { id: "staff-payroll", title: "Staff & Payroll", icon: Users, description: "Staff attendance & salary", route: "/staff-payroll", color: "bg-primary/10 text-primary" },
   { id: "users-roles", title: "Users & Roles", icon: Shield, description: "Manage staff credentials", route: "/users-roles", color: "bg-destructive/10 text-destructive" },
+  { id: "hospital-profile", title: "Hospital Profile", icon: Building, description: "Branding, letterhead & compliance", route: "/hospital-profile", color: "bg-primary/10 text-primary" },
 ];
