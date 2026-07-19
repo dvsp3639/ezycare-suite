@@ -30,6 +30,7 @@ import { usePatients } from "@/modules/patients/hooks";
 import { useMedicines } from "@/modules/pharmacy/hooks";
 import { pharmacyService } from "@/modules/pharmacy/services";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { MedicineInputBar } from "@/components/pharmacy/MedicineInputBar";
 import { supabase } from "@/integrations/supabase/client";
 import type { Medicine as DbMedicine } from "@/modules/pharmacy/types";
