@@ -40,6 +40,7 @@ type OrderSource = "doctor" | "manual" | null;
 
 const Pharmacy = () => {
   const { roles } = useAuth();
+  const { data: hospitalProfile } = useHospitalProfile();
   const hospitalId = roles?.[0]?.hospital_id || "";
   const { data: dbPatients } = usePatients();
   const { data: dbMedicines, refetch: refetchMedicines } = useMedicines();
