@@ -7,11 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SubscriptionsTab } from "@/components/superadmin/SubscriptionsTab";
+import { AIMonitoringTab } from "@/components/superadmin/AIMonitoringTab";
+import { SupportTab } from "@/components/superadmin/SupportTab";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield } from "lucide-react";
+import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield, CreditCard, Sparkles, LifeBuoy } from "lucide-react";
 
 interface Hospital {
   id: string;
@@ -238,6 +241,9 @@ export default function SuperAdminConsole() {
           <TabsList>
             <TabsTrigger value="hospitals"><Building2 className="h-4 w-4 mr-1" /> Hospitals ({hospitals.length})</TabsTrigger>
             <TabsTrigger value="admins"><Users className="h-4 w-4 mr-1" /> Hospital Admins ({admins.length})</TabsTrigger>
+            <TabsTrigger value="subscriptions"><CreditCard className="h-4 w-4 mr-1" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="ai"><Sparkles className="h-4 w-4 mr-1" /> AI Monitoring</TabsTrigger>
+            <TabsTrigger value="support"><LifeBuoy className="h-4 w-4 mr-1" /> Support</TabsTrigger>
           </TabsList>
 
           {/* HOSPITALS */}
@@ -339,6 +345,36 @@ export default function SuperAdminConsole() {
                 </Table>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="subscriptions" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">Hospital Subscriptions</h2>
+                <p className="text-sm text-muted-foreground">Manage plans, billing cycles, renewals and usage limits.</p>
+              </div>
+            </div>
+            <SubscriptionsTab />
+          </TabsContent>
+
+          <TabsContent value="ai" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">AI Feature Control & Intelligence</h2>
+                <p className="text-sm text-muted-foreground">Toggle AI per hospital and monitor accuracy, latency and errors.</p>
+              </div>
+            </div>
+            <AIMonitoringTab />
+          </TabsContent>
+
+          <TabsContent value="support" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">Customer Support</h2>
+                <p className="text-sm text-muted-foreground">Reply to hospital tickets, add internal notes and manage SLAs.</p>
+              </div>
+            </div>
+            <SupportTab />
           </TabsContent>
         </Tabs>
       </main>
