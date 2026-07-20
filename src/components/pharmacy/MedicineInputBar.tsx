@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { compressImageFile } from "@/lib/mobileScanHelpers";
 import { fileDebugInfo, traceFailure, traceUpload } from "@/lib/mobileUploadDiagnostics";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 
 export type MedicineLike = {
   id: string;
@@ -86,6 +87,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
 /* ---------------- component ---------------- */
 
 export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
+  const { aiEnabled } = useHospitalConfig();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
