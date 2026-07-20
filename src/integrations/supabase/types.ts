@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_events: {
+        Row: {
+          confidence_score: number | null
+          correction_delta: Json | null
+          created_at: string
+          error_message: string | null
+          feature: Database["public"]["Enums"]["ai_feature"]
+          hospital_id: string | null
+          id: string
+          latency_ms: number | null
+          metadata: Json
+          model: string | null
+          status: Database["public"]["Enums"]["ai_event_status"]
+          tokens_in: number | null
+          tokens_out: number | null
+          user_id: string | null
+          was_corrected: boolean
+        }
+        Insert: {
+          confidence_score?: number | null
+          correction_delta?: Json | null
+          created_at?: string
+          error_message?: string | null
+          feature: Database["public"]["Enums"]["ai_feature"]
+          hospital_id?: string | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json
+          model?: string | null
+          status?: Database["public"]["Enums"]["ai_event_status"]
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string | null
+          was_corrected?: boolean
+        }
+        Update: {
+          confidence_score?: number | null
+          correction_delta?: Json | null
+          created_at?: string
+          error_message?: string | null
+          feature?: Database["public"]["Enums"]["ai_feature"]
+          hospital_id?: string | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json
+          model?: string | null
+          status?: Database["public"]["Enums"]["ai_event_status"]
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string | null
+          was_corrected?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_events_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -1121,9 +1183,78 @@ export type Database = {
           },
         ]
       }
+      hospital_subscriptions: {
+        Row: {
+          amount: number
+          billing_cycle: string
+          cancelled_at: string | null
+          created_at: string
+          currency: string
+          current_period_end: string | null
+          features: Json
+          hospital_id: string
+          id: string
+          max_patients_per_month: number | null
+          max_users: number | null
+          notes: string | null
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          started_at: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          billing_cycle?: string
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          features?: Json
+          hospital_id: string
+          id?: string
+          max_patients_per_month?: number | null
+          max_users?: number | null
+          notes?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_cycle?: string
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          features?: Json
+          hospital_id?: string
+          id?: string
+          max_patients_per_month?: number | null
+          max_users?: number | null
+          notes?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_subscriptions_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: true
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hospitals: {
         Row: {
           address: string | null
+          ai_enabled: boolean
           city: string | null
           created_at: string
           email: string | null
@@ -1137,6 +1268,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_enabled?: boolean
           city?: string | null
           created_at?: string
           email?: string | null
@@ -1150,6 +1282,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_enabled?: boolean
           city?: string | null
           created_at?: string
           email?: string | null
@@ -3051,6 +3184,121 @@ export type Database = {
           },
         ]
       }
+      support_ticket_messages: {
+        Row: {
+          attachments: Json
+          body: string
+          created_at: string
+          id: string
+          internal_note: boolean
+          sender_id: string
+          sender_role: string
+          ticket_id: string
+        }
+        Insert: {
+          attachments?: Json
+          body: string
+          created_at?: string
+          id?: string
+          internal_note?: boolean
+          sender_id: string
+          sender_role: string
+          ticket_id: string
+        }
+        Update: {
+          attachments?: Json
+          body?: string
+          created_at?: string
+          id?: string
+          internal_note?: boolean
+          sender_id?: string
+          sender_role?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          admin_unread_count: number
+          assigned_to: string | null
+          category: Database["public"]["Enums"]["ticket_category"]
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          first_response_at: string | null
+          hospital_id: string
+          hospital_unread_count: number
+          id: string
+          last_message_at: string
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at: string | null
+          sla_due_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          ticket_no: string
+          updated_at: string
+        }
+        Insert: {
+          admin_unread_count?: number
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          first_response_at?: string | null
+          hospital_id: string
+          hospital_unread_count?: number
+          id?: string
+          last_message_at?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at?: string | null
+          sla_due_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          ticket_no: string
+          updated_at?: string
+        }
+        Update: {
+          admin_unread_count?: number
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          first_response_at?: string | null
+          hospital_id?: string
+          hospital_unread_count?: number
+          id?: string
+          last_message_at?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at?: string | null
+          sla_due_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          ticket_no?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       surgical_entries: {
         Row: {
           admission_id: string
@@ -3413,6 +3661,13 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
+      ai_event_status: "success" | "error" | "low_confidence" | "blocked"
+      ai_feature:
+        | "prescription_scan"
+        | "invoice_scan"
+        | "universal_search"
+        | "voice_transcribe"
+        | "medicine_scan"
       app_role:
         | "super_admin"
         | "hospital_admin"
@@ -3422,6 +3677,27 @@ export type Database = {
         | "lab_technician"
         | "pharmacist"
         | "receptionist"
+      subscription_plan: "trial" | "basic" | "professional" | "enterprise"
+      subscription_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "suspended"
+        | "cancelled"
+      ticket_category:
+        | "bug"
+        | "feature"
+        | "billing"
+        | "ai"
+        | "training"
+        | "other"
+      ticket_priority: "low" | "medium" | "high" | "urgent"
+      ticket_status:
+        | "open"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3549,6 +3825,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_event_status: ["success", "error", "low_confidence", "blocked"],
+      ai_feature: [
+        "prescription_scan",
+        "invoice_scan",
+        "universal_search",
+        "voice_transcribe",
+        "medicine_scan",
+      ],
       app_role: [
         "super_admin",
         "hospital_admin",
@@ -3558,6 +3842,23 @@ export const Constants = {
         "lab_technician",
         "pharmacist",
         "receptionist",
+      ],
+      subscription_plan: ["trial", "basic", "professional", "enterprise"],
+      subscription_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "suspended",
+        "cancelled",
+      ],
+      ticket_category: ["bug", "feature", "billing", "ai", "training", "other"],
+      ticket_priority: ["low", "medium", "high", "urgent"],
+      ticket_status: [
+        "open",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
       ],
     },
   },
