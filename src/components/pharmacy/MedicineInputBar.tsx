@@ -376,7 +376,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
               <X className="h-4 w-4" />
             </Button>
           )}
-          <Button
+          {aiEnabled && <Button
             type="button"
             size="icon"
             variant={recording ? "destructive" : "ghost"}
@@ -387,8 +387,8 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
             title={recording ? "Stop recording" : "Speak medicine names"}
           >
             {voiceBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-          <Button
+          </Button>}
+          {aiEnabled && <Button
             type="button"
             size="icon"
             variant="ghost"
@@ -399,7 +399,7 @@ export const MedicineInputBar = ({ medicines, onAdd }: Props) => {
             title="Scan medicine / prescription image"
           >
             {scanBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          </Button>
+          </Button>}
         </div>
         <input
           ref={fileRef}
