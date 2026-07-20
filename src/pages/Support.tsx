@@ -17,7 +17,8 @@ const PRIORITIES = ["low", "medium", "high", "urgent"];
 const CATEGORIES = ["bug", "feature", "billing", "ai", "training", "other"];
 
 export default function Support() {
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
+  const hospitalId = roles.find((r) => r.hospital_id)?.hospital_id;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,7 @@ export default function Support() {
 
   const create = async () => {
     if (!form.subject.trim()) return toast.error("Subject required");
+    if (!hospitalId) return toast.error("No hospital associated with your account");
     setSaving(true);
     try {
       const { data, error } = await (supabase.from("support_tickets" as any) as any)
@@ -53,6 +55,7 @@ export default function Support() {
           category: form.category,
           priority: form.priority,
           created_by: user!.id,
+          hospital_id: hospitalId,
         }).select().single();
       if (error) throw error;
       toast.success(`Ticket ${(data as any).ticket_no} created`);
