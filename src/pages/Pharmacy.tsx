@@ -323,28 +323,18 @@ const Pharmacy = () => {
     const pw = window.open("", "_blank");
     if (!pw) return;
     const e = escapeHtml;
+    const lh = buildLetterhead(hospitalProfile as any, { title: `${issueType} Receipt` });
     pw.document.write(`
       <html><head><title>${e(issueType)} Receipt – ${e(selectedPatient?.name)}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 32px; max-width: 700px; margin: auto; font-size: 13px; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 16px; }
-        .header h1 { font-size: 18px; margin: 0; } .header p { margin: 2px 0; color: #666; font-size: 11px; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; }
-        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        ${lh.styles}
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size:13px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size:13px; }
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
         th { background: #f5f5f5; font-size: 12px; }
-        .totals { text-align: right; margin-top: 12px; } .totals p { margin: 4px 0; }
-        .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #888; }
-        @media print { body { padding: 16px; } }
-      </style></head><body>
-      <div class="header">
-        ${hospitalProfile?.logoUrl ? `<img src="${e(hospitalProfile.logoUrl)}" style="height:48px;margin-bottom:6px;" />` : ""}
-        <h1>${e(hospitalProfile?.name || "EzyOp Pharmacy")}</h1>
-        ${hospitalProfile?.tagline ? `<p>${e(hospitalProfile.tagline)}</p>` : ""}
-        <p>${[hospitalProfile?.address, hospitalProfile?.city, hospitalProfile?.state].filter(Boolean).map(e).join(", ")}</p>
-        <p>${hospitalProfile?.phone ? `Tel: ${e(hospitalProfile.phone)}` : ""} ${hospitalProfile?.email ? `• ${e(hospitalProfile.email)}` : ""}</p>
-        <p><strong>${e(issueType)} Receipt</strong></p>
-      </div>
+        .totals { text-align: right; margin-top: 12px; font-size:13px; } .totals p { margin: 4px 0; }
+      </style></head><body><div class="lh-doc">
+      ${lh.header}
       <div class="info-row">
         <div><strong>Customer:</strong> ${e(activeCustomerName)}<br/><strong>Ref:</strong> ${e(activeRegistration)}<br/><strong>Mobile:</strong> ${e(activeCustomerMobile || "—")}</div>
         <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}<br/><strong>Doctor:</strong> ${e(selectedPatient?.doctor || "—")}<br/><strong>Age/Gender:</strong> ${selectedPatient ? `${e(selectedPatient.age)}/${e(selectedPatient.gender)}` : "—"}</div>
@@ -358,8 +348,8 @@ const Pharmacy = () => {
         <p><strong>Net Amount: ₹${netAmount.toFixed(2)}</strong></p>
         <p>Payment: ${e(isIP || isDirectSale ? paymentMode : "Cash")}</p>
       </div>
-      <div class="footer"><p>Thank you – Get well soon!</p></div>
-      </body></html>
+      ${lh.footer}
+      </div></body></html>
     `);
     pw.document.close();
     pw.print();
