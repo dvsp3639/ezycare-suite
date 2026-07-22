@@ -22,9 +22,18 @@ interface Hospital {
   address?: string;
   city?: string;
   state?: string;
+  pincode?: string;
+  country?: string;
   phone?: string;
   email?: string;
   license_number?: string;
+  gstin?: string;
+  website?: string;
+  logo_url?: string;
+  tagline?: string;
+  timezone?: string;
+  currency?: string;
+  registration_prefix?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -39,7 +48,12 @@ interface AdminUser {
   phone?: string;
 }
 
-const emptyHospital = { name: "", address: "", city: "", state: "", phone: "", email: "", license_number: "" };
+const emptyHospital = {
+  name: "", address: "", city: "", state: "", pincode: "", country: "India",
+  phone: "", email: "", license_number: "", gstin: "", website: "",
+  logo_url: "", tagline: "", timezone: "Asia/Kolkata", currency: "INR",
+  registration_prefix: "",
+};
 const emptyAdmin = { email: "", password: "", full_name: "", phone: "", hospital_id: "" };
 
 export default function SuperAdminConsole() {
@@ -93,7 +107,11 @@ export default function SuperAdminConsole() {
   const openHospital = (h?: Hospital) => {
     setHForm(h ? {
       name: h.name, address: h.address || "", city: h.city || "", state: h.state || "",
+      pincode: h.pincode || "", country: h.country || "India",
       phone: h.phone || "", email: h.email || "", license_number: h.license_number || "",
+      gstin: h.gstin || "", website: h.website || "", logo_url: h.logo_url || "",
+      tagline: h.tagline || "", timezone: h.timezone || "Asia/Kolkata",
+      currency: h.currency || "INR", registration_prefix: h.registration_prefix || "",
     } : emptyHospital);
     setHDialog({ open: true, edit: h });
   };
@@ -125,11 +143,7 @@ export default function SuperAdminConsole() {
     try {
       await api(`hospitals/${h.id}`, {
         method: "PUT",
-        body: {
-          name: h.name, address: h.address, city: h.city, state: h.state,
-          phone: h.phone, email: h.email, license_number: h.license_number,
-          is_active: !h.is_active,
-        },
+        body: { is_active: !h.is_active },
       });
       toast.success(h.is_active ? "Hospital deactivated" : "Hospital activated");
       loadAll();
@@ -381,16 +395,25 @@ export default function SuperAdminConsole() {
 
       {/* Hospital Dialog */}
       <Dialog open={hDialog.open} onOpenChange={(open) => setHDialog({ open })}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{hDialog.edit ? "Edit Hospital" : "Add Hospital"}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Name *</Label><Input value={hForm.name} onChange={(e) => setHForm({ ...hForm, name: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Tagline</Label><Input value={hForm.tagline} onChange={(e) => setHForm({ ...hForm, tagline: e.target.value })} placeholder="e.g. Caring for life since 1985" /></div>
             <div className="col-span-2"><Label>Address</Label><Input value={hForm.address} onChange={(e) => setHForm({ ...hForm, address: e.target.value })} /></div>
             <div><Label>City</Label><Input value={hForm.city} onChange={(e) => setHForm({ ...hForm, city: e.target.value })} /></div>
             <div><Label>State</Label><Input value={hForm.state} onChange={(e) => setHForm({ ...hForm, state: e.target.value })} /></div>
+            <div><Label>Pincode</Label><Input value={hForm.pincode} onChange={(e) => setHForm({ ...hForm, pincode: e.target.value })} /></div>
+            <div><Label>Country</Label><Input value={hForm.country} onChange={(e) => setHForm({ ...hForm, country: e.target.value })} /></div>
             <div><Label>Phone</Label><Input value={hForm.phone} onChange={(e) => setHForm({ ...hForm, phone: e.target.value })} /></div>
             <div><Label>Email</Label><Input type="email" value={hForm.email} onChange={(e) => setHForm({ ...hForm, email: e.target.value })} /></div>
-            <div className="col-span-2"><Label>License Number</Label><Input value={hForm.license_number} onChange={(e) => setHForm({ ...hForm, license_number: e.target.value })} /></div>
+            <div><Label>Website</Label><Input value={hForm.website} onChange={(e) => setHForm({ ...hForm, website: e.target.value })} placeholder="https://" /></div>
+            <div><Label>Logo URL</Label><Input value={hForm.logo_url} onChange={(e) => setHForm({ ...hForm, logo_url: e.target.value })} placeholder="https://" /></div>
+            <div><Label>License Number</Label><Input value={hForm.license_number} onChange={(e) => setHForm({ ...hForm, license_number: e.target.value })} /></div>
+            <div><Label>GSTIN</Label><Input value={hForm.gstin} onChange={(e) => setHForm({ ...hForm, gstin: e.target.value })} /></div>
+            <div><Label>Timezone</Label><Input value={hForm.timezone} onChange={(e) => setHForm({ ...hForm, timezone: e.target.value })} /></div>
+            <div><Label>Currency</Label><Input value={hForm.currency} onChange={(e) => setHForm({ ...hForm, currency: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Registration Number Prefix</Label><Input value={hForm.registration_prefix} onChange={(e) => setHForm({ ...hForm, registration_prefix: e.target.value })} placeholder="e.g. EZY" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHDialog({ open: false })}>Cancel</Button>

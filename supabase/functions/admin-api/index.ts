@@ -301,12 +301,20 @@ serve(async (req) => {
 
     if (path === "hospitals" && method === "POST") {
       const body = await req.json();
-      const { name, address, city, state, phone, email, license_number } = body;
+      const {
+        name, address, city, state, pincode, country, phone, email,
+        license_number, gstin, website, logo_url, tagline, timezone,
+        currency, registration_prefix,
+      } = body;
       if (!name) throw new Error("Hospital name is required");
 
       const { data, error } = await adminClient
         .from("hospitals")
-        .insert({ name, address, city, state, phone, email, license_number })
+        .insert({
+          name, address, city, state, pincode, country, phone, email,
+          license_number, gstin, website, logo_url, tagline, timezone,
+          currency, registration_prefix,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -320,11 +328,24 @@ serve(async (req) => {
     if (hospitalMatch && method === "PUT") {
       const hospitalId = hospitalMatch[1];
       const body = await req.json();
-      const { name, address, city, state, phone, email, license_number, is_active } = body;
+      const allowedFields = [
+        "name","address","city","state","pincode","country","phone","email",
+        "license_number","gstin","website","logo_url","tagline","timezone",
+        "currency","registration_prefix","is_active","ai_enabled",
+      ];
+      const updatePayload: Record<string, unknown> = {};
+      for (const key of allowedFields) {
+        if (Object.prototype.hasOwnProperty.call(body, key)) {
+          updatePayload[key] = body[key];
+        }
+      }
+      if (Object.keys(updatePayload).length === 0) {
+        throw new Error("No hospital fields provided to update");
+      }
 
       const { data, error } = await adminClient
         .from("hospitals")
-        .update({ name, address, city, state, phone, email, license_number, is_active })
+        .update(updatePayload)
         .eq("id", hospitalId)
         .select()
         .single();
