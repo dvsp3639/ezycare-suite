@@ -28,6 +28,8 @@ import { useAdmissions } from "@/modules/ipd/hooks";
 import { ipdService } from "@/modules/ipd/services";
 import { usePatients } from "@/modules/patients/hooks";
 import { useStaffMembers } from "@/modules/staff/hooks";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
+import { buildLetterhead } from "@/lib/letterhead";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 
