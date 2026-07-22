@@ -14,6 +14,13 @@ export interface HospitalProfile {
   logoUrl?: string;
   tagline?: string;
   accentColor?: string;
+  letterheadUrl?: string;
+  letterheadPath?: string;
+  footerNote?: string;
+  showLetterheadHeader?: boolean;
+  showLetterheadFooter?: boolean;
+  website?: string;
+  gstin?: string;
   reportConfig?: Partial<LabReportConfig>;
 }
 
@@ -69,6 +76,7 @@ export function useHospitalProfile() {
       const contact = (profileRow?.contact as any) || {};
       const compliance = (profileRow?.compliance as any) || {};
       const logoUrl = await resolveLogoUrl(branding.logoPath || branding.logoUrl);
+      const letterheadUrl = await resolveLogoUrl(branding.letterheadPath || branding.letterheadUrl);
       return {
         id: data.id,
         name: branding.displayName || data.name || FALLBACK.name,
@@ -81,6 +89,13 @@ export function useHospitalProfile() {
         logoUrl,
         tagline: branding.tagline || "",
         accentColor: branding.accentColor,
+        letterheadUrl,
+        letterheadPath: branding.letterheadPath,
+        footerNote: branding.letterhead?.footerNote || "",
+        showLetterheadHeader: branding.letterhead?.showHeader !== false,
+        showLetterheadFooter: branding.letterhead?.showFooter !== false,
+        website: contact.website || "",
+        gstin: compliance.gstin || "",
         reportConfig: {
           logoUrl,
           accentColor: branding.accentColor,

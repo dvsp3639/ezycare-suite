@@ -19,6 +19,7 @@ interface Branding {
   accentColor?: string;
   logoPath?: string;
   watermarkText?: string;
+  letterheadPath?: string;
   letterhead?: { showHeader?: boolean; showFooter?: boolean; footerNote?: string };
 }
 interface Contact { address?: string; city?: string; state?: string; pincode?: string; phone?: string; email?: string; website?: string; supportEmail?: string; }
@@ -33,9 +34,10 @@ const HospitalProfilePage = () => {
   const qc = useQueryClient();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const signInputRef = useRef<HTMLInputElement>(null);
+  const letterheadInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<"logo" | "signature" | null>(null);
+  const [uploading, setUploading] = useState<"logo" | "signature" | "letterhead" | null>(null);
   const [hospitalId, setHospitalId] = useState<string | null>(null);
   const [hospitalName, setHospitalName] = useState("");
   const [branding, setBranding] = useState<Branding>({ accentColor: "#0d9488", letterhead: { showHeader: true, showFooter: true } });
@@ -45,6 +47,7 @@ const HospitalProfilePage = () => {
   const [published, setPublished] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string>("");
   const [signaturePreview, setSignaturePreview] = useState<string>("");
+  const [letterheadPreview, setLetterheadPreview] = useState<string>("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["hospital-profile-editor", user?.id],
@@ -94,6 +97,10 @@ const HospitalProfilePage = () => {
         const { data: s } = await supabase.storage.from("hospital-assets").createSignedUrl(b.logoPath, 3600);
         setLogoPreview(s?.signedUrl || "");
       }
+      if (b.letterheadPath) {
+        const { data: s } = await supabase.storage.from("hospital-assets").createSignedUrl(b.letterheadPath, 3600);
+        setLetterheadPreview(s?.signedUrl || "");
+      }
       const sigPath = (p.signatures || {}).digitalSignaturePath;
       if (sigPath) {
         const { data: s } = await supabase.storage.from("hospital-assets").createSignedUrl(sigPath, 3600);
@@ -116,6 +123,28 @@ const HospitalProfilePage = () => {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
       return null;
     } finally { setUploading(null); }
+  };
+
+  const uploadLetterhead = async (file: File) => {
+    if (!hospitalId) return null;
+    setUploading("letterhead");
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${hospitalId}/letterhead-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("hospital-assets").upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      const { data: signed } = await supabase.storage.from("hospital-assets").createSignedUrl(path, 3600);
+      return { path, url: signed?.signedUrl || "" };
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+      return null;
+    } finally { setUploading(null); }
+  };
+
+  const onLetterheadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const res = await uploadLetterhead(f);
+    if (res) { setBranding((b) => ({ ...b, letterheadPath: res.path })); setLetterheadPreview(res.url); }
   };
 
   const onLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,6 +290,26 @@ const HospitalProfilePage = () => {
           <Card>
             <CardHeader><CardTitle className="text-base">Letterhead</CardTitle></CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <Label>Pre-designed Letterhead Image (optional)</Label>
+                <p className="text-xs text-muted-foreground mb-2">If uploaded, it will replace the text-based header on OP receipts, prescriptions, pharmacy bills, diagnostic reports and discharge summaries. Recommended: 1240 × 260 PNG/JPG.</p>
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div className="w-64 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/30 overflow-hidden">
+                    {letterheadPreview ? <img src={letterheadPreview} alt="Letterhead" className="max-w-full max-h-full object-contain" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
+                  </div>
+                  <div className="space-y-2">
+                    <input ref={letterheadInputRef} type="file" accept="image/*" className="hidden" onChange={onLetterheadChange} />
+                    <Button variant="outline" onClick={() => letterheadInputRef.current?.click()} disabled={uploading === "letterhead"} className="gap-2">
+                      {uploading === "letterhead" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload Letterhead
+                    </Button>
+                    {branding.letterheadPath && (
+                      <Button variant="ghost" size="sm" onClick={() => { setBranding({ ...branding, letterheadPath: undefined }); setLetterheadPreview(""); }} className="gap-1 text-destructive">
+                        <Trash2 className="h-3 w-3" /> Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center justify-between"><Label>Show branded header on reports</Label>
                 <Switch checked={!!branding.letterhead?.showHeader} onCheckedChange={(v) => setBranding({ ...branding, letterhead: { ...branding.letterhead, showHeader: v } })} />
               </div>

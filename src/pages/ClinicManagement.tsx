@@ -27,6 +27,8 @@ import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
 import { daycareService } from "@/modules/daycare/services";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
+import { buildLetterhead } from "@/lib/letterhead";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -83,6 +85,7 @@ const ClinicManagement = () => {
   } = useClinicData();
   const { roles } = useAuth();
   const hospitalId = roles?.[0]?.hospital_id || "";
+  const { data: hospitalProfile } = useHospitalProfile();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const labCatEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
@@ -526,13 +529,11 @@ const ClinicManagement = () => {
     if (!printWindow || !consultPatient) return;
     const rxLines = consultPrescriptions.filter((p) => p.medicine.trim());
     const e = escapeHtml;
+    const lh = buildLetterhead(hospitalProfile as any, { title: "Medical Prescription" });
     printWindow.document.write(`
       <html><head><title>Prescription – ${e(consultPatient.patientName)}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: auto; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
-        .header h1 { font-size: 20px; margin: 0; }
-        .header p { margin: 4px 0; font-size: 12px; color: #666; }
+        ${lh.styles}
         .patient-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
         .section { margin-bottom: 16px; }
         .section h3 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
@@ -540,12 +541,8 @@ const ClinicManagement = () => {
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
         th { background: #f5f5f5; }
         .footer { margin-top: 48px; display: flex; justify-content: space-between; font-size: 12px; }
-        @media print { body { padding: 20px; } }
-      </style></head><body>
-      <div class="header">
-        <h1>EzyOp Clinic</h1>
-        <p>Medical Prescription</p>
-      </div>
+      </style></head><body><div class="lh-doc">
+      ${lh.header}
       <div class="patient-info">
         <div><strong>Patient:</strong> ${e(consultPatient.patientName)}<br/><strong>Reg No:</strong> ${e(consultPatient.registrationNumber)}</div>
         <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}<br/><strong>Doctor:</strong> ${e(consultPatient.doctorName)}</div>
@@ -559,7 +556,8 @@ const ClinicManagement = () => {
       ${consultFollowUp ? `<div class="section"><h3>Follow-up</h3><p>${format(consultFollowUp, "dd/MM/yyyy")}</p></div>` : ""}
       ${consultNotes ? `<div class="section"><h3>Doctor's Notes</h3><p>${e(consultNotes)}</p></div>` : ""}
       <div class="footer"><span>Signature: ___________________</span><span>Date: ${format(new Date(), "dd/MM/yyyy")}</span></div>
-      </body></html>
+      ${lh.footer}
+      </div></body></html>
     `);
     printWindow.document.close();
     printWindow.print();

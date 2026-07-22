@@ -28,6 +28,8 @@ import { useAdmissions } from "@/modules/ipd/hooks";
 import { ipdService } from "@/modules/ipd/services";
 import { usePatients } from "@/modules/patients/hooks";
 import { useStaffMembers } from "@/modules/staff/hooks";
+import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
+import { buildLetterhead } from "@/lib/letterhead";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -130,6 +132,7 @@ const IPD = () => {
 
   // Print ref
   const printRef = useRef<HTMLDivElement>(null);
+  const { data: hospitalProfile } = useHospitalProfile();
 
   // Forms
   const [admitForm, setAdmitForm] = useState<Partial<IPDAdmission>>({});
@@ -403,13 +406,13 @@ const IPD = () => {
     if (!printRef.current) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
+    const lh = buildLetterhead(hospitalProfile as any, { title: "Discharge Summary" });
     printWindow.document.write(`
       <html><head><title>Discharge Summary</title>
       <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
+        ${lh.styles}
         h1 { font-size: 20px; margin-bottom: 4px; }
         h2 { font-size: 16px; color: #444; border-bottom: 2px solid #0066cc; padding-bottom: 4px; margin-top: 24px; }
-        .header { text-align: center; border-bottom: 3px solid #0066cc; padding-bottom: 16px; margin-bottom: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
         .value { font-size: 13px; font-weight: 600; }
@@ -419,10 +422,11 @@ const IPD = () => {
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
         th { background: #f5f5f5; font-weight: 600; }
-        @media print { body { padding: 20px; } }
-      </style></head><body>
+      </style></head><body><div class="lh-doc">
+      ${lh.header}
       ${printRef.current.innerHTML}
-      </body></html>
+      ${lh.footer}
+      </div></body></html>
     `);
     printWindow.document.close();
     printWindow.focus();
