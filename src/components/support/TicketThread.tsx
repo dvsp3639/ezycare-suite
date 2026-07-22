@@ -20,6 +20,7 @@ export interface Ticket {
   created_at: string;
   sla_due_at?: string | null;
   assigned_to?: string | null;
+  contact_number?: string | null;
 }
 
 interface Message {
@@ -105,6 +106,11 @@ export function TicketThread({ ticket, onChange }: { ticket: Ticket; onChange?: 
             <Badge variant="outline">{ticket.category}</Badge>
             <Badge>{ticket.status.replace("_", " ")}</Badge>
           </div>
+          {ticket.contact_number && (
+            <p className="text-xs text-muted-foreground mt-2">
+              📞 Contact: <a href={`tel:${ticket.contact_number}`} className="font-medium text-primary hover:underline">{ticket.contact_number}</a>
+            </p>
+          )}
         </div>
         {isSuperAdmin && (
           <div className="flex gap-1">
