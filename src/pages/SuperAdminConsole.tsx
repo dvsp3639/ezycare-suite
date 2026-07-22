@@ -22,9 +22,18 @@ interface Hospital {
   address?: string;
   city?: string;
   state?: string;
+  pincode?: string;
+  country?: string;
   phone?: string;
   email?: string;
   license_number?: string;
+  gstin?: string;
+  website?: string;
+  logo_url?: string;
+  tagline?: string;
+  timezone?: string;
+  currency?: string;
+  registration_prefix?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -39,7 +48,12 @@ interface AdminUser {
   phone?: string;
 }
 
-const emptyHospital = { name: "", address: "", city: "", state: "", phone: "", email: "", license_number: "" };
+const emptyHospital = {
+  name: "", address: "", city: "", state: "", pincode: "", country: "India",
+  phone: "", email: "", license_number: "", gstin: "", website: "",
+  logo_url: "", tagline: "", timezone: "Asia/Kolkata", currency: "INR",
+  registration_prefix: "",
+};
 const emptyAdmin = { email: "", password: "", full_name: "", phone: "", hospital_id: "" };
 
 export default function SuperAdminConsole() {
@@ -93,7 +107,11 @@ export default function SuperAdminConsole() {
   const openHospital = (h?: Hospital) => {
     setHForm(h ? {
       name: h.name, address: h.address || "", city: h.city || "", state: h.state || "",
+      pincode: h.pincode || "", country: h.country || "India",
       phone: h.phone || "", email: h.email || "", license_number: h.license_number || "",
+      gstin: h.gstin || "", website: h.website || "", logo_url: h.logo_url || "",
+      tagline: h.tagline || "", timezone: h.timezone || "Asia/Kolkata",
+      currency: h.currency || "INR", registration_prefix: h.registration_prefix || "",
     } : emptyHospital);
     setHDialog({ open: true, edit: h });
   };
@@ -125,11 +143,7 @@ export default function SuperAdminConsole() {
     try {
       await api(`hospitals/${h.id}`, {
         method: "PUT",
-        body: {
-          name: h.name, address: h.address, city: h.city, state: h.state,
-          phone: h.phone, email: h.email, license_number: h.license_number,
-          is_active: !h.is_active,
-        },
+        body: { is_active: !h.is_active },
       });
       toast.success(h.is_active ? "Hospital deactivated" : "Hospital activated");
       loadAll();
