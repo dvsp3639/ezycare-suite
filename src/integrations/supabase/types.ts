@@ -1256,43 +1256,70 @@ export type Database = {
           address: string | null
           ai_enabled: boolean
           city: string | null
+          country: string | null
           created_at: string
+          currency: string | null
           email: string | null
+          gstin: string | null
           id: string
           is_active: boolean
           license_number: string | null
+          logo_url: string | null
           name: string
           phone: string | null
+          pincode: string | null
+          registration_prefix: string | null
           state: string | null
+          tagline: string | null
+          timezone: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           address?: string | null
           ai_enabled?: boolean
           city?: string | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
           email?: string | null
+          gstin?: string | null
           id?: string
           is_active?: boolean
           license_number?: string | null
+          logo_url?: string | null
           name: string
           phone?: string | null
+          pincode?: string | null
+          registration_prefix?: string | null
           state?: string | null
+          tagline?: string | null
+          timezone?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           address?: string | null
           ai_enabled?: boolean
           city?: string | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
           email?: string | null
+          gstin?: string | null
           id?: string
           is_active?: boolean
           license_number?: string | null
+          logo_url?: string | null
           name?: string
           phone?: string | null
+          pincode?: string | null
+          registration_prefix?: string | null
           state?: string | null
+          tagline?: string | null
+          timezone?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
