@@ -74,6 +74,8 @@ export default function SuperAdminConsole() {
   const [pwDialog, setPwDialog] = useState<{ open: boolean; admin?: AdminUser }>({ open: false });
   const [pwValue, setPwValue] = useState("");
 
+  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; hospital?: Hospital }>({ open: false });
+
   const api = async (path: string, options: { method?: string; body?: any } = {}) => {
     const { data, error } = await supabase.functions.invoke(`admin-api/${path}`, {
       method: (options.method as any) || "GET",
@@ -150,6 +152,12 @@ export default function SuperAdminConsole() {
     } catch (e: any) {
       toast.error(e.message);
     }
+  };
+
+  const confirmToggleHospitalActive = async () => {
+    if (!toggleDialog.hospital) return;
+    await toggleHospitalActive(toggleDialog.hospital);
+    setToggleDialog({ open: false });
   };
 
   // ---------- Admins ----------
@@ -299,7 +307,7 @@ export default function SuperAdminConsole() {
                           <Button variant="ghost" size="sm" onClick={() => openHospital(h)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleHospitalActive(h)} title={h.is_active ? "Deactivate" : "Activate"}>
+                          <Button variant="ghost" size="sm" onClick={() => setToggleDialog({ open: true, hospital: h })} title={h.is_active ? "Deactivate" : "Activate"}>
                             <Power className={`h-4 w-4 ${h.is_active ? "text-destructive" : "text-success"}`} />
                           </Button>
                         </TableCell>
@@ -471,6 +479,31 @@ export default function SuperAdminConsole() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPwDialog({ open: false })}>Cancel</Button>
             <Button onClick={resetPassword}>Reset</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activate/Deactivate Confirmation */}
+      <Dialog open={toggleDialog.open} onOpenChange={(open) => setToggleDialog({ open })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {toggleDialog.hospital?.is_active ? "Deactivate Hospital" : "Activate Hospital"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to {toggleDialog.hospital?.is_active ? "deactivate" : "activate"}{" "}
+            <span className="font-semibold text-foreground">{toggleDialog.hospital?.name}</span>?
+            {toggleDialog.hospital?.is_active && " Users of this hospital will lose access until reactivated."}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToggleDialog({ open: false })}>Cancel</Button>
+            <Button
+              variant={toggleDialog.hospital?.is_active ? "destructive" : "default"}
+              onClick={confirmToggleHospitalActive}
+            >
+              {toggleDialog.hospital?.is_active ? "Deactivate" : "Activate"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
