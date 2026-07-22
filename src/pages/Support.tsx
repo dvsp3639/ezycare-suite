@@ -23,8 +23,9 @@ export default function Support() {
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [dlg, setDlg] = useState(false);
-  const [form, setForm] = useState({ subject: "", description: "", category: "other", priority: "medium" });
+  const [form, setForm] = useState({ subject: "", description: "", category: "other", priority: "medium", contact_number: "" });
   const [saving, setSaving] = useState(false);
+  const [defaultContact, setDefaultContact] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -43,8 +44,26 @@ export default function Support() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  useEffect(() => {
+    if (!hospitalId) return;
+    (async () => {
+      const [{ data: hp }, { data: h }] = await Promise.all([
+        supabase.from("hospital_profiles").select("contact").eq("hospital_id", hospitalId).maybeSingle(),
+        supabase.from("hospitals").select("phone").eq("id", hospitalId).maybeSingle(),
+      ]);
+      const phone = (hp?.contact as any)?.phone || h?.phone || "";
+      setDefaultContact(phone);
+    })();
+  }, [hospitalId]);
+
+  const openDialog = () => {
+    setForm({ subject: "", description: "", category: "other", priority: "medium", contact_number: defaultContact });
+    setDlg(true);
+  };
+
   const create = async () => {
     if (!form.subject.trim()) return toast.error("Subject required");
+    if (!form.contact_number.trim()) return toast.error("Contact number required");
     if (!hospitalId) return toast.error("No hospital associated with your account");
     setSaving(true);
     try {
@@ -54,13 +73,14 @@ export default function Support() {
           description: form.description.trim() || null,
           category: form.category,
           priority: form.priority,
+          contact_number: form.contact_number.trim(),
           created_by: user!.id,
           hospital_id: hospitalId,
         }).select().single();
       if (error) throw error;
       toast.success(`Ticket ${(data as any).ticket_no} created`);
       setDlg(false);
-      setForm({ subject: "", description: "", category: "other", priority: "medium" });
+      setForm({ subject: "", description: "", category: "other", priority: "medium", contact_number: defaultContact });
       load();
       setSelected(data as any);
     } catch (e: any) {
@@ -80,7 +100,7 @@ export default function Support() {
             <p className="text-sm text-muted-foreground">Raise tickets and chat with Ezy OP support</p>
           </div>
         </div>
-        <Button onClick={() => setDlg(true)}><Plus className="h-4 w-4 mr-1" /> New Ticket</Button>
+        <Button onClick={openDialog}><Plus className="h-4 w-4 mr-1" /> New Ticket</Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 h-[calc(100vh-220px)]">
@@ -125,6 +145,17 @@ export default function Support() {
           <div className="space-y-3">
             <div><Label>Subject *</Label><Input value={form.subject} onChange={(e) => setForm({...form, subject: e.target.value})} /></div>
             <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} /></div>
+            <div>
+              <Label>Contact Number *</Label>
+              <Input
+                value={form.contact_number}
+                onChange={(e) => setForm({...form, contact_number: e.target.value})}
+                placeholder="Phone number for support callback"
+              />
+              {defaultContact && form.contact_number === defaultContact && (
+                <p className="text-[10px] text-muted-foreground mt-1">Auto-filled from hospital profile. Edit if different.</p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Category</Label>
