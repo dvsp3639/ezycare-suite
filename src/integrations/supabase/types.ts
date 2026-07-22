@@ -3231,6 +3231,7 @@ export type Database = {
           assigned_to: string | null
           category: Database["public"]["Enums"]["ticket_category"]
           closed_at: string | null
+          contact_number: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -3252,6 +3253,7 @@ export type Database = {
           assigned_to?: string | null
           category?: Database["public"]["Enums"]["ticket_category"]
           closed_at?: string | null
+          contact_number?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -3273,6 +3275,7 @@ export type Database = {
           assigned_to?: string | null
           category?: Database["public"]["Enums"]["ticket_category"]
           closed_at?: string | null
+          contact_number?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
