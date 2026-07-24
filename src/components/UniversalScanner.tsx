@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
 import { compressImageFile, extractionCache } from "@/lib/mobileScanHelpers";
