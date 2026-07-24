@@ -3652,20 +3652,10 @@ export type Database = {
         }
         Returns: boolean
       }
-      import_purchase_invoice:
-        | {
-            Args: { _invoice: Json; _items: Json; _supplier: Json }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _audit?: Json
-              _invoice: Json
-              _items: Json
-              _supplier: Json
-            }
-            Returns: Json
-          }
+      import_purchase_invoice: {
+        Args: { _audit?: Json; _invoice: Json; _items: Json; _supplier: Json }
+        Returns: Json
+      }
       next_pharmacy_invoice_no: {
         Args: { _hospital_id: string }
         Returns: string
