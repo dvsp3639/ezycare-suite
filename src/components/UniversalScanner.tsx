@@ -1935,6 +1935,14 @@ function InvoiceWizard(props: {
   const blockingMissing = checks.filter((c) => !c.ok);
 
   function tryApprove() {
+    traceUpload("17 Approve import button pressed", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "tryApprove",
+      block: "Step 3 Approve & import button click handler fired",
+      blockingMissing: blockingMissing.map((check) => check.label),
+      warnings: warnings.map((warning) => warning.kind),
+    });
     if (blockingMissing.length) {
       toast.error(`Cannot import yet — ${blockingMissing[0].label} is missing.`);
       return;
@@ -2228,7 +2236,7 @@ function InvoiceWizard(props: {
 
       {/* Final confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={(o) => !busy && setConfirmOpen(o)}>
-        <DialogContent>
+        <DialogContent className="z-[180]">
           <DialogHeader>
             <DialogTitle>Confirm inventory import</DialogTitle>
             <DialogDescription>
