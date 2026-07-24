@@ -328,9 +328,32 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
               <div className="px-6 py-5">
                 {/* ─── WEEKLY ─── */}
                 <TabsContent value="weekly" className="mt-0 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">Set the recurring template. The system auto-generates the next 7 days of slots on save.</p>
-                    <div className="flex gap-2">
+                  <p className="text-sm text-muted-foreground">Set the recurring template. The system auto-generates the next 7 days of slots on save.</p>
+
+                  {/* Doctor-level default consultation fee */}
+                  <div className="rounded-xl border border-border bg-card p-3 flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div className="flex-1">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <IndianRupee className="h-3.5 w-3.5 text-primary" /> Default consultation fee
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Auto-fills every new session. Click <span className="font-medium text-foreground">Apply to all sessions</span> to sync existing ones — no need to edit each day.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-9 w-28 pl-6"
+                          value={defaultFee}
+                          onChange={(e) => setDefaultFee(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={applyDefaultFeeToAll}>
+                        Apply to all sessions
+                      </Button>
                       <Button variant="outline" size="sm" onClick={copyMondayToWeekdays}>
                         <Copy className="h-4 w-4 mr-1.5" /> Copy Mon → Weekdays
                       </Button>
