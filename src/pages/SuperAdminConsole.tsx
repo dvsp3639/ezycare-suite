@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield, CreditCard, Sparkles, LifeBuoy } from "lucide-react";
+import ezyopIconAsset from "@/assets/ezyop-icon-v2.png.asset.json";
 
 interface Hospital {
   id: string;
