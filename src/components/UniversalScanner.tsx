@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 import { useNavigate } from "react-router-dom";
 import { workspaceService } from "@/modules/pharmacy/workspace";
 import { compressImageFile, extractionCache } from "@/lib/mobileScanHelpers";
@@ -212,6 +213,7 @@ function sourceFileHash(file: File, base64: string) {
 
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const { user, profile } = useAuth();
+  const { hospitalId } = useHospitalConfig();
   const [mode, setMode] = useState<Mode>("menu");
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -380,7 +382,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       if (f.storagePath) { out.push(f); continue; }
       try {
         const blob = await (await fetch(`data:${f.mime};base64,${f.base64}`)).blob();
-        const path = `${user.id}/${Date.now()}-${f.id}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const hospitalPrefix = hospitalId ? `${hospitalId}/` : "";
+        const path = `${hospitalPrefix}${user.id}/${Date.now()}-${f.id}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         traceUpload("8 Upload request created", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
