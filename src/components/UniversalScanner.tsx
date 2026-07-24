@@ -380,7 +380,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       if (f.storagePath) { out.push(f); continue; }
       try {
         const blob = await (await fetch(`data:${f.mime};base64,${f.base64}`)).blob();
-        const path = `${user.id}/${Date.now()}-${f.id}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const hospitalPrefix = hospitalId ? `${hospitalId}/` : "";
+        const path = `${hospitalPrefix}${user.id}/${Date.now()}-${f.id}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         traceUpload("8 Upload request created", {
           file: "src/components/UniversalScanner.tsx",
           component: "UniversalScanner",
