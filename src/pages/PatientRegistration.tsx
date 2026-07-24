@@ -23,6 +23,34 @@ const formatDateDisplay = (dateStr: string) => {
   return `${d}/${m}/${y}`;
 };
 
+// Convert ISO yyyy-mm-dd -> dd/mm/yyyy for display in text input
+const isoToDisplay = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "";
+  return `${d}/${m}/${y}`;
+};
+
+// Auto-format user input as dd/mm/yyyy while typing
+const maskDobInput = (raw: string) => {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  const parts: string[] = [];
+  if (digits.length > 0) parts.push(digits.slice(0, 2));
+  if (digits.length >= 3) parts.push(digits.slice(2, 4));
+  if (digits.length >= 5) parts.push(digits.slice(4, 8));
+  return parts.join("/");
+};
+
+// Convert dd/mm/yyyy -> yyyy-mm-dd; returns "" if invalid/incomplete
+const displayToIso = (display: string) => {
+  const m = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return "";
+  const [, dd, mm, yyyy] = m;
+  const d = parseInt(dd, 10), mo = parseInt(mm, 10), y = parseInt(yyyy, 10);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900) return "";
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 interface UIPatient {
   id: string;
   registrationNumber: string;
@@ -45,6 +73,7 @@ const PatientRegistration = () => {
   const [searchMobile, setSearchMobile] = useState("");
   const [searchResults, setSearchResults] = useState<UIPatient[] | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [dobDisplay, setDobDisplay] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<UIPatient | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
@@ -140,6 +169,7 @@ const PatientRegistration = () => {
       emergencyContact: p.emergencyContact || "", bloodGroup: p.bloodGroup || "",
       address: p.address || "", chronicConditions: p.chronicConditions || "",
     });
+    setDobDisplay(isoToDisplay(p.dob));
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
@@ -152,6 +182,7 @@ const PatientRegistration = () => {
     setIsRegistered(false);
     setRegistrationNumber("");
     setForm({ ...emptyForm, mobile: searchMobile });
+    setDobDisplay("");
   };
 
   const updateField = (key: string, value: string) => {
@@ -258,6 +289,7 @@ const PatientRegistration = () => {
 
   const resetForm = () => {
     setForm(emptyForm);
+    setDobDisplay("");
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
