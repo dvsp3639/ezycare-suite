@@ -194,6 +194,10 @@ const PatientRegistration = () => {
       toast.error("Please fill all required fields");
       return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob)) {
+      toast.error("Enter Date of Birth as dd/mm/yyyy");
+      return;
+    }
     setSaving(true);
     try {
       // Check for duplicates
@@ -409,7 +413,18 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date of Birth *</Label>
-              <Input type="date" value={form.dob} onChange={(e) => updateField("dob", e.target.value)} />
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="dd/mm/yyyy"
+                value={dobDisplay}
+                onChange={(e) => {
+                  const masked = maskDobInput(e.target.value);
+                  setDobDisplay(masked);
+                  updateField("dob", displayToIso(masked));
+                }}
+                maxLength={10}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Gender *</Label>
