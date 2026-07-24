@@ -202,6 +202,7 @@ const StaffPayroll = () => {
 
       setShowAddStaff(false);
       setStaffForm({});
+      setJoiningDateDisplay("");
       setCreateLogin(false);
       setLoginEmail("");
       setLoginPassword("");
@@ -338,7 +339,7 @@ const StaffPayroll = () => {
           </h1>
           <p className="text-sm text-muted-foreground">Staff profiles, attendance, leaves & salary management</p>
         </div>
-        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employment_type: "Full-Time" }); setCreateLogin(false); setLoginEmail(""); setLoginPassword(""); setSelectedModules([]); }}>
+        <Button size="sm" onClick={() => { setShowAddStaff(true); setStaffForm({ role: "Nurse", employment_type: "Full-Time" }); setJoiningDateDisplay(""); setCreateLogin(false); setLoginEmail(""); setLoginPassword(""); setSelectedModules([]); }}>
           <Plus className="h-4 w-4 mr-1" /> Add Staff
         </Button>
       </div>
