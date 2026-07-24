@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   CalendarDays, Clock, Copy, Plus, Trash2, Save, Zap, Coffee, AlertTriangle,
   Ban, PauseCircle, PlayCircle, RadioTower, Stethoscope, Users, Loader2, CalendarIcon,
-  Sparkles,
+  Sparkles, IndianRupee,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
