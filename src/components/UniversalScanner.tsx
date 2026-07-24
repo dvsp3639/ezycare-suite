@@ -1808,7 +1808,6 @@ function InvoiceWizard(props: {
     { ok: lines.length > 0, label: "At least one medicine line" },
     { ok: lines.every((l) => l.name?.trim() && (Number(l.quantity) || 0) > 0), label: "Every line has name & quantity" },
     { ok: lowConfLines === 0, label: `Low-confidence rows reviewed${lowConfLines ? ` (${lowConfLines} pending)` : ""}` },
-    { ok: !!employeeId.trim(), label: "Employee ID entered" },
     { ok: !requireAck || acknowledged, label: "Pre-import warnings acknowledged" },
     { ok: !dupInvoiceBlocked, label: "Duplicate invoice resolved" },
   ];
@@ -2063,14 +2062,6 @@ function InvoiceWizard(props: {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div><p className="text-muted-foreground">Verified by</p><p className="font-medium">{profile?.full_name || user?.email || "—"}</p></div>
               <div><p className="text-muted-foreground">Date & time</p><p className="font-medium">{new Date().toLocaleString()}</p></div>
-              <div className="space-y-1">
-                <Label className="text-xs">Employee ID</Label>
-                <Input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="e.g. EMP1023" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Approved by (optional)</Label>
-                <Input value={approverName} onChange={(e) => setApproverName(e.target.value)} placeholder="Pharmacist / Manager name" />
-              </div>
               <div className="md:col-span-2"><p className="text-muted-foreground">Device</p><p className="font-mono text-[11px] break-all">{deviceInfo()}</p></div>
               <div className="md:col-span-2"><p className="text-muted-foreground">Original uploads ({sourceFiles.length})</p><p className="font-medium">{sourceFiles.map((f) => f.name).join(", ") || "—"}</p></div>
               <div className="md:col-span-2"><p className="text-muted-foreground">Manual corrections ({corrections.length})</p>
