@@ -213,6 +213,7 @@ function sourceFileHash(file: File, base64: string) {
 
 export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const { user, profile } = useAuth();
+  const { hospitalId } = useHospitalConfig();
   const [mode, setMode] = useState<Mode>("menu");
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
