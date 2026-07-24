@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield, CreditCard, Sparkles, LifeBuoy } from "lucide-react";
+import ezyopIconAsset from "@/assets/ezyop-icon-v2.png.asset.json";
 
 interface Hospital {
   id: string;
@@ -241,8 +242,8 @@ export default function SuperAdminConsole() {
       <header className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Shield className="h-5 w-5" />
+            <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden">
+              <img src={ezyopIconAsset.url} alt="EZY OP" className="w-9 h-9 object-contain" />
             </div>
             <div>
               <h1 className="text-lg font-display font-bold">Master Console</h1>
