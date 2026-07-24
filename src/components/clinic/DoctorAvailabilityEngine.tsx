@@ -65,6 +65,10 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
   const [liveStatus, setLiveStatus] = useState<DoctorLiveStatus | null>(null);
   const [overrides, setOverrides] = useState<DailyOverride[]>([]);
 
+  // Doctor-level default consultation fee — auto-fills new sessions and
+  // can be applied to all existing sessions in one click.
+  const [defaultFee, setDefaultFee] = useState<number>(0);
+
   const load = async () => {
     if (!doctorName) return;
     setLoading(true);
@@ -90,6 +94,14 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
         };
       }
       setWeeklyByDay(map);
+      // Derive default fee from the most common fee across existing sessions
+      const allFees = (w as any[]).flatMap((row) => (row.sessions || []).map((s: any) => Number(s.consultation_fee) || 0));
+      if (allFees.length > 0) {
+        const counts: Record<number, number> = {};
+        allFees.forEach((f) => (counts[f] = (counts[f] || 0) + 1));
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+        setDefaultFee(Number(top[0]));
+      }
       setLeaves(l);
       setHolidays(h);
       setLiveStatus(s);
@@ -123,7 +135,27 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
     setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], is_working: working, sessions: working && p[day].sessions.length === 0 ? [emptySession()] : p[day].sessions } }));
   };
   const addSession = (day: number) => {
-    setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, emptySession(p[day].sessions.length === 0 ? "Morning OP" : "Evening OP", p[day].sessions.length === 0 ? "09:00" : "17:00", p[day].sessions.length === 0 ? "13:00" : "20:00")] } }));
+    setWeeklyByDay((p) => {
+      const base = emptySession(
+        p[day].sessions.length === 0 ? "Morning OP" : "Evening OP",
+        p[day].sessions.length === 0 ? "09:00" : "17:00",
+        p[day].sessions.length === 0 ? "13:00" : "20:00",
+      );
+      // Pre-fill new sessions with the doctor-level default fee
+      base.consultation_fee = defaultFee || 0;
+      return { ...p, [day]: { ...p[day], sessions: [...p[day].sessions, base] } };
+    });
+  };
+
+  const applyDefaultFeeToAll = () => {
+    setWeeklyByDay((p) => {
+      const next: typeof p = {};
+      for (const [k, v] of Object.entries(p)) {
+        next[Number(k)] = { ...v, sessions: v.sessions.map((s) => ({ ...s, consultation_fee: defaultFee || 0 })) };
+      }
+      return next;
+    });
+    toast.success(`Applied ₹${defaultFee || 0} to all sessions`);
   };
   const removeSession = (day: number, idx: number) => {
     setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter((_, i) => i !== idx) } }));
