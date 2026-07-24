@@ -2745,6 +2745,8 @@ export type Database = {
       }
       purchase_bills: {
         Row: {
+          approval_status: string
+          approved_at: string | null
           approved_by: string | null
           approved_by_name: string | null
           bill_date: string
@@ -2780,6 +2782,8 @@ export type Database = {
           warnings: Json | null
         }
         Insert: {
+          approval_status?: string
+          approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
           bill_date?: string
@@ -2815,6 +2819,8 @@ export type Database = {
           warnings?: Json | null
         }
         Update: {
+          approval_status?: string
+          approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
           bill_date?: string
