@@ -2321,7 +2321,7 @@ function WizardFooter({ children, onCancel, busy }: { children: React.ReactNode;
 }
 
 function SuccessView({ info, onViewInventory, onViewInvoice, onPrintGRN, onClose }: {
-  info: { billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number };
+  info: { billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number; approvalStatus?: string; verifiedStock?: number };
   onViewInventory: () => void;
   onViewInvoice: () => void;
   onPrintGRN: () => void;
@@ -2342,6 +2342,7 @@ function SuccessView({ info, onViewInventory, onViewInvoice, onPrintGRN, onClose
         <ul className="text-sm mt-6 space-y-2 inline-block text-left">
           <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> {totalLines} medicine{totalLines === 1 ? "" : "s"} imported successfully ({info.created} new · {info.updated} updated).</li>
           <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Inventory updated — visible in Stock, Pharmacy and Sale searches.</li>
+          <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Approval status: {info.approvalStatus || "Approved"}{info.verifiedStock != null ? ` · ${info.verifiedStock} unit(s) verified` : ""}.</li>
           <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Purchase invoice archived in the repository.</li>
         </ul>
 
