@@ -1896,6 +1896,8 @@ function InvoiceWizard(props: {
   approverName: string; setApproverName: (s: string) => void;
   corrections: Correction[];
   summary: { qty: number; newCount: number; existingCount: number; updatedBatches: number; total: number };
+  importDebugSteps: ImportDebugStep[];
+  importError: string;
   user: any; profile: any;
   busy: boolean;
   onCancel: () => void;
@@ -1907,7 +1909,7 @@ function InvoiceWizard(props: {
     supplier, updateSupplier, invoice, updateInvoice, lines, updateLine, removeLine,
     warnings, acknowledged, setAcknowledged,
     employeeId, setEmployeeId, approverName, setApproverName,
-    corrections, summary, user, profile, busy, onCancel, onGotoApproval, onFinalImport,
+    corrections, summary, importDebugSteps, importError, user, profile, busy, onCancel, onGotoApproval, onFinalImport,
   } = props;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
