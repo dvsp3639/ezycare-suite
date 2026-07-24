@@ -1919,22 +1919,27 @@ function InvoiceWizard(props: {
 
   // ---- Readiness checks for Step 3 ----
   const lowConfLines = useMemo(() => lines.filter((l) => (l.confidence ?? 1) < 0.6).length, [lines]);
-  const dupInvoiceBlocked = warnings.some((w) => w.kind === "duplicate_invoice");
-  const otherWarnings = warnings.filter((w) => w.kind !== "duplicate_invoice");
-  const requireAck = otherWarnings.length > 0;
+  const requireAck = warnings.length > 0;
   const checks = [
     { ok: !!supplier.name?.trim(), label: "Supplier name entered" },
     { ok: !!invoice.invoiceNo?.trim(), label: "Invoice number entered" },
     { ok: !!invoice.invoiceDate, label: "Invoice date set" },
     { ok: lines.length > 0, label: "At least one medicine line" },
     { ok: lines.every((l) => l.name?.trim() && (Number(l.quantity) || 0) > 0), label: "Every line has name & quantity" },
-    { ok: lowConfLines === 0, label: `Low-confidence rows reviewed${lowConfLines ? ` (${lowConfLines} pending)` : ""}` },
+    { ok: true, label: lowConfLines ? `Low-confidence rows visible for manual review (${lowConfLines})` : "No low-confidence rows pending" },
     { ok: !requireAck || acknowledged, label: "Pre-import warnings acknowledged" },
-    { ok: !dupInvoiceBlocked, label: "Duplicate invoice resolved" },
   ];
   const blockingMissing = checks.filter((c) => !c.ok);
 
   function tryApprove() {
+    traceUpload("17 Approve import button pressed", {
+      file: "src/components/UniversalScanner.tsx",
+      component: "UniversalScanner",
+      function: "tryApprove",
+      block: "Step 3 Approve & import button click handler fired",
+      blockingMissing: blockingMissing.map((check) => check.label),
+      warnings: warnings.map((warning) => warning.kind),
+    });
     if (blockingMissing.length) {
       toast.error(`Cannot import yet — ${blockingMissing[0].label} is missing.`);
       return;
@@ -2228,7 +2233,7 @@ function InvoiceWizard(props: {
 
       {/* Final confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={(o) => !busy && setConfirmOpen(o)}>
-        <DialogContent>
+        <DialogContent className="z-[180]">
           <DialogHeader>
             <DialogTitle>Confirm inventory import</DialogTitle>
             <DialogDescription>
