@@ -2179,6 +2179,27 @@ function InvoiceWizard(props: {
             )}
           </Section>
 
+          {(importDebugSteps.length > 0 || importError) && (
+            <Section title="Approval flow diagnostics" icon={ServerCog}>
+              <ul className="space-y-1.5 text-xs">
+                {importDebugSteps.map((step) => (
+                  <li key={step.label} className={cn(
+                    "flex items-start gap-2 rounded-md px-2 py-1.5",
+                    step.status === "ok" && "bg-success/10 text-success",
+                    step.status === "pending" && "bg-primary/10 text-primary",
+                    step.status === "error" && "bg-destructive/10 text-destructive",
+                  )}>
+                    {step.status === "ok" && <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                    {step.status === "pending" && <Loader2 className="h-3.5 w-3.5 mt-0.5 shrink-0 animate-spin" />}
+                    {step.status === "error" && <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                    <span><span className="font-medium">{step.label}</span>{step.detail ? ` — ${step.detail}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+              {importError && <p className="mt-2 text-xs text-destructive break-words">Exact error: {importError}</p>}
+            </Section>
+          )}
+
           <Section title="Audit details" icon={ShieldCheck}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div><p className="text-muted-foreground">Verified by</p><p className="font-medium">{profile?.full_name || user?.email || "—"}</p></div>
