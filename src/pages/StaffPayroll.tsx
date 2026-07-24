@@ -36,6 +36,30 @@ const STAFF_ROLE_TO_AUTH_ROLE: Record<string, string> = {
 
 const accessibleModules = modules.filter((m) => m.id !== "users-roles");
 
+// Date helpers: UI uses dd/mm/yyyy, DB stores yyyy-mm-dd
+const isoToDisplay = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "";
+  return `${d}/${m}/${y}`;
+};
+const maskDateInput = (raw: string) => {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  const parts: string[] = [];
+  if (digits.length > 0) parts.push(digits.slice(0, 2));
+  if (digits.length >= 3) parts.push(digits.slice(2, 4));
+  if (digits.length >= 5) parts.push(digits.slice(4, 8));
+  return parts.join("/");
+};
+const displayToIso = (display: string) => {
+  const m = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return "";
+  const [, dd, mm, yyyy] = m;
+  const d = parseInt(dd, 10), mo = parseInt(mm, 10), y = parseInt(yyyy, 10);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900) return "";
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const staffRoles = ["Doctor", "Nurse", "Technician", "Pharmacist", "Admin", "Receptionist", "Housekeeping", "Security", "Driver"];
 const leaveTypes = ["Casual", "Sick", "Earned", "Maternity", "Paternity", "Unpaid"];
 
@@ -664,7 +688,19 @@ const StaffPayroll = () => {
               <div><Label>Emergency Contact</Label><Input value={staffForm.emergency_contact || ""} onChange={(e) => setStaffForm({ ...staffForm, emergency_contact: e.target.value })} /></div>
               <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.base_salary || 0} onChange={(e) => setStaffForm({ ...staffForm, base_salary: +e.target.value })} /></div>
             </div>
-            <div><Label>Joining Date</Label><Input type="date" value={staffForm.joining_date || ""} onChange={(e) => setStaffForm({ ...staffForm, joining_date: e.target.value })} /></div>
+            <div>
+              <Label>Joining Date</Label>
+              <Input
+                placeholder="dd/mm/yyyy"
+                inputMode="numeric"
+                maxLength={10}
+                value={isoToDisplay(staffForm.joining_date || "")}
+                onChange={(e) => {
+                  const masked = maskDateInput(e.target.value);
+                  setStaffForm({ ...staffForm, joining_date: displayToIso(masked) || (masked as any) });
+                }}
+              />
+            </div>
 
             {/* Login Creation Section */}
             <div className="border-t border-border pt-4 mt-4">
@@ -745,7 +781,7 @@ const StaffPayroll = () => {
                 <Detail label="Employment" value={selectedStaff.employment_type || ""} />
                 <Detail label="Phone" value={selectedStaff.phone || ""} />
                 <Detail label="Email" value={selectedStaff.email || ""} />
-                <Detail label="Joining Date" value={selectedStaff.joining_date || "—"} />
+                <Detail label="Joining Date" value={isoToDisplay(selectedStaff.joining_date || "") || "—"} />
                 <Detail label="Blood Group" value={selectedStaff.blood_group || "—"} />
                 <Detail label="Qualification" value={selectedStaff.qualification || "—"} />
                 <Detail label="Specialization" value={selectedStaff.specialization || "—"} />
