@@ -391,7 +391,7 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                             <div className="space-y-2">
                               {state.sessions.map((s, i) => (
                                 <div key={i} className="rounded-lg border border-border bg-background p-3 grid grid-cols-12 gap-2 items-end">
-                                  <div className="col-span-12 sm:col-span-3">
+                                  <div className="col-span-12 sm:col-span-2">
                                     <Label className="text-[10px] text-muted-foreground">Session</Label>
                                     <Input className="h-8 text-xs" value={s.session_name} onChange={(e) => updateSession(d, i, { session_name: e.target.value })} />
                                   </div>
@@ -421,9 +421,19 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                                     <Label className="text-[10px] text-muted-foreground">Cap</Label>
                                     <Input type="number" min={1} className="h-8 text-xs" value={s.token_capacity} onChange={(e) => updateSession(d, i, { token_capacity: parseInt(e.target.value) || 1 })} />
                                   </div>
-                                  <div className="col-span-8 sm:col-span-1">
-                                    <Label className="text-[10px] text-muted-foreground">Fee ₹</Label>
-                                    <Input type="number" min={0} className="h-8 text-xs" value={s.consultation_fee} onChange={(e) => updateSession(d, i, { consultation_fee: parseFloat(e.target.value) || 0 })} />
+                                  <div className="col-span-8 sm:col-span-2">
+                                    <Label className="text-[10px] text-muted-foreground">Fee (₹)</Label>
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">₹</span>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step={50}
+                                        className="h-8 text-xs pl-5"
+                                        value={s.consultation_fee}
+                                        onChange={(e) => updateSession(d, i, { consultation_fee: parseFloat(e.target.value) || 0 })}
+                                      />
+                                    </div>
                                   </div>
                                   <div className="col-span-4 sm:col-span-1 flex items-center justify-end">
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeSession(d, i)}>
