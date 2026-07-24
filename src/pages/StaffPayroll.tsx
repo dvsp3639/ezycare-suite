@@ -106,6 +106,7 @@ const StaffPayroll = () => {
 
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
+  const [joiningDateDisplay, setJoiningDateDisplay] = useState("");
   const [createLogin, setCreateLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -161,7 +162,7 @@ const StaffPayroll = () => {
         department: staffForm.department || "",
         designation: staffForm.designation || "",
         employment_type: staffForm.employment_type || "Full-Time",
-        joining_date: staffForm.joining_date || null,
+        joining_date: displayToIso(joiningDateDisplay) || null,
         phone: staffForm.phone || "",
         email: staffForm.email || "",
         address: staffForm.address || "",
@@ -694,11 +695,8 @@ const StaffPayroll = () => {
                 placeholder="dd/mm/yyyy"
                 inputMode="numeric"
                 maxLength={10}
-                value={isoToDisplay(staffForm.joining_date || "")}
-                onChange={(e) => {
-                  const masked = maskDateInput(e.target.value);
-                  setStaffForm({ ...staffForm, joining_date: displayToIso(masked) || (masked as any) });
-                }}
+                value={joiningDateDisplay}
+                onChange={(e) => setJoiningDateDisplay(maskDateInput(e.target.value))}
               />
             </div>
 
