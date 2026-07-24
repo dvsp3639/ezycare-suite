@@ -5,7 +5,7 @@ import {
   Camera, X, Upload, FileText, FileSpreadsheet, Image as ImageIcon,
   Loader2, CheckCircle2, AlertCircle, ScanLine, Save, Plus, Pencil,
   FileCheck2, Building2, Trash2, ArrowLeft, ArrowRight, ShieldCheck,
-  ChevronUp, ChevronDown, AlertTriangle, FileWarning,
+  ChevronUp, ChevronDown, AlertTriangle, FileWarning, ServerCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +97,12 @@ type Warning = {
   kind: "duplicate_invoice" | "duplicate_batch" | "expired" | "near_expiry" | "supplier_mismatch" | "price_anomaly";
   message: string;
   severity: "warn" | "block";
+};
+
+type ImportDebugStep = {
+  label: string;
+  status: "pending" | "ok" | "error";
+  detail?: string;
 };
 
 const FIELDS: { key: string; label: string; type?: "number" | "date" | "text" }[] = [
@@ -231,7 +237,9 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
   const [acknowledgedWarnings, setAcknowledgedWarnings] = useState(false);
   const [employeeId, setEmployeeId] = useState<string>("");
   const [approverName, setApproverName] = useState<string>("");
-  const [successInfo, setSuccessInfo] = useState<{ billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number } | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{ billId: string; vendor: string; invoiceNo: string; created: number; updated: number; total: number; approvalStatus?: string; verifiedStock?: number } | null>(null);
+  const [importDebugSteps, setImportDebugSteps] = useState<ImportDebugStep[]>([]);
+  const [importError, setImportError] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pickerSourceRef = useRef<string>("");
@@ -253,10 +261,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
     setExcelRows([]); setExcelCols([]);
     setInvoiceStep(1); setSourceFiles([]); setLines([]); setCorrections([]);
     setWarnings([]); setAcknowledgedWarnings(false); setApproverName("");
-    setSuccessInfo(null);
+    setSuccessInfo(null); setImportDebugSteps([]); setImportError("");
     setSupplier({ name: "", gst: "", address: "", contact: "" });
     setInvoiceMeta({ invoiceNo: "", invoiceDate: "", subtotal: 0, discount: 0, gstAmount: 0, roundOff: 0, totalAmount: 0, netPayable: 0 });
     sessionDocTypeRef.current = null;
+  }, []);
+
+  const markImportStep = useCallback((label: string, status: ImportDebugStep["status"], detail?: string) => {
+    setImportDebugSteps((prev) => {
+      const next = prev.filter((step) => step.label !== label);
+      return [...next, { label, status, detail }];
+    });
   }, []);
 
   function stopCamera() {
@@ -1287,10 +1302,26 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
 
   async function finalImport(force = false) {
     setBusy(true);
+    setImportError("");
+    setImportDebugSteps([]);
     try {
+      traceUpload("17 Approve import clicked", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "finalImport",
+        block: "Approve & Import button handler fired",
+        invoiceNo: invoiceMeta.invoiceNo,
+        supplier: supplier.name,
+        lineItems: lines.length,
+        force,
+      });
+      markImportStep("Button click", "ok", "Approve & Import handler fired.");
+
       // 1. Upload originals for audit
+      markImportStep("Original file archive", "pending", "Uploading source documents for audit trail.");
       const uploaded = await uploadOriginals(sourceFiles);
       setSourceFiles(uploaded);
+      markImportStep("Original file archive", "ok", `${uploaded.filter((file) => file.storagePath).length}/${uploaded.length} file(s) archived. Import continues even if archive is unavailable.`);
 
       const payloadItems = lines.map((l) => ({
         name: l.name, brandName: l.brandName || null, genericName: l.genericName || null,
@@ -1320,6 +1351,17 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         warnings: warnings,
       };
 
+      markImportStep("Backend transaction", "pending", "Calling purchase invoice import RPC.");
+      traceUpload("18 Import RPC request sent", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "finalImport",
+        block: "supabase.rpc('import_purchase_invoice')",
+        invoiceNo: invoiceMeta.invoiceNo,
+        supplier: supplier.name,
+        itemCount: payloadItems.length,
+        sourceFiles: uploaded.map((file) => ({ name: file.name, storagePath: file.storagePath ?? null })),
+      });
       const { data, error } = await supabase.rpc("import_purchase_invoice", {
         _supplier: supplier as any,
         _invoice: invoiceMeta as any,
@@ -1327,6 +1369,16 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         _audit: audit as any,
       });
       if (error) {
+        markImportStep("Backend transaction", "error", error.message || "RPC failed.");
+        traceFailure("18 Import RPC request sent", {
+          file: "src/components/UniversalScanner.tsx",
+          component: "UniversalScanner",
+          function: "finalImport",
+          block: "RPC returned error before database transaction completed",
+          invoiceNo: invoiceMeta.invoiceNo,
+          supplier: supplier.name,
+          stopReason: "Purchase invoice import RPC failed.",
+        }, error);
         const msg = String(error.message || "");
         if (msg.startsWith("duplicate_invoice") && !force) {
           const ok = window.confirm(`This invoice was already imported.\n\nForce import anyway? Stock will be added on top of the previous import.`);
@@ -1336,18 +1388,83 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         throw error;
       }
       const summary = data as any;
-      toast.success(`Imported · ${summary?.created ?? 0} new · ${summary?.updated ?? 0} updated · ${summary?.total_items ?? lines.length} lines saved`);
+      markImportStep("Backend transaction", "ok", `RPC completed. Bill ID: ${summary?.bill_id || "not returned"}`);
+
+      const billId = String(summary?.bill_id || "");
+      if (!billId) throw new Error("Import completed but did not return a purchase bill ID.");
+
+      markImportStep("Invoice approval status", "pending", "Checking saved invoice status.");
+      const { data: savedBill, error: billError } = await supabase
+        .from("purchase_bills")
+        .select("id,approval_status,imported_at")
+        .eq("id", billId)
+        .maybeSingle();
+      if (billError) throw billError;
+      if (!savedBill) throw new Error("Import completed, but the saved purchase invoice could not be reloaded.");
+      const approvalStatus = String((savedBill as any).approval_status || ((savedBill as any).imported_at ? "Approved" : ""));
+      if (approvalStatus !== "Approved") {
+        throw new Error(`Purchase invoice saved but status is "${approvalStatus || "Unknown"}" instead of "Approved".`);
+      }
+      markImportStep("Invoice approval status", "ok", "Invoice status is Approved.");
+
+      markImportStep("Medicine stock verification", "pending", "Checking imported medicine rows and stock.");
+      const { data: importedRows, error: rowsError } = await supabase
+        .from("purchase_bill_items")
+        .select("medicine_id,medicine_name,quantity,free_quantity")
+        .eq("purchase_bill_id", billId);
+      if (rowsError) throw rowsError;
+      const rows = (importedRows || []) as Array<{ medicine_id: string | null; medicine_name: string; quantity: number | null; free_quantity: number | null }>;
+      if (!rows.length) throw new Error("Invoice saved, but no medicine line items were attached to the purchase bill.");
+      const medicineIds = Array.from(new Set(rows.map((row) => row.medicine_id).filter((id): id is string => Boolean(id))));
+      if (!medicineIds.length) throw new Error("Invoice items were saved, but they are not linked to inventory medicines.");
+      const { data: medicines, error: stockError } = await supabase
+        .from("medicines")
+        .select("id,name,stock")
+        .in("id", medicineIds);
+      if (stockError) throw stockError;
+      const stockById = new Map((medicines || []).map((medicine: any) => [medicine.id, Number(medicine.stock) || 0]));
+      const missingStock = rows.filter((row) => row.medicine_id && !stockById.has(row.medicine_id));
+      if (missingStock.length) throw new Error(`Stock verification failed for ${missingStock.length} medicine(s).`);
+      const importedQty = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) + (Number(row.free_quantity) || 0), 0);
+      markImportStep("Medicine stock verification", "ok", `${rows.length} line(s), ${medicineIds.length} medicine(s), ${importedQty} unit(s) verified in stock.`);
+      traceUpload("19 Import verification completed", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "finalImport",
+        block: "post-RPC database verification completed",
+        billId,
+        approvalStatus,
+        importedRows: rows.length,
+        linkedMedicines: medicineIds.length,
+        importedQty,
+      });
+
+      toast.success(`Approved & imported · ${summary?.created ?? 0} new · ${summary?.updated ?? 0} updated · ${rows.length} lines saved`);
       setSuccessInfo({
-        billId: summary?.bill_id || "",
+        billId,
         vendor: supplier.name,
         invoiceNo: invoiceMeta.invoiceNo,
         created: summary?.created ?? 0,
         updated: summary?.updated ?? 0,
         total: invoiceMeta.netPayable || invoiceMeta.totalAmount,
+        approvalStatus,
+        verifiedStock: importedQty,
       });
       setMode("success");
     } catch (e: any) {
-      toast.error(e?.message || "Import failed");
+      const message = e?.message || "Import failed";
+      setImportError(message);
+      markImportStep("Import result", "error", message);
+      traceFailure("20 Import failed", {
+        file: "src/components/UniversalScanner.tsx",
+        component: "UniversalScanner",
+        function: "finalImport",
+        block: "catch block with visible error message",
+        invoiceNo: invoiceMeta.invoiceNo,
+        supplier: supplier.name,
+        stopReason: message,
+      }, e);
+      toast.error(message);
     } finally { setBusy(false); }
   }
 
@@ -1451,6 +1568,8 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
             approverName={approverName} setApproverName={setApproverName}
             corrections={corrections}
             summary={finalSummary}
+            importDebugSteps={importDebugSteps}
+            importError={importError}
             user={user} profile={profile}
             busy={busy}
             onCancel={reset}
