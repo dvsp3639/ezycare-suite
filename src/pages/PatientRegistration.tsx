@@ -312,12 +312,6 @@ const PatientRegistration = () => {
           <p className="text-sm text-muted-foreground">Search or register new patients</p>
         </div>
         <div className="flex gap-2">
-          {((form.name && !isRegistered) || showAddNew) && (
-            <Button onClick={handleSave} size="sm" disabled={saving}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Details
-            </Button>
-          )}
           {isRegistered && (
             <Button onClick={() => setShowOPD(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
@@ -461,6 +455,14 @@ const PatientRegistration = () => {
               <Input value={form.chronicConditions} onChange={(e) => updateField("chronicConditions", e.target.value)} placeholder="e.g., Diabetes, Hypertension (optional)" />
             </div>
           </div>
+          {((form.name && !isRegistered) || showAddNew) && (
+            <div className="flex justify-end mt-6 pt-4 border-t border-border">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Details
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
