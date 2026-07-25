@@ -2106,7 +2106,7 @@ function InvoiceWizard(props: {
                         <TableCell><Input className="h-8 text-xs w-20" value={l.strength || ""} onChange={(e) => updateLine(i, { strength: e.target.value })} /></TableCell>
                         <TableCell><Input className="h-8 text-xs w-20" value={l.packSize || ""} onChange={(e) => updateLine(i, { packSize: e.target.value })} /></TableCell>
                         <TableCell><Input className="h-8 text-xs w-24" value={l.batchNo || ""} onChange={(e) => updateLine(i, { batchNo: e.target.value })} /></TableCell>
-                        <TableCell><Input type="date" className="h-8 text-xs w-36" value={l.expiryDate || ""} onChange={(e) => updateLine(i, { expiryDate: e.target.value })} /></TableCell>
+                        <TableCell><DateInput className="h-8 text-xs w-36" value={l.expiryDate || ""} onChange={(v) => updateLine(i, { expiryDate: v })} /></TableCell>
                         <TableCell><Input type="number" className="h-8 text-xs w-16 text-right" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) || 0 })} /></TableCell>
                         <TableCell><Input type="number" className="h-8 text-xs w-14 text-right" value={l.freeQuantity} onChange={(e) => updateLine(i, { freeQuantity: Number(e.target.value) || 0 })} /></TableCell>
                         <TableCell><Input type="number" className="h-8 text-xs w-20 text-right" value={l.purchaseRate} onChange={(e) => updateLine(i, { purchaseRate: Number(e.target.value) || 0 })} /></TableCell>
