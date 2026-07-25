@@ -422,7 +422,7 @@ const StaffPayroll = () => {
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="w-[170px] h-9" />
+              <DateInput value={attendanceDate} onChange={(v) => setAttendanceDate(v)} className="w-[170px] h-9" />
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground ml-2">
               <span className="text-success font-semibold">{attendance.filter((a) => a.status === "Present").length} Present</span>
@@ -839,8 +839,8 @@ const StaffPayroll = () => {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>From</Label><Input type="date" value={leaveForm.from_date} onChange={(e) => setLeaveForm({ ...leaveForm, from_date: e.target.value })} /></div>
-              <div><Label>To</Label><Input type="date" value={leaveForm.to_date} onChange={(e) => setLeaveForm({ ...leaveForm, to_date: e.target.value })} /></div>
+              <div><Label>From</Label><DateInput value={leaveForm.from_date} onChange={(v) => setLeaveForm({ ...leaveForm, from_date: v })} /></div>
+              <div><Label>To</Label><DateInput value={leaveForm.to_date} onChange={(v) => setLeaveForm({ ...leaveForm, to_date: v })} /></div>
             </div>
             <div><Label>Reason</Label><Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} rows={2} /></div>
           </div>
