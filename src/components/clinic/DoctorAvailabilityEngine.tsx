@@ -646,11 +646,11 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                       <div>
                         <Label className="text-xs">From</Label>
-                        <Input type="date" className="h-9" value={newLeave.from_date} onChange={(e) => setNewLeave({ ...newLeave, from_date: e.target.value, to_date: e.target.value > newLeave.to_date ? e.target.value : newLeave.to_date })} />
+                        <DateInput className="h-9" value={newLeave.from_date} onChange={(v) => setNewLeave({ ...newLeave, from_date: v, to_date: v > newLeave.to_date ? v : newLeave.to_date })} />
                       </div>
                       <div>
                         <Label className="text-xs">To</Label>
-                        <Input type="date" className="h-9" value={newLeave.to_date} onChange={(e) => setNewLeave({ ...newLeave, to_date: e.target.value })} />
+                        <DateInput className="h-9" value={newLeave.to_date} onChange={(v) => setNewLeave({ ...newLeave, to_date: v })} />
                       </div>
                       <div>
                         <Label className="text-xs">Type</Label>
@@ -702,7 +702,7 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                       <div>
                         <Label className="text-xs">Date</Label>
-                        <Input type="date" className="h-9" value={newHoliday.holiday_date} onChange={(e) => setNewHoliday({ ...newHoliday, holiday_date: e.target.value })} />
+                        <DateInput className="h-9" value={newHoliday.holiday_date} onChange={(v) => setNewHoliday({ ...newHoliday, holiday_date: v })} />
                       </div>
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Name</Label>
