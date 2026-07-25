@@ -1645,7 +1645,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Expiry Date</Label>
-              <Input type="date" value={formData.expiryDate || ""} onChange={(e) => setFormData((p) => ({ ...p, expiryDate: e.target.value }))} />
+              <DateInput value={formData.expiryDate || ""} onChange={(v) => setFormData((p) => ({ ...p, expiryDate: v }))} />
             </div>
             <div>
               <Label className="text-xs">Vendor</Label>
@@ -1964,7 +1964,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Purchase Date</Label>
-              <Input type="date" value={assetForm.purchaseDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, purchaseDate: e.target.value }))} />
+              <DateInput value={assetForm.purchaseDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, purchaseDate: v }))} />
             </div>
             <div>
               <Label className="text-xs">Purchase Cost (₹)</Label>
@@ -1972,7 +1972,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Warranty Expiry</Label>
-              <Input type="date" value={assetForm.warrantyExpiry || ""} onChange={(e) => setAssetForm((p) => ({ ...p, warrantyExpiry: e.target.value }))} />
+              <DateInput value={assetForm.warrantyExpiry || ""} onChange={(v) => setAssetForm((p) => ({ ...p, warrantyExpiry: v }))} />
             </div>
             <div>
               <Label className="text-xs">Status</Label>
@@ -1994,11 +1994,11 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Last Maintenance</Label>
-              <Input type="date" value={assetForm.lastMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, lastMaintenanceDate: e.target.value }))} />
+              <DateInput value={assetForm.lastMaintenanceDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, lastMaintenanceDate: v }))} />
             </div>
             <div>
               <Label className="text-xs">Next Maintenance</Label>
-              <Input type="date" value={assetForm.nextMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, nextMaintenanceDate: e.target.value }))} />
+              <DateInput value={assetForm.nextMaintenanceDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, nextMaintenanceDate: v }))} />
             </div>
             <div className="col-span-2">
               <Label className="text-xs">Notes</Label>
