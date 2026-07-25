@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -154,11 +155,11 @@ export function SubscriptionsTab() {
               </div>
               <div>
                 <Label>Trial Ends</Label>
-                <Input type="date" value={edit.trial_ends_at?.slice(0, 10) || ""} onChange={(e) => setEdit({ ...edit, trial_ends_at: e.target.value || null })} />
+                <DateInput value={edit.trial_ends_at?.slice(0, 10) || ""} onChange={(v) => setEdit({ ...edit, trial_ends_at: v || null })} />
               </div>
               <div>
                 <Label>Renewal Date</Label>
-                <Input type="date" value={edit.current_period_end?.slice(0, 10) || ""} onChange={(e) => setEdit({ ...edit, current_period_end: e.target.value || null })} />
+                <DateInput value={edit.current_period_end?.slice(0, 10) || ""} onChange={(v) => setEdit({ ...edit, current_period_end: v || null })} />
               </div>
               <div>
                 <Label>Max Users</Label>

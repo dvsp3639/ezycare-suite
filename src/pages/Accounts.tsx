@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -192,8 +193,8 @@ const Accounts = () => {
               <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
-          <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} className="w-40" />
-          <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} className="w-40" />
+          <DateInput value={from} onChange={(v) => { setFrom(v); setPreset("custom"); }} className="w-40" />
+          <DateInput value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} className="w-40" />
         </div>
       </div>
 
@@ -351,7 +352,7 @@ const Accounts = () => {
                 <DialogContent>
                   <DialogHeader><DialogTitle>Record Operating Expense</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Date</Label><Input type="date" value={opForm.expenseDate} onChange={(e) => setOpForm({ ...opForm, expenseDate: e.target.value })} /></div>
+                    <div><Label>Date</Label><DateInput value={opForm.expenseDate} onChange={(v) => setOpForm({ ...opForm, expenseDate: v })} /></div>
                     <div><Label>Category</Label>
                       <Select value={opForm.category} onValueChange={(v) => setOpForm({ ...opForm, category: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -443,7 +444,7 @@ const Accounts = () => {
               <DialogContent>
                 <DialogHeader><DialogTitle>Record Purchase Bill</DialogTitle></DialogHeader>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Bill Date</Label><Input type="date" value={purForm.billDate} onChange={(e) => setPurForm({ ...purForm, billDate: e.target.value })} /></div>
+                  <div><Label>Bill Date</Label><DateInput value={purForm.billDate} onChange={(v) => setPurForm({ ...purForm, billDate: v })} /></div>
                   <div><Label>Type</Label>
                     <Select value={purForm.billType} onValueChange={(v: any) => setPurForm({ ...purForm, billType: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>

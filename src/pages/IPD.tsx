@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1119,7 +1120,7 @@ const IPD = () => {
             <div><Label>Condition at Discharge</Label><Input value={dischargeForm.conditionAtDischarge} onChange={(e) => setDischargeForm({ ...dischargeForm, conditionAtDischarge: e.target.value })} placeholder="Stable, afebrile..." /></div>
             <div><Label>Final Diagnosis *</Label><Textarea value={dischargeForm.finalDiagnosis} onChange={(e) => setDischargeForm({ ...dischargeForm, finalDiagnosis: e.target.value })} rows={2} /></div>
             <div><Label>Treatment Summary</Label><Textarea value={dischargeForm.treatmentSummary} onChange={(e) => setDischargeForm({ ...dischargeForm, treatmentSummary: e.target.value })} rows={3} /></div>
-            <div><Label>Follow-up Date</Label><Input type="date" value={dischargeForm.followUpDate} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpDate: e.target.value })} /></div>
+            <div><Label>Follow-up Date</Label><DateInput value={dischargeForm.followUpDate} onChange={(v) => setDischargeForm({ ...dischargeForm, followUpDate: v })} /></div>
             <div><Label>Follow-up Instructions</Label><Textarea value={dischargeForm.followUpInstructions} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpInstructions: e.target.value })} rows={2} /></div>
             <div><Label>Medications on Discharge</Label><Textarea value={dischargeForm.medicationsOnDischarge} onChange={(e) => setDischargeForm({ ...dischargeForm, medicationsOnDischarge: e.target.value })} rows={2} /></div>
             {billBreakdown && (
