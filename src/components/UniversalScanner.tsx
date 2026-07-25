@@ -2298,7 +2298,11 @@ function Fld({ label, value, onChange, type = "text" }: { label: string; value: 
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
-      <Input type={type} value={value ?? ""} onChange={(e) => onChange(type === "number" ? e.target.value : e.target.value)} />
+      {type === "date" ? (
+        <DateInput value={value ?? ""} onChange={(v) => onChange(v)} />
+      ) : (
+        <Input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+      )}
     </div>
   );
 }
