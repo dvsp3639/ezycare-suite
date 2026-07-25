@@ -152,11 +152,11 @@ export function PurchaseInvoiceRepository({ openBillId, onOpenedBillId }: { open
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] text-muted-foreground">From</Label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[150px]" />
+          <DateInput value={from} onChange={(v) => setFrom(v)} className="h-9 w-[150px]" />
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] text-muted-foreground">To</Label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[150px]" />
+          <DateInput value={to} onChange={(v) => setTo(v)} className="h-9 w-[150px]" />
         </div>
         <Button variant="outline" size="sm" onClick={load}>Refresh</Button>
       </div>
