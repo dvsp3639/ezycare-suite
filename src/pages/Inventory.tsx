@@ -266,14 +266,16 @@ const Inventory = () => {
 
   // Pharma filtered inventory
   const pharmaInventory = useMemo(() => {
-    return inventory.filter((item) => {
-      const isPharma = item.department === "Pharmacy" || item.category === "Medicine";
-      const matchSearch = !pharmaSearch ||
-        item.name.toLowerCase().includes(pharmaSearch.toLowerCase()) ||
-        item.sku.toLowerCase().includes(pharmaSearch.toLowerCase());
-      return isPharma && matchSearch;
-    });
-  }, [inventory, pharmaSearch]);
+    const legacy = inventory.filter((i) => i.department === "Pharmacy" || i.category === "Medicine");
+    const combined = [...medicines, ...legacy.filter((l) => !medicines.some((m) => m.id === l.id))];
+    const q = pharmaSearch.toLowerCase();
+    return combined.filter((item) =>
+      !q ||
+      item.name.toLowerCase().includes(q) ||
+      (item.sku || "").toLowerCase().includes(q) ||
+      (item.batchNo || "").toLowerCase().includes(q)
+    );
+  }, [inventory, medicines, pharmaSearch]);
 
   const allLabCategories = useMemo(() => {
     const defaults = ["Blood", "Urine", "Radiology", "Serology"];
