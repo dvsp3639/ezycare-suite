@@ -110,6 +110,37 @@ const Inventory = () => {
   }, []);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
+  const [medicines, setMedicines] = useState<InventoryItem[]>([]);
+  async function loadMedicines() {
+    const { data, error } = await supabase
+      .from("medicines")
+      .select("id,name,brand_name,generic_name,manufacturer,batch_no,expiry_date,stock,min_stock,mrp,selling_price,gst_percent,hsn_code,unit,barcode,updated_at")
+      .order("name");
+    if (error) return;
+    setMedicines((data || []).map((m: any): InventoryItem => ({
+      id: m.id,
+      name: m.name,
+      category: "Medicine",
+      sku: m.hsn_code || m.barcode || "",
+      batchNo: m.batch_no || "",
+      manufacturer: m.manufacturer || m.brand_name || "",
+      unitPrice: Number(m.mrp || 0),
+      sellingPrice: Number(m.selling_price || m.mrp || 0),
+      stock: m.stock || 0,
+      minStock: m.min_stock || 0,
+      unit: m.unit || "Strip",
+      hsnCode: m.hsn_code || "",
+      gstPercent: Number(m.gst_percent ?? 12),
+      expiryDate: m.expiry_date || undefined,
+      department: "Pharmacy",
+      barcode: m.barcode || "",
+      lastUpdated: m.updated_at || "",
+      vendor: "",
+      purchaseDate: "",
+      consumptionRate: 0,
+    } as any)));
+  }
+  useEffect(() => { loadMedicines(); }, []);
   const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
