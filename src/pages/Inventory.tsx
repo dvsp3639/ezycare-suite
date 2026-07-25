@@ -1731,7 +1731,7 @@ const Inventory = () => {
       </Dialog>
 
       {/* AI Invoice Scanner */}
-      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
+      <UniversalScanner open={showAIScanner} onClose={() => { setShowAIScanner(false); loadMedicines(); }} />
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
