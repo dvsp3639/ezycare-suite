@@ -28,6 +28,7 @@ import type { StaffMember, SalaryRecord, AttendanceRecord, LeaveRequest, SalaryA
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { modules } from "@/data/modules";
+import { DoctorSpecializationPicker } from "@/components/staff/DoctorSpecializationPicker";
 
 const STAFF_ROLE_TO_AUTH_ROLE: Record<string, string> = {
   Doctor: "doctor", Nurse: "nurse", Technician: "lab_technician",
@@ -108,6 +109,8 @@ const StaffPayroll = () => {
   // Forms
   const [staffForm, setStaffForm] = useState<Partial<StaffMember>>({});
   const [joiningDateDisplay, setJoiningDateDisplay] = useState("");
+  const [doctorSpecIds, setDoctorSpecIds] = useState<string[]>([]);
+  const [primarySpecId, setPrimarySpecId] = useState<string | null>(null);
   const [createLogin, setCreateLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -150,13 +153,29 @@ const StaffPayroll = () => {
   // Handlers
   const handleAddStaff = async () => {
     if (!staffForm.name || !staffForm.employee_id) { toast.error("Name and Employee ID required"); return; }
+    const isDoctor = (staffForm.role || "Nurse") === "Doctor";
+    if (isDoctor && doctorSpecIds.length === 0) {
+      toast.error("Select at least one specialization for the doctor");
+      return;
+    }
     if (createLogin && (!loginEmail || !loginPassword)) { toast.error("Email and password required for login"); return; }
     if (createLogin && loginPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     if (createLogin && selectedModules.length === 0) { toast.error("Select at least one module for access"); return; }
 
     setCreatingUser(true);
     try {
-      await createStaff.mutateAsync({
+      // Resolve primary specialization name for denormalized text column (used by schedules)
+      let primarySpecName = "";
+      if (isDoctor && primarySpecId) {
+        const { data: spec } = await supabase
+          .from("specializations")
+          .select("name")
+          .eq("id", primarySpecId)
+          .maybeSingle();
+        primarySpecName = spec?.name || "";
+      }
+
+      const createdStaff = await createStaff.mutateAsync({
         employee_id: staffForm.employee_id,
         name: staffForm.name,
         role: staffForm.role || "Admin",
@@ -170,7 +189,7 @@ const StaffPayroll = () => {
         emergency_contact: staffForm.emergency_contact || "",
         blood_group: staffForm.blood_group || "",
         qualification: staffForm.qualification || "",
-        specialization: staffForm.specialization || "",
+        specialization: isDoctor ? primarySpecName : (staffForm.specialization || ""),
         aadhar_no: staffForm.aadhar_no || "",
         pan_no: staffForm.pan_no || "",
         bank_account: staffForm.bank_account || "",
@@ -179,6 +198,19 @@ const StaffPayroll = () => {
         base_salary: staffForm.base_salary || 0,
         status: "Active",
       });
+
+      // Link doctor specializations
+      if (isDoctor && createdStaff?.id && doctorSpecIds.length > 0) {
+        const rows = doctorSpecIds.map((sid) => ({
+          staff_id: createdStaff.id,
+          specialization_id: sid,
+          is_primary: sid === primarySpecId,
+        }));
+        const { error: linkErr } = await supabase
+          .from("staff_specializations")
+          .insert(rows as any);
+        if (linkErr) throw linkErr;
+      }
 
       // Create login if checked
       if (createLogin) {
@@ -204,6 +236,8 @@ const StaffPayroll = () => {
       setShowAddStaff(false);
       setStaffForm({});
       setJoiningDateDisplay("");
+      setDoctorSpecIds([]);
+      setPrimarySpecId(null);
       setCreateLogin(false);
       setLoginEmail("");
       setLoginPassword("");
@@ -675,8 +709,17 @@ const StaffPayroll = () => {
             <div><Label>Address</Label><Input value={staffForm.address || ""} onChange={(e) => setStaffForm({ ...staffForm, address: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Qualification</Label><Input value={staffForm.qualification || ""} onChange={(e) => setStaffForm({ ...staffForm, qualification: e.target.value })} /></div>
-              <div><Label>Specialization</Label><Input value={staffForm.specialization || ""} onChange={(e) => setStaffForm({ ...staffForm, specialization: e.target.value })} /></div>
+              {(staffForm.role || "Nurse") !== "Doctor" && (
+                <div><Label>Specialization</Label><Input value={staffForm.specialization || ""} onChange={(e) => setStaffForm({ ...staffForm, specialization: e.target.value })} /></div>
+              )}
             </div>
+            {(staffForm.role || "Nurse") === "Doctor" && (
+              <DoctorSpecializationPicker
+                selectedIds={doctorSpecIds}
+                primaryId={primarySpecId}
+                onChange={(ids, pid) => { setDoctorSpecIds(ids); setPrimarySpecId(pid); }}
+              />
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Blood Group</Label><Input value={staffForm.blood_group || ""} onChange={(e) => setStaffForm({ ...staffForm, blood_group: e.target.value })} /></div>
               <div><Label>Aadhar No</Label><Input value={staffForm.aadhar_no || ""} onChange={(e) => setStaffForm({ ...staffForm, aadhar_no: e.target.value })} /></div>
