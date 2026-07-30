@@ -32,6 +32,7 @@ export function AppSidebar() {
   const visibleModules = modules.filter((mod) => {
     if (mod.id === "users-roles") return isHospitalAdmin || isSuperAdmin;
     if (mod.id === "hospital-profile") return isHospitalAdmin || isSuperAdmin;
+    if (mod.id === "hospital-settings") return isHospitalAdmin || isSuperAdmin;
     if (mod.id === "support") return isHospitalAdmin || isSuperAdmin;
     // Super admins and hospital admins see all modules
     if (isSuperAdmin || isHospitalAdmin) return true;
