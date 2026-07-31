@@ -1,6 +1,10 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+// Cost-optimised tiering: cheap multimodal first, premium only when unsure.
+const PRIMARY_MODEL = 'google/gemini-3.6-flash';
+const ESCALATION_MODEL = 'google/gemini-3.1-pro-preview';
+const ESCALATE_BELOW = 0.75;
 
 const SYSTEM = `You are an expert pharmacy OCR assistant for an Indian hospital. The user uploads an image or PDF of a medicine strip, supplier invoice, purchase bill, prescription, or lab report (camera photo, WhatsApp image, scanned PDF, etc.).
 
