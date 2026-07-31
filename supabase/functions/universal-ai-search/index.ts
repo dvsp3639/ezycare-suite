@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.1-flash-lite',
         messages: [
           { role: 'system', content: SYSTEM },
           { role: 'user', content: query },
