@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { UniversalScanner } from "@/components/UniversalScanner";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 
 type Kind = "module" | "medicine" | "patient" | "ai" | "recent";
 interface Result {
@@ -57,6 +58,7 @@ export function UniversalSearch() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { aiEnabled } = useHospitalConfig();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[]>([]);
@@ -101,8 +103,8 @@ export function UniversalSearch() {
     if (p === "/accounts")            return { voice: false, scan: false, label: "Accounts · Smart search" };
     return { voice: false, scan: false, label: undefined as string | undefined };
   }, [location.pathname]);
-  const showVoice = toolContext.voice;
-  const showScan = toolContext.scan;
+  const showVoice = toolContext.voice && aiEnabled;
+  const showScan = toolContext.scan && aiEnabled;
 
   useEffect(() => {
     scanOpenRef.current = scanOpen;

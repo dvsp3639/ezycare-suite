@@ -8,6 +8,8 @@ const DashboardPage = () => {
 
   const visibleModules = modules.filter((mod) => {
     if (mod.id === "users-roles") return isHospitalAdmin || isSuperAdmin;
+    if (mod.id === "hospital-profile") return isHospitalAdmin || isSuperAdmin;
+    if (mod.id === "hospital-settings") return isHospitalAdmin || isSuperAdmin;
     if (isSuperAdmin || isHospitalAdmin) return true;
     return allowedModules.includes(mod.id);
   });

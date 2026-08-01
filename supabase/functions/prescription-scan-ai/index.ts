@@ -1,6 +1,10 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+// Cost-optimised tiering: cheap multimodal first, premium only for hard handwriting.
+const PRIMARY_MODEL = 'google/gemini-3.6-flash';
+const ESCALATION_MODEL = 'google/gemini-3.1-pro-preview';
+const ESCALATE_BELOW = 0.75;
 
 const SYSTEM = `You are an expert pharmacy prescription OCR assistant for Indian hospitals. The user uploads a photo, scan, or PDF of a doctor's prescription — printed or HANDWRITTEN. Extract every prescribed medicine with the highest possible accuracy.
 
@@ -78,11 +82,11 @@ Deno.serve(async (req) => {
     if (isPdf) userContent.push({ type: 'file', file: { filename: 'rx.pdf', file_data: dataUrl } });
     else userContent.push({ type: 'image_url', image_url: { url: dataUrl } });
 
-    const r = await fetch(GATEWAY, {
+    const callModel = (model: string) => fetch(GATEWAY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model,
         messages: [
           { role: 'system', content: SYSTEM },
           { role: 'user', content: userContent },
@@ -90,6 +94,8 @@ Deno.serve(async (req) => {
         response_format: { type: 'json_object' },
       }),
     });
+
+    const r = await callModel(PRIMARY_MODEL);
     if (r.status === 429) return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (r.status === 402) return new Response(JSON.stringify({ error: 'credits_exhausted' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (!r.ok) {
@@ -101,6 +107,23 @@ Deno.serve(async (req) => {
     let parsed: any;
     try { parsed = JSON.parse(content); } catch { parsed = { documentType: 'other', confidence: 0, rawText: content, medicines: [] }; }
     if (!Array.isArray(parsed.medicines)) parsed.medicines = [];
+    parsed.modelUsed = PRIMARY_MODEL;
+
+    // Escalate only on low confidence or an empty extraction from a real Rx
+    const weak = Number(parsed?.confidence ?? 0) < ESCALATE_BELOW || parsed.medicines.length === 0;
+    if (weak) {
+      try {
+        const r2 = await callModel(ESCALATION_MODEL);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          const p2 = JSON.parse(j2.choices?.[0]?.message?.content || '{}');
+          if (!Array.isArray(p2.medicines)) p2.medicines = [];
+          const better = p2.medicines.length > parsed.medicines.length
+            || Number(p2?.confidence ?? 0) > Number(parsed?.confidence ?? 0);
+          if (better) parsed = { ...p2, modelUsed: ESCALATION_MODEL, escalated: true };
+        }
+      } catch (_) { /* keep tier-1 result */ }
+    }
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'server_error', detail: String((e as Error)?.message ?? e).slice(0, 200) }), {

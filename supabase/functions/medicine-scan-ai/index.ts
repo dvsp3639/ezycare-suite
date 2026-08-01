@@ -1,6 +1,10 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+// Cost-optimised tiering: cheap multimodal first, premium only when unsure.
+const PRIMARY_MODEL = 'google/gemini-3.6-flash';
+const ESCALATION_MODEL = 'google/gemini-3.1-pro-preview';
+const ESCALATE_BELOW = 0.75;
 
 const SYSTEM = `You are an expert pharmacy OCR assistant for an Indian hospital. The user uploads an image or PDF of a medicine strip, supplier invoice, purchase bill, prescription, or lab report (camera photo, WhatsApp image, scanned PDF, etc.).
 
@@ -96,28 +100,50 @@ Deno.serve(async (req) => {
       userContent.push({ type: 'image_url', image_url: { url: dataUrl } });
     }
 
-    const r = await fetch(GATEWAY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: userContent },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
+    const callModel = async (model: string) => {
+      const r = await fetch(GATEWAY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SYSTEM },
+            { role: 'user', content: userContent },
+          ],
+          response_format: { type: 'json_object' },
+        }),
+      });
+      return r;
+    };
+
+    // Tier 1: cheap, fast, multimodal
+    let r = await callModel(PRIMARY_MODEL);
     if (r.status === 429) return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (r.status === 402) return new Response(JSON.stringify({ error: 'credits_exhausted' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (!r.ok) {
       const t = await r.text();
       return new Response(JSON.stringify({ error: 'ai_failed', detail: t.slice(0, 300) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const j = await r.json();
-    const content = j.choices?.[0]?.message?.content || '{}';
+    let j = await r.json();
+    let content = j.choices?.[0]?.message?.content || '{}';
     let parsed: any;
     try { parsed = JSON.parse(content); } catch { parsed = { documentType: 'other', confidence: 0, rawText: content }; }
+    parsed.modelUsed = PRIMARY_MODEL;
+
+    // Tier 2: escalate ONLY when the cheap pass is unsure — keeps credit usage low
+    if (Number(parsed?.confidence ?? 0) < ESCALATE_BELOW) {
+      try {
+        const r2 = await callModel(ESCALATION_MODEL);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          const c2 = j2.choices?.[0]?.message?.content || '{}';
+          const p2 = JSON.parse(c2);
+          if (Number(p2?.confidence ?? 0) >= Number(parsed?.confidence ?? 0)) {
+            parsed = { ...p2, modelUsed: ESCALATION_MODEL, escalated: true };
+          }
+        }
+      } catch (_) { /* keep tier-1 result */ }
+    }
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'server_error', detail: String((e as Error)?.message ?? e).slice(0, 200) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

@@ -11,6 +11,10 @@ import {
   Package,
   Pill,
   Users,
+  Building,
+  LifeBuoy,
+  HeartPulse,
+  Settings2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,4 +39,8 @@ export const modules: ModuleItem[] = [
   { id: "pharmacy", title: "Pharmacy", icon: Pill, description: "Pharmacy management", route: "/pharmacy", color: "bg-info/10 text-info" },
   { id: "staff-payroll", title: "Staff & Payroll", icon: Users, description: "Staff attendance & salary", route: "/staff-payroll", color: "bg-primary/10 text-primary" },
   { id: "users-roles", title: "Users & Roles", icon: Shield, description: "Manage staff credentials", route: "/users-roles", color: "bg-destructive/10 text-destructive" },
+  { id: "hospital-profile", title: "Hospital Profile", icon: Building, description: "Branding, letterhead & compliance", route: "/hospital-profile", color: "bg-primary/10 text-primary" },
+  { id: "follow-up-care", title: "Follow-up Care", icon: HeartPulse, description: "Free follow-up eligibility & reminders", route: "/follow-up-care", color: "bg-success/10 text-success" },
+  { id: "hospital-settings", title: "Hospital Settings", icon: Settings2, description: "Follow-up policy & reminder rules", route: "/hospital-settings", color: "bg-warning/10 text-warning" },
+  { id: "support", title: "Support", icon: LifeBuoy, description: "Raise tickets & chat with support", route: "/support", color: "bg-info/10 text-info" },
 ];
