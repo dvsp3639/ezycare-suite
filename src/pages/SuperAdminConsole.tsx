@@ -7,11 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SubscriptionsTab } from "@/components/superadmin/SubscriptionsTab";
+import { AIMonitoringTab } from "@/components/superadmin/AIMonitoringTab";
+import { SupportTab } from "@/components/superadmin/SupportTab";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield } from "lucide-react";
+import { Building2, Users, Plus, Pencil, Power, KeyRound, LogOut, Loader2, Shield, CreditCard, Sparkles, LifeBuoy } from "lucide-react";
+import ezyopIconAsset from "@/assets/ezyop-icon-v2.png.asset.json";
 
 interface Hospital {
   id: string;
@@ -19,9 +23,18 @@ interface Hospital {
   address?: string;
   city?: string;
   state?: string;
+  pincode?: string;
+  country?: string;
   phone?: string;
   email?: string;
   license_number?: string;
+  gstin?: string;
+  website?: string;
+  logo_url?: string;
+  tagline?: string;
+  timezone?: string;
+  currency?: string;
+  registration_prefix?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -36,7 +49,12 @@ interface AdminUser {
   phone?: string;
 }
 
-const emptyHospital = { name: "", address: "", city: "", state: "", phone: "", email: "", license_number: "" };
+const emptyHospital = {
+  name: "", address: "", city: "", state: "", pincode: "", country: "India",
+  phone: "", email: "", license_number: "", gstin: "", website: "",
+  logo_url: "", tagline: "", timezone: "Asia/Kolkata", currency: "INR",
+  registration_prefix: "",
+};
 const emptyAdmin = { email: "", password: "", full_name: "", phone: "", hospital_id: "" };
 
 export default function SuperAdminConsole() {
@@ -56,6 +74,8 @@ export default function SuperAdminConsole() {
 
   const [pwDialog, setPwDialog] = useState<{ open: boolean; admin?: AdminUser }>({ open: false });
   const [pwValue, setPwValue] = useState("");
+
+  const [toggleDialog, setToggleDialog] = useState<{ open: boolean; hospital?: Hospital }>({ open: false });
 
   const api = async (path: string, options: { method?: string; body?: any } = {}) => {
     const { data, error } = await supabase.functions.invoke(`admin-api/${path}`, {
@@ -90,7 +110,11 @@ export default function SuperAdminConsole() {
   const openHospital = (h?: Hospital) => {
     setHForm(h ? {
       name: h.name, address: h.address || "", city: h.city || "", state: h.state || "",
+      pincode: h.pincode || "", country: h.country || "India",
       phone: h.phone || "", email: h.email || "", license_number: h.license_number || "",
+      gstin: h.gstin || "", website: h.website || "", logo_url: h.logo_url || "",
+      tagline: h.tagline || "", timezone: h.timezone || "Asia/Kolkata",
+      currency: h.currency || "INR", registration_prefix: h.registration_prefix || "",
     } : emptyHospital);
     setHDialog({ open: true, edit: h });
   };
@@ -122,17 +146,19 @@ export default function SuperAdminConsole() {
     try {
       await api(`hospitals/${h.id}`, {
         method: "PUT",
-        body: {
-          name: h.name, address: h.address, city: h.city, state: h.state,
-          phone: h.phone, email: h.email, license_number: h.license_number,
-          is_active: !h.is_active,
-        },
+        body: { is_active: !h.is_active },
       });
       toast.success(h.is_active ? "Hospital deactivated" : "Hospital activated");
       loadAll();
     } catch (e: any) {
       toast.error(e.message);
     }
+  };
+
+  const confirmToggleHospitalActive = async () => {
+    if (!toggleDialog.hospital) return;
+    await toggleHospitalActive(toggleDialog.hospital);
+    setToggleDialog({ open: false });
   };
 
   // ---------- Admins ----------
@@ -216,8 +242,8 @@ export default function SuperAdminConsole() {
       <header className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Shield className="h-5 w-5" />
+            <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden">
+              <img src={ezyopIconAsset.url} alt="EZY OP" className="w-9 h-9 object-contain" />
             </div>
             <div>
               <h1 className="text-lg font-display font-bold">Master Console</h1>
@@ -238,6 +264,9 @@ export default function SuperAdminConsole() {
           <TabsList>
             <TabsTrigger value="hospitals"><Building2 className="h-4 w-4 mr-1" /> Hospitals ({hospitals.length})</TabsTrigger>
             <TabsTrigger value="admins"><Users className="h-4 w-4 mr-1" /> Hospital Admins ({admins.length})</TabsTrigger>
+            <TabsTrigger value="subscriptions"><CreditCard className="h-4 w-4 mr-1" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="ai"><Sparkles className="h-4 w-4 mr-1" /> AI Monitoring</TabsTrigger>
+            <TabsTrigger value="support"><LifeBuoy className="h-4 w-4 mr-1" /> Support</TabsTrigger>
           </TabsList>
 
           {/* HOSPITALS */}
@@ -279,7 +308,7 @@ export default function SuperAdminConsole() {
                           <Button variant="ghost" size="sm" onClick={() => openHospital(h)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleHospitalActive(h)} title={h.is_active ? "Deactivate" : "Activate"}>
+                          <Button variant="ghost" size="sm" onClick={() => setToggleDialog({ open: true, hospital: h })} title={h.is_active ? "Deactivate" : "Activate"}>
                             <Power className={`h-4 w-4 ${h.is_active ? "text-destructive" : "text-success"}`} />
                           </Button>
                         </TableCell>
@@ -340,21 +369,60 @@ export default function SuperAdminConsole() {
               )}
             </div>
           </TabsContent>
+
+          <TabsContent value="subscriptions" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">Hospital Subscriptions</h2>
+                <p className="text-sm text-muted-foreground">Manage plans, billing cycles, renewals and usage limits.</p>
+              </div>
+            </div>
+            <SubscriptionsTab />
+          </TabsContent>
+
+          <TabsContent value="ai" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">AI Feature Control & Intelligence</h2>
+                <p className="text-sm text-muted-foreground">Toggle AI per hospital and monitor accuracy, latency and errors.</p>
+              </div>
+            </div>
+            <AIMonitoringTab />
+          </TabsContent>
+
+          <TabsContent value="support" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">Customer Support</h2>
+                <p className="text-sm text-muted-foreground">Reply to hospital tickets, add internal notes and manage SLAs.</p>
+              </div>
+            </div>
+            <SupportTab />
+          </TabsContent>
         </Tabs>
       </main>
 
       {/* Hospital Dialog */}
       <Dialog open={hDialog.open} onOpenChange={(open) => setHDialog({ open })}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{hDialog.edit ? "Edit Hospital" : "Add Hospital"}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Name *</Label><Input value={hForm.name} onChange={(e) => setHForm({ ...hForm, name: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Tagline</Label><Input value={hForm.tagline} onChange={(e) => setHForm({ ...hForm, tagline: e.target.value })} placeholder="e.g. Caring for life since 1985" /></div>
             <div className="col-span-2"><Label>Address</Label><Input value={hForm.address} onChange={(e) => setHForm({ ...hForm, address: e.target.value })} /></div>
             <div><Label>City</Label><Input value={hForm.city} onChange={(e) => setHForm({ ...hForm, city: e.target.value })} /></div>
             <div><Label>State</Label><Input value={hForm.state} onChange={(e) => setHForm({ ...hForm, state: e.target.value })} /></div>
+            <div><Label>Pincode</Label><Input value={hForm.pincode} onChange={(e) => setHForm({ ...hForm, pincode: e.target.value })} /></div>
+            <div><Label>Country</Label><Input value={hForm.country} onChange={(e) => setHForm({ ...hForm, country: e.target.value })} /></div>
             <div><Label>Phone</Label><Input value={hForm.phone} onChange={(e) => setHForm({ ...hForm, phone: e.target.value })} /></div>
             <div><Label>Email</Label><Input type="email" value={hForm.email} onChange={(e) => setHForm({ ...hForm, email: e.target.value })} /></div>
-            <div className="col-span-2"><Label>License Number</Label><Input value={hForm.license_number} onChange={(e) => setHForm({ ...hForm, license_number: e.target.value })} /></div>
+            <div><Label>Website</Label><Input value={hForm.website} onChange={(e) => setHForm({ ...hForm, website: e.target.value })} placeholder="https://" /></div>
+            <div><Label>Logo URL</Label><Input value={hForm.logo_url} onChange={(e) => setHForm({ ...hForm, logo_url: e.target.value })} placeholder="https://" /></div>
+            <div><Label>License Number</Label><Input value={hForm.license_number} onChange={(e) => setHForm({ ...hForm, license_number: e.target.value })} /></div>
+            <div><Label>GSTIN</Label><Input value={hForm.gstin} onChange={(e) => setHForm({ ...hForm, gstin: e.target.value })} /></div>
+            <div><Label>Timezone</Label><Input value={hForm.timezone} onChange={(e) => setHForm({ ...hForm, timezone: e.target.value })} /></div>
+            <div><Label>Currency</Label><Input value={hForm.currency} onChange={(e) => setHForm({ ...hForm, currency: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Registration Number Prefix</Label><Input value={hForm.registration_prefix} onChange={(e) => setHForm({ ...hForm, registration_prefix: e.target.value })} placeholder="e.g. EZY" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHDialog({ open: false })}>Cancel</Button>
@@ -412,6 +480,31 @@ export default function SuperAdminConsole() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPwDialog({ open: false })}>Cancel</Button>
             <Button onClick={resetPassword}>Reset</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activate/Deactivate Confirmation */}
+      <Dialog open={toggleDialog.open} onOpenChange={(open) => setToggleDialog({ open })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {toggleDialog.hospital?.is_active ? "Deactivate Hospital" : "Activate Hospital"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to {toggleDialog.hospital?.is_active ? "deactivate" : "activate"}{" "}
+            <span className="font-semibold text-foreground">{toggleDialog.hospital?.name}</span>?
+            {toggleDialog.hospital?.is_active && " Users of this hospital will lose access until reactivated."}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToggleDialog({ open: false })}>Cancel</Button>
+            <Button
+              variant={toggleDialog.hospital?.is_active ? "destructive" : "default"}
+              onClick={confirmToggleHospitalActive}
+            >
+              {toggleDialog.hospital?.is_active ? "Deactivate" : "Activate"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
