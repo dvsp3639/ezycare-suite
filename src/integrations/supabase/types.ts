@@ -1085,6 +1085,359 @@ export type Database = {
         }
         Relationships: []
       }
+      followup_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          created_at: string
+          details: Json
+          entity_id: string | null
+          entity_type: string | null
+          hospital_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          details?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          hospital_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          details?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          hospital_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_audit_log_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_doctor_policies: {
+        Row: {
+          created_at: string
+          department: string | null
+          doctor_name: string
+          enabled: boolean
+          hospital_id: string
+          id: string
+          max_visits: number | null
+          remarks: string | null
+          updated_at: string
+          window_days: number | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          doctor_name: string
+          enabled?: boolean
+          hospital_id: string
+          id?: string
+          max_visits?: number | null
+          remarks?: string | null
+          updated_at?: string
+          window_days?: number | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          doctor_name?: string
+          enabled?: boolean
+          hospital_id?: string
+          id?: string
+          max_visits?: number | null
+          remarks?: string | null
+          updated_at?: string
+          window_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_doctor_policies_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_entitlements: {
+        Row: {
+          consent: boolean
+          created_at: string
+          department: string | null
+          doctor_name: string
+          expiry_date: string
+          hospital_id: string
+          id: string
+          max_visits: number
+          mobile: string
+          patient_id: string | null
+          patient_name: string
+          registration_number: string
+          source_appointment_id: string | null
+          source_visit_date: string
+          status: string
+          updated_at: string
+          used_visits: number
+        }
+        Insert: {
+          consent?: boolean
+          created_at?: string
+          department?: string | null
+          doctor_name: string
+          expiry_date: string
+          hospital_id: string
+          id?: string
+          max_visits?: number
+          mobile?: string
+          patient_id?: string | null
+          patient_name?: string
+          registration_number?: string
+          source_appointment_id?: string | null
+          source_visit_date: string
+          status?: string
+          updated_at?: string
+          used_visits?: number
+        }
+        Update: {
+          consent?: boolean
+          created_at?: string
+          department?: string | null
+          doctor_name?: string
+          expiry_date?: string
+          hospital_id?: string
+          id?: string
+          max_visits?: number
+          mobile?: string
+          patient_id?: string | null
+          patient_name?: string
+          registration_number?: string
+          source_appointment_id?: string | null
+          source_visit_date?: string
+          status?: string
+          updated_at?: string
+          used_visits?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_entitlements_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_policies: {
+        Row: {
+          created_at: string
+          department_wise: boolean
+          doctor_wise: boolean
+          enabled: boolean
+          hospital_id: string
+          id: string
+          max_visits: number
+          notes: string | null
+          push_enabled: boolean
+          reminder_days: number[]
+          reminder_enabled: boolean
+          sms_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+          whatsapp_enabled: boolean
+          window_days: number
+        }
+        Insert: {
+          created_at?: string
+          department_wise?: boolean
+          doctor_wise?: boolean
+          enabled?: boolean
+          hospital_id: string
+          id?: string
+          max_visits?: number
+          notes?: string | null
+          push_enabled?: boolean
+          reminder_days?: number[]
+          reminder_enabled?: boolean
+          sms_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_enabled?: boolean
+          window_days?: number
+        }
+        Update: {
+          created_at?: string
+          department_wise?: boolean
+          doctor_wise?: boolean
+          enabled?: boolean
+          hospital_id?: string
+          id?: string
+          max_visits?: number
+          notes?: string | null
+          push_enabled?: boolean
+          reminder_days?: number[]
+          reminder_enabled?: boolean
+          sms_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_enabled?: boolean
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_policies_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: true
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_reminders: {
+        Row: {
+          channel: string
+          created_at: string
+          delivered_at: string | null
+          entitlement_id: string
+          error_message: string | null
+          hospital_id: string
+          id: string
+          message: string | null
+          offset_days: number
+          provider_ref: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          delivered_at?: string | null
+          entitlement_id: string
+          error_message?: string | null
+          hospital_id: string
+          id?: string
+          message?: string | null
+          offset_days?: number
+          provider_ref?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          delivered_at?: string | null
+          entitlement_id?: string
+          error_message?: string | null
+          hospital_id?: string
+          id?: string
+          message?: string | null
+          offset_days?: number
+          provider_ref?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_reminders_entitlement_id_fkey"
+            columns: ["entitlement_id"]
+            isOneToOne: false
+            referencedRelation: "followup_entitlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followup_reminders_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_visits: {
+        Row: {
+          appointment_id: string | null
+          booked_by: string | null
+          channel: string
+          created_at: string
+          doctor_name: string
+          entitlement_id: string
+          hospital_id: string
+          id: string
+          source_appointment_id: string | null
+          status: string
+          token_no: number | null
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          booked_by?: string | null
+          channel?: string
+          created_at?: string
+          doctor_name: string
+          entitlement_id: string
+          hospital_id: string
+          id?: string
+          source_appointment_id?: string | null
+          status?: string
+          token_no?: number | null
+          updated_at?: string
+          visit_date: string
+        }
+        Update: {
+          appointment_id?: string | null
+          booked_by?: string | null
+          channel?: string
+          created_at?: string
+          doctor_name?: string
+          entitlement_id?: string
+          hospital_id?: string
+          id?: string
+          source_appointment_id?: string | null
+          status?: string
+          token_no?: number | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_visits_entitlement_id_fkey"
+            columns: ["entitlement_id"]
+            isOneToOne: false
+            referencedRelation: "followup_entitlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followup_visits_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hospital_holidays: {
         Row: {
           created_at: string
@@ -1260,6 +1613,7 @@ export type Database = {
           created_at: string
           currency: string | null
           email: string | null
+          followup_enabled: boolean
           gstin: string | null
           id: string
           is_active: boolean
@@ -1283,6 +1637,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           email?: string | null
+          followup_enabled?: boolean
           gstin?: string | null
           id?: string
           is_active?: boolean
@@ -1306,6 +1661,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           email?: string | null
+          followup_enabled?: boolean
           gstin?: string | null
           id?: string
           is_active?: boolean
@@ -2153,6 +2509,7 @@ export type Database = {
           mobile: string
           name: string
           registration_number: string
+          reminder_consent: boolean
           updated_at: string
         }
         Insert: {
@@ -2168,6 +2525,7 @@ export type Database = {
           mobile: string
           name: string
           registration_number: string
+          reminder_consent?: boolean
           updated_at?: string
         }
         Update: {
@@ -2183,6 +2541,7 @@ export type Database = {
           mobile?: string
           name?: string
           registration_number?: string
+          reminder_consent?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -3729,10 +4088,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      book_followup_visit: {
+        Args: {
+          _appointment_date: string
+          _channel?: string
+          _entitlement_id: string
+          _time_slot?: string
+        }
+        Returns: Json
+      }
       create_pharmacy_sale: {
         Args: { _items: Json; _order: Json }
         Returns: Json
       }
+      expire_followup_entitlements: { Args: never; Returns: number }
       generate_doctor_slots: {
         Args: { _doctor_name: string; _from_date: string; _to_date: string }
         Returns: number

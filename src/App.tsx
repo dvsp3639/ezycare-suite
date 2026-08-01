@@ -26,6 +26,8 @@ import UsersRoles from "./pages/UsersRoles";
 import SuperAdminConsole from "./pages/SuperAdminConsole";
 import HospitalProfilePage from "./pages/HospitalProfile";
 import Support from "./pages/Support";
+import FollowUpCare from "./pages/FollowUpCare";
+import HospitalSettings from "./pages/HospitalSettings";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -77,6 +79,8 @@ const AppRoutes = () => (
     <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
     <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
     <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+    <Route path="/follow-up-care" element={<ProtectedRoute><FollowUpCare /></ProtectedRoute>} />
+    <Route path="/hospital-settings" element={<AdminRoute><HospitalSettings /></AdminRoute>} />
     <Route path="/debug-upload" element={<ProtectedRoute><DebugUpload /></ProtectedRoute>} />
     <Route path="/ai-core/test-upload" element={<ProtectedRoute><AiCoreTestUpload /></ProtectedRoute>} />
     <Route path="/ai-engine-v2/test" element={<ProtectedRoute><AiEngineV2Test /></ProtectedRoute>} />
