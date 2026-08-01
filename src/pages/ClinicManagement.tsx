@@ -27,8 +27,6 @@ import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
 import { daycareService } from "@/modules/daycare/services";
 import { useAuth } from "@/contexts/AuthContext";
-import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
-import { buildLetterhead } from "@/lib/letterhead";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -40,7 +38,6 @@ import {
 } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import { useLabTestCatalog, useLabOrders } from "@/modules/diagnostics/hooks";
-import DoctorAvailabilityEngine from "@/components/clinic/DoctorAvailabilityEngine";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -85,7 +82,6 @@ const ClinicManagement = () => {
   } = useClinicData();
   const { roles } = useAuth();
   const hospitalId = roles?.[0]?.hospital_id || "";
-  const { data: hospitalProfile } = useHospitalProfile();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const labCatEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
@@ -99,7 +95,6 @@ const ClinicManagement = () => {
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
-  const [engineDoctor, setEngineDoctor] = useState<{ name: string; specialization?: string } | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
@@ -529,11 +524,13 @@ const ClinicManagement = () => {
     if (!printWindow || !consultPatient) return;
     const rxLines = consultPrescriptions.filter((p) => p.medicine.trim());
     const e = escapeHtml;
-    const lh = buildLetterhead(hospitalProfile as any, { title: "Medical Prescription" });
     printWindow.document.write(`
       <html><head><title>Prescription – ${e(consultPatient.patientName)}</title>
       <style>
-        ${lh.styles}
+        body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: auto; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { font-size: 20px; margin: 0; }
+        .header p { margin: 4px 0; font-size: 12px; color: #666; }
         .patient-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
         .section { margin-bottom: 16px; }
         .section h3 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
@@ -541,8 +538,12 @@ const ClinicManagement = () => {
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
         th { background: #f5f5f5; }
         .footer { margin-top: 48px; display: flex; justify-content: space-between; font-size: 12px; }
-      </style></head><body><div class="lh-doc">
-      ${lh.header}
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <div class="header">
+        <h1>EzyOp Clinic</h1>
+        <p>Medical Prescription</p>
+      </div>
       <div class="patient-info">
         <div><strong>Patient:</strong> ${e(consultPatient.patientName)}<br/><strong>Reg No:</strong> ${e(consultPatient.registrationNumber)}</div>
         <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}<br/><strong>Doctor:</strong> ${e(consultPatient.doctorName)}</div>
@@ -556,8 +557,7 @@ const ClinicManagement = () => {
       ${consultFollowUp ? `<div class="section"><h3>Follow-up</h3><p>${format(consultFollowUp, "dd/MM/yyyy")}</p></div>` : ""}
       ${consultNotes ? `<div class="section"><h3>Doctor's Notes</h3><p>${e(consultNotes)}</p></div>` : ""}
       <div class="footer"><span>Signature: ___________________</span><span>Date: ${format(new Date(), "dd/MM/yyyy")}</span></div>
-      ${lh.footer}
-      </div></body></html>
+      </body></html>
     `);
     printWindow.document.close();
     printWindow.print();
@@ -659,8 +659,8 @@ const ClinicManagement = () => {
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
                   {!isPastDate && (
-                    <Button variant="outline" size="sm" onClick={() => setEngineDoctor({ name: doc.doctorName, specialization: doc.specialization })}>
-                      <Settings2 className="h-4 w-4 mr-1.5" /> Availability Engine
+                    <Button variant="outline" size="sm" onClick={() => openManageSlots(doc.id)}>
+                      <Settings2 className="h-4 w-4 mr-1.5" /> Manage Slots
                     </Button>
                   )}
                 </div>
@@ -837,16 +837,90 @@ const ClinicManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* ─── Doctor Availability Engine ─── */}
-      {engineDoctor && (
-        <DoctorAvailabilityEngine
-          open={!!engineDoctor}
-          onClose={() => setEngineDoctor(null)}
-          doctorName={engineDoctor.name}
-          specialization={engineDoctor.specialization}
-          onSlotsRegenerated={() => { refetchDateSchedules(); refreshData(); }}
-        />
-      )}
+      {/* ─── Manage Slots Dialog ─── */}
+      <Dialog open={!!editSlotDoctorId} onOpenChange={(v) => !v && setEditSlotDoctorId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">Manage Slots — {editSlotDoctor?.doctorName}</DialogTitle>
+            <p className="text-sm text-muted-foreground">{editSlotDoctor?.specialization}</p>
+          </DialogHeader>
+          {editSlotDoctor && (
+            <>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><ClockIcon className="h-4 w-4" /> Availability Ranges</h4>
+                  <Button size="sm" variant="outline" onClick={addSlotRange}><Plus className="h-3.5 w-3.5 mr-1" /> Add Range</Button>
+                </div>
+                <div className="space-y-3 max-h-[260px] overflow-y-auto">
+                  {slotRanges.map((range, idx) => (
+                    <div key={idx} className="bg-muted/50 rounded-lg p-3 space-y-2 border border-border">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Range {idx + 1}</span>
+                        {slotRanges.length > 1 && (
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeSlotRange(idx)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">From</label>
+                          <Select value={range.from} onValueChange={(v) => updateSlotRange(idx, "from", v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">To</label>
+                          <Select value={range.to} onValueChange={(v) => updateSlotRange(idx, "to", v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-foreground mb-0.5 block">Tokens / 30 min</label>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", Math.max(1, range.tokensPerSlot - 1))}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center font-semibold text-foreground text-sm">{range.tokensPerSlot}</span>
+                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateSlotRange(idx, "tokensPerSlot", range.tokensPerSlot + 1)}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview generated slots */}
+              {slotRanges.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground">Preview — {generateSlotsFromRanges(slotRanges).length} slots</h4>
+                  <div className="grid grid-cols-4 gap-1.5 max-h-[160px] overflow-y-auto">
+                    {generateSlotsFromRanges(slotRanges).map((slot) => {
+                      const past = isSlotPast(slot.time);
+                      const existing = editSlotDoctor.timeSlots.find(es => es.time === slot.time);
+                      return (
+                        <div key={slot.time} className={cn("rounded-md border p-2 text-center text-xs", past ? "border-border/50 bg-muted/40 opacity-50" : "border-border bg-card")}>
+                          <p className="font-medium text-foreground">{slot.time}</p>
+                          <p className="text-muted-foreground">{existing ? `${existing.bookedPatients}/` : "0/"}{slot.maxPatients}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleSaveSlotConfig} disabled={savingSlots} className="w-full mt-2">
+                {savingSlots ? <><Clock className="h-4 w-4 mr-1.5 animate-spin" /> Saving...</> : <><Save className="h-4 w-4 mr-1.5" /> Save Configuration</>}
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Nurse Vitals Entry Dialog ─── */}
       <Dialog open={!!vitalsPatient} onOpenChange={(v) => !v && setVitalsPatient(null)}>

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,8 +28,6 @@ import { useAdmissions } from "@/modules/ipd/hooks";
 import { ipdService } from "@/modules/ipd/services";
 import { usePatients } from "@/modules/patients/hooks";
 import { useStaffMembers } from "@/modules/staff/hooks";
-import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
-import { buildLetterhead } from "@/lib/letterhead";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -133,7 +130,6 @@ const IPD = () => {
 
   // Print ref
   const printRef = useRef<HTMLDivElement>(null);
-  const { data: hospitalProfile } = useHospitalProfile();
 
   // Forms
   const [admitForm, setAdmitForm] = useState<Partial<IPDAdmission>>({});
@@ -407,13 +403,13 @@ const IPD = () => {
     if (!printRef.current) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    const lh = buildLetterhead(hospitalProfile as any, { title: "Discharge Summary" });
     printWindow.document.write(`
       <html><head><title>Discharge Summary</title>
       <style>
-        ${lh.styles}
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
         h1 { font-size: 20px; margin-bottom: 4px; }
         h2 { font-size: 16px; color: #444; border-bottom: 2px solid #0066cc; padding-bottom: 4px; margin-top: 24px; }
+        .header { text-align: center; border-bottom: 3px solid #0066cc; padding-bottom: 16px; margin-bottom: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
         .value { font-size: 13px; font-weight: 600; }
@@ -423,11 +419,10 @@ const IPD = () => {
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
         th { background: #f5f5f5; font-weight: 600; }
-      </style></head><body><div class="lh-doc">
-      ${lh.header}
+        @media print { body { padding: 20px; } }
+      </style></head><body>
       ${printRef.current.innerHTML}
-      ${lh.footer}
-      </div></body></html>
+      </body></html>
     `);
     printWindow.document.close();
     printWindow.focus();
@@ -1120,7 +1115,7 @@ const IPD = () => {
             <div><Label>Condition at Discharge</Label><Input value={dischargeForm.conditionAtDischarge} onChange={(e) => setDischargeForm({ ...dischargeForm, conditionAtDischarge: e.target.value })} placeholder="Stable, afebrile..." /></div>
             <div><Label>Final Diagnosis *</Label><Textarea value={dischargeForm.finalDiagnosis} onChange={(e) => setDischargeForm({ ...dischargeForm, finalDiagnosis: e.target.value })} rows={2} /></div>
             <div><Label>Treatment Summary</Label><Textarea value={dischargeForm.treatmentSummary} onChange={(e) => setDischargeForm({ ...dischargeForm, treatmentSummary: e.target.value })} rows={3} /></div>
-            <div><Label>Follow-up Date</Label><DateInput value={dischargeForm.followUpDate} onChange={(v) => setDischargeForm({ ...dischargeForm, followUpDate: v })} /></div>
+            <div><Label>Follow-up Date</Label><Input type="date" value={dischargeForm.followUpDate} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpDate: e.target.value })} /></div>
             <div><Label>Follow-up Instructions</Label><Textarea value={dischargeForm.followUpInstructions} onChange={(e) => setDischargeForm({ ...dischargeForm, followUpInstructions: e.target.value })} rows={2} /></div>
             <div><Label>Medications on Discharge</Label><Textarea value={dischargeForm.medicationsOnDischarge} onChange={(e) => setDischargeForm({ ...dischargeForm, medicationsOnDischarge: e.target.value })} rows={2} /></div>
             {billBreakdown && (

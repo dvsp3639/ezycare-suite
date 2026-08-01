@@ -1,97 +1,72 @@
-# Super Admin: Subscriptions, AI Controls & Support Tickets
+## Goal
 
-Three enterprise features added to `/super-admin`, plus a hospital-side Support inbox for admins.
+Replace the current ad-hoc scanner stack (`UniversalScanner`, `MedicineInputBar` camera, `MobileScanView`, scattered AI calls) with a **single AI Core Engine** that every HMS module reuses. Existing Pharmacy, Inventory, Diagnostics, Billing, Patients, Auth flows stay untouched — only their AI entry points are rewired to the new engine.
 
-## 1. Hospital Subscription Management
+Build strictly **one layer at a time**. Ship Layer 1, verify on Android + desktop, then move on. This plan describes the full target; we will only execute Layer 1 after you approve.
 
-New table `hospital_subscriptions` (one-to-one with hospital):
-- `plan` (enum: `trial`, `basic`, `professional`, `enterprise`)
-- `status` (enum: `active`, `past_due`, `suspended`, `cancelled`, `trialing`)
-- `billing_cycle` (`monthly` / `yearly`)
-- `amount`, `currency` (INR default)
-- `started_at`, `current_period_end`, `trial_ends_at`, `cancelled_at`
-- `max_users`, `max_patients_per_month`, `features` (jsonb)
-- `notes` (super admin only)
+## Target architecture
 
-Super Admin UI (new "Subscriptions" tab):
-- Table of all hospitals with plan, status badge, renewal date, MRR
-- Edit dialog: change plan, extend period, suspend/reactivate, add notes
-- Summary cards: total MRR, active/trial/suspended counts, upcoming renewals (30d)
-- When status = `suspended` or `cancelled` → block hospital login server-side via `is_active` sync on `hospitals`
+```text
+src/ai-core/
+  upload/          Layer 1 — Universal Upload Engine
+    UploadEngine.tsx        mobile-first picker (camera/gallery/files/drag-drop)
+    enhance.ts              crop, deskew, shadow-remove, compress (reuses docScan.ts)
+    uploader.ts             chunked upload to `ai-core-uploads` bucket + retry + progress
+    types.ts                UploadedFile, UploadProgress, UploadResult
+    hooks.ts                useUploadEngine()
+  classify/        Layer 2 — Document Classification Engine
+    classifier.ts           calls edge fn `ai-classify`, returns DocumentKind
+    types.ts                DocumentKind = prescription|purchase_invoice|lab_report|medicine_label|barcode|qr|unknown
+  extract/         Layer 3 — AI Extraction Engine
+    extractors/             one schema + prompt per DocumentKind
+    extractEngine.ts        single entry: extract(kind, files) -> StructuredPayload
+    schemas.ts              zod schemas per kind
+  verify/          Layer 4 — Human Verification
+    VerifyShell.tsx         shared editable shell (mobile sheet / desktop dialog)
+    renderers/              kind-specific editable tables (Prescription, Invoice, LabReport)
+  connector/       Layer 5 — HMS Connector
+    routes.ts               kind -> module handler map
+    handlers/               prescriptionToPharmacy.ts, invoiceToInventory.ts, labToDiagnostics.ts
+  memory/          Learning loop
+    corrections.ts          wraps existing record_rx_correction + new generic table
+  AiCoreProvider.tsx        single context exposing openAiCore({ accept?, hintKind? })
+  index.ts
+supabase/functions/
+  ai-classify/            new — fast classifier (Gemini Flash, low tokens)
+  ai-extract/             new — kind-routed extractor (replaces prescription-scan-ai + medicine-scan-ai usage from the engine)
+```
 
-Hospital side: read-only banner on Dashboard when trial ending in ≤7 days or `past_due`.
+Existing edge functions stay deployed for back-compat until Layer 3 is live; then `UniversalScanner.tsx`, `MobileScanView.tsx`, the camera button inside `MedicineInputBar.tsx`, and the inventory "Scan Invoice" wizard are rewired to call `openAiCore()`.
 
-## 2. AI Feature Toggle + Intelligence Monitoring
+## Phased delivery
 
-### Toggle
-Add `ai_enabled boolean default true` to `hospitals` table.
-- Super Admin: switch in Subscriptions row + dedicated "AI Controls" tab.
-- Client: new hook `useAIEnabled()` reads it once at login; feature flags:
-  - Universal AI Search, AI Scanner (Pharmacy/Inventory/Diagnostics), Voice input, Prescription scanner, Purchase invoice extraction.
-- When off: hide AI buttons across the app, show "AI disabled by administrator — use manual entry" tooltip. Edge functions (`medicine-scan-ai`, `prescription-scan-ai`, `universal-ai-search`, `voice-transcribe`) reject calls with 403 after checking hospital flag.
+**Phase 1 — Layer 1 only (this turn if approved)**
+- Scaffold `src/ai-core/upload/` with `UploadEngine.tsx`, `enhance.ts` (thin wrapper around existing `docScan.ts` + `mobileScanHelpers.ts`), `uploader.ts`, `hooks.ts`, `types.ts`.
+- Create private storage bucket `ai-core-uploads` (path: `{hospital_id}/{user_id}/{yyyy-mm-dd}/{uuid}.{ext}`) with RLS: insert/select/update/delete restricted to uploader's folder; service_role full.
+- Mobile-first UI: full-screen sheet, big Camera / Gallery / Files buttons, multi-file thumbnails, per-file progress, retry, remove. Desktop: same component with drag-and-drop zone.
+- Logging via existing `mobileUploadDiagnostics.ts`.
+- Demo route `/ai-core/test-upload` (dev only) to verify end-to-end on Android.
+- **No classification, no AI, no HMS writes in this phase.**
 
-### Intelligence Monitoring
-New table `ai_usage_events`:
-- `hospital_id`, `user_id`, `feature` (enum: prescription_scan, invoice_scan, universal_search, voice_transcribe, medicine_scan)
-- `model`, `tokens_in`, `tokens_out`, `latency_ms`
-- `status` (`success`/`error`/`low_confidence`)
-- `confidence_score` numeric, `was_corrected` boolean, `correction_delta` jsonb
-- `created_at`
+**Phase 2 — Layer 2** Classifier edge fn + `classify/` module. Hook into UploadEngine `onComplete`. Show detected kind chip.
 
-All 4 edge functions log one row per invocation (fire-and-forget insert). Existing correction tables (`prescription_corrections`, `scanner_corrections`) already track manual overrides — we backfill by joining on time proximity.
+**Phase 3 — Layer 3** Extractor edge fn with per-kind schemas. Stream structured JSON back.
 
-Super Admin "AI Monitoring" tab per hospital:
-- KPI cards: total calls (7d/30d), success rate, avg confidence, correction rate, avg latency, credits est.
-- Charts (recharts): calls/day stacked by feature, accuracy trend, top corrected medicine names.
-- Feature breakdown table.
-- Export CSV.
+**Phase 4 — Layer 4** VerifyShell + per-kind editable renderers.
 
-## 3. Customer Support Tickets
+**Phase 5 — Layer 5** HMS connector handlers. Rewire Pharmacy / Inventory / Diagnostics entry points to `openAiCore()`. Retire `UniversalScanner`, old `MobileScanView`, `MedicineInputBar` camera path (text + voice stay). Old edge fns kept one release for safety, then removed.
 
-New tables:
-- `support_tickets`: `id`, `hospital_id`, `created_by`, `subject`, `category` (enum: bug, feature, billing, ai, training, other), `priority` (low/medium/high/urgent), `status` (open, in_progress, waiting_customer, resolved, closed), `assigned_to` (super admin uuid), `first_response_at`, `resolved_at`, `sla_due_at`, timestamps.
-- `support_ticket_messages`: `ticket_id`, `sender_id`, `sender_role` (hospital / super_admin), `body` text, `attachments` jsonb (storage paths), `internal_note` boolean (super admin only), `created_at`.
-- Storage bucket `support-attachments` (private, RLS by ticket → hospital scope).
+**Phase 6 — Memory** Generic `ai_corrections` table (kind, field, before, after, hospital_id, user_id) feeding back into extractor prompts.
 
-RLS:
-- Hospital admins: see/create tickets for their own hospital, reply to their own tickets, cannot see `internal_note = true` messages.
-- Super admin: full access, can set status/priority/assignee, post internal notes.
+## Out of scope
 
-### Hospital side ("Support" module in sidebar for admin role)
-- Ticket list (status filter, search)
-- New ticket form (subject, category, priority, description, attach files)
-- Ticket thread view: chronological messages, reply box, status pill, "Reopen" if resolved
-- Notification badge on sidebar for unread replies
+- Changing HMS business logic, schemas, billing math, RLS on existing tables.
+- Offline mode.
+- Replacing voice input or smart medicine search.
+- Touching Auth, Patients, IPD, Day Care, Accounts, Staff.
 
-### Super Admin side (new "Support" tab)
-- Ticket queue with filters (status, priority, hospital, assignee, SLA)
-- Ticket detail: reply, internal note toggle, change status/priority/assignee, hospital context sidebar (plan, AI status, recent activity)
-- SLA rules: urgent 2h, high 8h, medium 24h, low 72h — computed on create
-- Dashboard KPIs: open count, breached SLA, avg first response, CSAT (optional post-close 1-5 rating in a follow-up)
+## Confirmation needed
 
-## Files
+Reply **approve** and I will implement **Phase 1 (Layer 1 — Universal Upload Engine) only**, including the storage bucket, the mobile-first uploader, and the `/ai-core/test-upload` verification page. I will not touch any existing module in this phase.
 
-**Migrations (one file)**
-- `hospital_subscriptions` + `hospitals.ai_enabled` + `ai_usage_events` + `support_tickets` + `support_ticket_messages` + storage bucket + RLS + GRANTs + `has_role('super_admin')` policies.
-
-**Edge functions**
-- Update `medicine-scan-ai`, `prescription-scan-ai`, `universal-ai-search`, `voice-transcribe`: check `hospitals.ai_enabled`, log `ai_usage_events`.
-- Extend `admin-api`: subscriptions CRUD, ai monitoring aggregate endpoint, tickets CRUD.
-
-**Frontend**
-- `src/pages/SuperAdminConsole.tsx`: add tabs Subscriptions, AI Monitoring, Support (extract subcomponents into `src/components/superadmin/`).
-- `src/components/superadmin/SubscriptionsTab.tsx`
-- `src/components/superadmin/AIMonitoringTab.tsx` (uses recharts)
-- `src/components/superadmin/SupportTab.tsx` + `SupportTicketDetail.tsx`
-- `src/pages/Support.tsx` (hospital admin)
-- `src/hooks/useAIEnabled.ts` + wire into `UniversalSearch`, `MedicineInputBar`, `PurchaseInvoiceRepository`, prescription scanner, voice input to hide/disable when false.
-- `src/data/modules.ts` + `AppSidebar.tsx`: add "Support" entry for admins.
-
-## Rollout order
-1. Migration (schema + RLS + bucket).
-2. admin-api endpoints.
-3. Super Admin UI tabs.
-4. AI toggle enforcement (client + edge functions) & usage logging.
-5. Hospital Support page + notifications.
-
-Scope note: no payment gateway integration in this pass — subscription state is managed manually by super admin. Stripe/Razorpay hookup can be a later phase.
+Tell me if you want any layer reordered, dropped, or scoped differently before I start.
