@@ -6,7 +6,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   CalendarDays, Clock, Copy, Plus, Trash2, Save, Zap, Coffee, AlertTriangle,
   Ban, PauseCircle, PlayCircle, RadioTower, Stethoscope, Users, Loader2, CalendarIcon,
-  Sparkles, IndianRupee,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -66,10 +65,6 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
   const [liveStatus, setLiveStatus] = useState<DoctorLiveStatus | null>(null);
   const [overrides, setOverrides] = useState<DailyOverride[]>([]);
 
-  // Doctor-level default consultation fee — auto-fills new sessions and
-  // can be applied to all existing sessions in one click.
-  const [defaultFee, setDefaultFee] = useState<number>(0);
-
   const load = async () => {
     if (!doctorName) return;
     setLoading(true);
@@ -95,14 +90,6 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
         };
       }
       setWeeklyByDay(map);
-      // Derive default fee from the most common fee across existing sessions
-      const allFees = (w as any[]).flatMap((row) => (row.sessions || []).map((s: any) => Number(s.consultation_fee) || 0));
-      if (allFees.length > 0) {
-        const counts: Record<number, number> = {};
-        allFees.forEach((f) => (counts[f] = (counts[f] || 0) + 1));
-        const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-        setDefaultFee(Number(top[0]));
-      }
       setLeaves(l);
       setHolidays(h);
       setLiveStatus(s);
@@ -136,27 +123,7 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
     setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], is_working: working, sessions: working && p[day].sessions.length === 0 ? [emptySession()] : p[day].sessions } }));
   };
   const addSession = (day: number) => {
-    setWeeklyByDay((p) => {
-      const base = emptySession(
-        p[day].sessions.length === 0 ? "Morning OP" : "Evening OP",
-        p[day].sessions.length === 0 ? "09:00" : "17:00",
-        p[day].sessions.length === 0 ? "13:00" : "20:00",
-      );
-      // Pre-fill new sessions with the doctor-level default fee
-      base.consultation_fee = defaultFee || 0;
-      return { ...p, [day]: { ...p[day], sessions: [...p[day].sessions, base] } };
-    });
-  };
-
-  const applyDefaultFeeToAll = () => {
-    setWeeklyByDay((p) => {
-      const next: typeof p = {};
-      for (const [k, v] of Object.entries(p)) {
-        next[Number(k)] = { ...v, sessions: v.sessions.map((s) => ({ ...s, consultation_fee: defaultFee || 0 })) };
-      }
-      return next;
-    });
-    toast.success(`Applied ₹${defaultFee || 0} to all sessions`);
+    setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, emptySession(p[day].sessions.length === 0 ? "Morning OP" : "Evening OP", p[day].sessions.length === 0 ? "09:00" : "17:00", p[day].sessions.length === 0 ? "13:00" : "20:00")] } }));
   };
   const removeSession = (day: number, idx: number) => {
     setWeeklyByDay((p) => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter((_, i) => i !== idx) } }));
@@ -329,32 +296,9 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
               <div className="px-6 py-5">
                 {/* ─── WEEKLY ─── */}
                 <TabsContent value="weekly" className="mt-0 space-y-4">
-                  <p className="text-sm text-muted-foreground">Set the recurring template. The system auto-generates the next 7 days of slots on save.</p>
-
-                  {/* Doctor-level default consultation fee */}
-                  <div className="rounded-xl border border-border bg-card p-3 flex flex-col sm:flex-row sm:items-end gap-3">
-                    <div className="flex-1">
-                      <Label className="text-xs flex items-center gap-1.5">
-                        <IndianRupee className="h-3.5 w-3.5 text-primary" /> Default consultation fee
-                      </Label>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Auto-fills every new session. Click <span className="font-medium text-foreground">Apply to all sessions</span> to sync existing ones — no need to edit each day.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="h-9 w-28 pl-6"
-                          value={defaultFee}
-                          onChange={(e) => setDefaultFee(parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={applyDefaultFeeToAll}>
-                        Apply to all sessions
-                      </Button>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Set the recurring template. The system auto-generates the next 7 days of slots on save.</p>
+                    <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={copyMondayToWeekdays}>
                         <Copy className="h-4 w-4 mr-1.5" /> Copy Mon → Weekdays
                       </Button>
@@ -392,7 +336,7 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                             <div className="space-y-2">
                               {state.sessions.map((s, i) => (
                                 <div key={i} className="rounded-lg border border-border bg-background p-3 grid grid-cols-12 gap-2 items-end">
-                                  <div className="col-span-12 sm:col-span-2">
+                                  <div className="col-span-12 sm:col-span-3">
                                     <Label className="text-[10px] text-muted-foreground">Session</Label>
                                     <Input className="h-8 text-xs" value={s.session_name} onChange={(e) => updateSession(d, i, { session_name: e.target.value })} />
                                   </div>
@@ -422,19 +366,9 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                                     <Label className="text-[10px] text-muted-foreground">Cap</Label>
                                     <Input type="number" min={1} className="h-8 text-xs" value={s.token_capacity} onChange={(e) => updateSession(d, i, { token_capacity: parseInt(e.target.value) || 1 })} />
                                   </div>
-                                  <div className="col-span-8 sm:col-span-2">
-                                    <Label className="text-[10px] text-muted-foreground">Fee (₹)</Label>
-                                    <div className="relative">
-                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">₹</span>
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        step={50}
-                                        className="h-8 text-xs pl-5"
-                                        value={s.consultation_fee}
-                                        onChange={(e) => updateSession(d, i, { consultation_fee: parseFloat(e.target.value) || 0 })}
-                                      />
-                                    </div>
+                                  <div className="col-span-8 sm:col-span-1">
+                                    <Label className="text-[10px] text-muted-foreground">Fee ₹</Label>
+                                    <Input type="number" min={0} className="h-8 text-xs" value={s.consultation_fee} onChange={(e) => updateSession(d, i, { consultation_fee: parseFloat(e.target.value) || 0 })} />
                                   </div>
                                   <div className="col-span-4 sm:col-span-1 flex items-center justify-end">
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeSession(d, i)}>
@@ -646,11 +580,11 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                       <div>
                         <Label className="text-xs">From</Label>
-                        <DateInput className="h-9" value={newLeave.from_date} onChange={(v) => setNewLeave({ ...newLeave, from_date: v, to_date: v > newLeave.to_date ? v : newLeave.to_date })} />
+                        <Input type="date" className="h-9" value={newLeave.from_date} onChange={(e) => setNewLeave({ ...newLeave, from_date: e.target.value, to_date: e.target.value > newLeave.to_date ? e.target.value : newLeave.to_date })} />
                       </div>
                       <div>
                         <Label className="text-xs">To</Label>
-                        <DateInput className="h-9" value={newLeave.to_date} onChange={(v) => setNewLeave({ ...newLeave, to_date: v })} />
+                        <Input type="date" className="h-9" value={newLeave.to_date} onChange={(e) => setNewLeave({ ...newLeave, to_date: e.target.value })} />
                       </div>
                       <div>
                         <Label className="text-xs">Type</Label>
@@ -702,7 +636,7 @@ export default function DoctorAvailabilityEngine({ open, onClose, doctorName, sp
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                       <div>
                         <Label className="text-xs">Date</Label>
-                        <DateInput className="h-9" value={newHoliday.holiday_date} onChange={(v) => setNewHoliday({ ...newHoliday, holiday_date: v })} />
+                        <Input type="date" className="h-9" value={newHoliday.holiday_date} onChange={(e) => setNewHoliday({ ...newHoliday, holiday_date: e.target.value })} />
                       </div>
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Name</Label>

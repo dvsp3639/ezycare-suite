@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,34 +21,6 @@ const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
   const [y, m, d] = dateStr.split("-");
   return `${d}/${m}/${y}`;
-};
-
-// Convert ISO yyyy-mm-dd -> dd/mm/yyyy for display in text input
-const isoToDisplay = (iso: string) => {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return "";
-  return `${d}/${m}/${y}`;
-};
-
-// Auto-format user input as dd/mm/yyyy while typing
-const maskDobInput = (raw: string) => {
-  const digits = raw.replace(/\D/g, "").slice(0, 8);
-  const parts: string[] = [];
-  if (digits.length > 0) parts.push(digits.slice(0, 2));
-  if (digits.length >= 3) parts.push(digits.slice(2, 4));
-  if (digits.length >= 5) parts.push(digits.slice(4, 8));
-  return parts.join("/");
-};
-
-// Convert dd/mm/yyyy -> yyyy-mm-dd; returns "" if invalid/incomplete
-const displayToIso = (display: string) => {
-  const m = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return "";
-  const [, dd, mm, yyyy] = m;
-  const d = parseInt(dd, 10), mo = parseInt(mm, 10), y = parseInt(yyyy, 10);
-  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900) return "";
-  return `${yyyy}-${mm}-${dd}`;
 };
 
 interface UIPatient {
@@ -74,7 +45,6 @@ const PatientRegistration = () => {
   const [searchMobile, setSearchMobile] = useState("");
   const [searchResults, setSearchResults] = useState<UIPatient[] | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [dobDisplay, setDobDisplay] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<UIPatient | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
@@ -170,7 +140,6 @@ const PatientRegistration = () => {
       emergencyContact: p.emergencyContact || "", bloodGroup: p.bloodGroup || "",
       address: p.address || "", chronicConditions: p.chronicConditions || "",
     });
-    setDobDisplay(isoToDisplay(p.dob));
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
@@ -183,7 +152,6 @@ const PatientRegistration = () => {
     setIsRegistered(false);
     setRegistrationNumber("");
     setForm({ ...emptyForm, mobile: searchMobile });
-    setDobDisplay("");
   };
 
   const updateField = (key: string, value: string) => {
@@ -193,10 +161,6 @@ const PatientRegistration = () => {
   const handleSave = async () => {
     if (!form.name || !form.mobile || !form.dob || !form.address) {
       toast.error("Please fill all required fields");
-      return;
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob)) {
-      toast.error("Enter Date of Birth as dd/mm/yyyy");
       return;
     }
     setSaving(true);
@@ -294,7 +258,6 @@ const PatientRegistration = () => {
 
   const resetForm = () => {
     setForm(emptyForm);
-    setDobDisplay("");
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
@@ -313,6 +276,12 @@ const PatientRegistration = () => {
           <p className="text-sm text-muted-foreground">Search or register new patients</p>
         </div>
         <div className="flex gap-2">
+          {((form.name && !isRegistered) || showAddNew) && (
+            <Button onClick={handleSave} size="sm" disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Details
+            </Button>
+          )}
           {isRegistered && (
             <Button onClick={() => setShowOPD(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
@@ -408,18 +377,7 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date of Birth *</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="dd/mm/yyyy"
-                value={dobDisplay}
-                onChange={(e) => {
-                  const masked = maskDobInput(e.target.value);
-                  setDobDisplay(masked);
-                  updateField("dob", displayToIso(masked));
-                }}
-                maxLength={10}
-              />
+              <Input type="date" value={form.dob} onChange={(e) => updateField("dob", e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Gender *</Label>
@@ -456,14 +414,6 @@ const PatientRegistration = () => {
               <Input value={form.chronicConditions} onChange={(e) => updateField("chronicConditions", e.target.value)} placeholder="e.g., Diabetes, Hypertension (optional)" />
             </div>
           </div>
-          {((form.name && !isRegistered) || showAddNew) && (
-            <div className="flex justify-end mt-6 pt-4 border-t border-border">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Details
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -477,7 +427,7 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <DateInput value={opdDate} onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} />
+              <Input type="date" value={opdDate} onChange={(e) => { setOpdDate(e.target.value); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} className="[&::-webkit-calendar-picker-indicator]:cursor-pointer" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>

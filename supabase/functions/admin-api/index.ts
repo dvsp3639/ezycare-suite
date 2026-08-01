@@ -1,21 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders as baseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const appCorsHeaders = {
-  ...baseCorsHeaders,
-  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-const corsHeaders = appCorsHeaders;
 
 const VALID_ROLES = ["hospital_admin", "doctor", "nurse", "lab_technician", "pharmacist", "staff", "receptionist"];
 const HOSPITAL_ADMIN_MANAGEABLE_ROLES = ["doctor", "nurse", "lab_technician", "pharmacist", "receptionist"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: appCorsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -27,7 +24,7 @@ serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...appCorsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -39,7 +36,7 @@ serve(async (req) => {
     if (userError || !userResult?.user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
-        headers: { ...appCorsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -304,20 +301,12 @@ serve(async (req) => {
 
     if (path === "hospitals" && method === "POST") {
       const body = await req.json();
-      const {
-        name, address, city, state, pincode, country, phone, email,
-        license_number, gstin, website, logo_url, tagline, timezone,
-        currency, registration_prefix,
-      } = body;
+      const { name, address, city, state, phone, email, license_number } = body;
       if (!name) throw new Error("Hospital name is required");
 
       const { data, error } = await adminClient
         .from("hospitals")
-        .insert({
-          name, address, city, state, pincode, country, phone, email,
-          license_number, gstin, website, logo_url, tagline, timezone,
-          currency, registration_prefix,
-        })
+        .insert({ name, address, city, state, phone, email, license_number })
         .select()
         .single();
       if (error) throw error;
@@ -331,24 +320,11 @@ serve(async (req) => {
     if (hospitalMatch && method === "PUT") {
       const hospitalId = hospitalMatch[1];
       const body = await req.json();
-      const allowedFields = [
-        "name","address","city","state","pincode","country","phone","email",
-        "license_number","gstin","website","logo_url","tagline","timezone",
-        "currency","registration_prefix","is_active","ai_enabled",
-      ];
-      const updatePayload: Record<string, unknown> = {};
-      for (const key of allowedFields) {
-        if (Object.prototype.hasOwnProperty.call(body, key)) {
-          updatePayload[key] = body[key];
-        }
-      }
-      if (Object.keys(updatePayload).length === 0) {
-        throw new Error("No hospital fields provided to update");
-      }
+      const { name, address, city, state, phone, email, license_number, is_active } = body;
 
       const { data, error } = await adminClient
         .from("hospitals")
-        .update(updatePayload)
+        .update({ name, address, city, state, phone, email, license_number, is_active })
         .eq("id", hospitalId)
         .select()
         .single();

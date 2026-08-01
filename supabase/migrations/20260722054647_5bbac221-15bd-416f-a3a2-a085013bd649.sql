@@ -1,1 +1,0 @@
-ALTER TABLE public.support_tickets ADD COLUMN IF NOT EXISTS contact_number text;

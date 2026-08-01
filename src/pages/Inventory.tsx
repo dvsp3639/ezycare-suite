@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -111,37 +110,6 @@ const Inventory = () => {
   }, []);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
-  const [medicines, setMedicines] = useState<InventoryItem[]>([]);
-  async function loadMedicines() {
-    const { data, error } = await supabase
-      .from("medicines")
-      .select("id,name,brand_name,generic_name,manufacturer,batch_no,expiry_date,stock,min_stock,mrp,selling_price,gst_percent,hsn_code,unit,barcode,updated_at")
-      .order("name");
-    if (error) return;
-    setMedicines((data || []).map((m: any): InventoryItem => ({
-      id: m.id,
-      name: m.name,
-      category: "Medicine",
-      sku: m.hsn_code || m.barcode || "",
-      batchNo: m.batch_no || "",
-      manufacturer: m.manufacturer || m.brand_name || "",
-      unitPrice: Number(m.mrp || 0),
-      sellingPrice: Number(m.selling_price || m.mrp || 0),
-      stock: m.stock || 0,
-      minStock: m.min_stock || 0,
-      unit: m.unit || "Strip",
-      hsnCode: m.hsn_code || "",
-      gstPercent: Number(m.gst_percent ?? 12),
-      expiryDate: m.expiry_date || undefined,
-      department: "Pharmacy",
-      barcode: m.barcode || "",
-      lastUpdated: m.updated_at || "",
-      vendor: "",
-      purchaseDate: "",
-      consumptionRate: 0,
-    } as any)));
-  }
-  useEffect(() => { loadMedicines(); }, []);
   const [labTests, setLabTests] = useState<LabTestDefinition[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [labCustomCategories, setLabCustomCategories] = useState<string[]>([]);
@@ -267,16 +235,14 @@ const Inventory = () => {
 
   // Pharma filtered inventory
   const pharmaInventory = useMemo(() => {
-    const legacy = inventory.filter((i) => i.department === "Pharmacy" || i.category === "Medicine");
-    const combined = [...medicines, ...legacy.filter((l) => !medicines.some((m) => m.id === l.id))];
-    const q = pharmaSearch.toLowerCase();
-    return combined.filter((item) =>
-      !q ||
-      item.name.toLowerCase().includes(q) ||
-      (item.sku || "").toLowerCase().includes(q) ||
-      (item.batchNo || "").toLowerCase().includes(q)
-    );
-  }, [inventory, medicines, pharmaSearch]);
+    return inventory.filter((item) => {
+      const isPharma = item.department === "Pharmacy" || item.category === "Medicine";
+      const matchSearch = !pharmaSearch ||
+        item.name.toLowerCase().includes(pharmaSearch.toLowerCase()) ||
+        item.sku.toLowerCase().includes(pharmaSearch.toLowerCase());
+      return isPharma && matchSearch;
+    });
+  }, [inventory, pharmaSearch]);
 
   const allLabCategories = useMemo(() => {
     const defaults = ["Blood", "Urine", "Radiology", "Serology"];
@@ -1645,7 +1611,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Expiry Date</Label>
-              <DateInput value={formData.expiryDate || ""} onChange={(v) => setFormData((p) => ({ ...p, expiryDate: v }))} />
+              <Input type="date" value={formData.expiryDate || ""} onChange={(e) => setFormData((p) => ({ ...p, expiryDate: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Vendor</Label>
@@ -1732,7 +1698,7 @@ const Inventory = () => {
       </Dialog>
 
       {/* AI Invoice Scanner */}
-      <UniversalScanner open={showAIScanner} onClose={() => { setShowAIScanner(false); loadMedicines(); }} />
+      <UniversalScanner open={showAIScanner} onClose={() => setShowAIScanner(false)} />
 
       {/* Add/Edit Test Dialog */}
       <Dialog open={showAddTest || !!editTest} onOpenChange={(open) => { if (!open) resetTestDialog(); }}>
@@ -1964,7 +1930,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Purchase Date</Label>
-              <DateInput value={assetForm.purchaseDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, purchaseDate: v }))} />
+              <Input type="date" value={assetForm.purchaseDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, purchaseDate: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Purchase Cost (₹)</Label>
@@ -1972,7 +1938,7 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Warranty Expiry</Label>
-              <DateInput value={assetForm.warrantyExpiry || ""} onChange={(v) => setAssetForm((p) => ({ ...p, warrantyExpiry: v }))} />
+              <Input type="date" value={assetForm.warrantyExpiry || ""} onChange={(e) => setAssetForm((p) => ({ ...p, warrantyExpiry: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Status</Label>
@@ -1994,11 +1960,11 @@ const Inventory = () => {
             </div>
             <div>
               <Label className="text-xs">Last Maintenance</Label>
-              <DateInput value={assetForm.lastMaintenanceDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, lastMaintenanceDate: v }))} />
+              <Input type="date" value={assetForm.lastMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, lastMaintenanceDate: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Next Maintenance</Label>
-              <DateInput value={assetForm.nextMaintenanceDate || ""} onChange={(v) => setAssetForm((p) => ({ ...p, nextMaintenanceDate: v }))} />
+              <Input type="date" value={assetForm.nextMaintenanceDate || ""} onChange={(e) => setAssetForm((p) => ({ ...p, nextMaintenanceDate: e.target.value }))} />
             </div>
             <div className="col-span-2">
               <Label className="text-xs">Notes</Label>
