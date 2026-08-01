@@ -14,68 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_usage_events: {
-        Row: {
-          confidence_score: number | null
-          correction_delta: Json | null
-          created_at: string
-          error_message: string | null
-          feature: Database["public"]["Enums"]["ai_feature"]
-          hospital_id: string | null
-          id: string
-          latency_ms: number | null
-          metadata: Json
-          model: string | null
-          status: Database["public"]["Enums"]["ai_event_status"]
-          tokens_in: number | null
-          tokens_out: number | null
-          user_id: string | null
-          was_corrected: boolean
-        }
-        Insert: {
-          confidence_score?: number | null
-          correction_delta?: Json | null
-          created_at?: string
-          error_message?: string | null
-          feature: Database["public"]["Enums"]["ai_feature"]
-          hospital_id?: string | null
-          id?: string
-          latency_ms?: number | null
-          metadata?: Json
-          model?: string | null
-          status?: Database["public"]["Enums"]["ai_event_status"]
-          tokens_in?: number | null
-          tokens_out?: number | null
-          user_id?: string | null
-          was_corrected?: boolean
-        }
-        Update: {
-          confidence_score?: number | null
-          correction_delta?: Json | null
-          created_at?: string
-          error_message?: string | null
-          feature?: Database["public"]["Enums"]["ai_feature"]
-          hospital_id?: string | null
-          id?: string
-          latency_ms?: number | null
-          metadata?: Json
-          model?: string | null
-          status?: Database["public"]["Enums"]["ai_event_status"]
-          tokens_in?: number | null
-          tokens_out?: number | null
-          user_id?: string | null
-          was_corrected?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_usage_events_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       appointments: {
         Row: {
           appointment_date: string
@@ -1085,359 +1023,6 @@ export type Database = {
         }
         Relationships: []
       }
-      followup_audit_log: {
-        Row: {
-          action: string
-          actor_id: string | null
-          actor_name: string | null
-          created_at: string
-          details: Json
-          entity_id: string | null
-          entity_type: string | null
-          hospital_id: string
-          id: string
-        }
-        Insert: {
-          action: string
-          actor_id?: string | null
-          actor_name?: string | null
-          created_at?: string
-          details?: Json
-          entity_id?: string | null
-          entity_type?: string | null
-          hospital_id: string
-          id?: string
-        }
-        Update: {
-          action?: string
-          actor_id?: string | null
-          actor_name?: string | null
-          created_at?: string
-          details?: Json
-          entity_id?: string | null
-          entity_type?: string | null
-          hospital_id?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_audit_log_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followup_doctor_policies: {
-        Row: {
-          created_at: string
-          department: string | null
-          doctor_name: string
-          enabled: boolean
-          hospital_id: string
-          id: string
-          max_visits: number | null
-          remarks: string | null
-          updated_at: string
-          window_days: number | null
-        }
-        Insert: {
-          created_at?: string
-          department?: string | null
-          doctor_name: string
-          enabled?: boolean
-          hospital_id: string
-          id?: string
-          max_visits?: number | null
-          remarks?: string | null
-          updated_at?: string
-          window_days?: number | null
-        }
-        Update: {
-          created_at?: string
-          department?: string | null
-          doctor_name?: string
-          enabled?: boolean
-          hospital_id?: string
-          id?: string
-          max_visits?: number | null
-          remarks?: string | null
-          updated_at?: string
-          window_days?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_doctor_policies_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followup_entitlements: {
-        Row: {
-          consent: boolean
-          created_at: string
-          department: string | null
-          doctor_name: string
-          expiry_date: string
-          hospital_id: string
-          id: string
-          max_visits: number
-          mobile: string
-          patient_id: string | null
-          patient_name: string
-          registration_number: string
-          source_appointment_id: string | null
-          source_visit_date: string
-          status: string
-          updated_at: string
-          used_visits: number
-        }
-        Insert: {
-          consent?: boolean
-          created_at?: string
-          department?: string | null
-          doctor_name: string
-          expiry_date: string
-          hospital_id: string
-          id?: string
-          max_visits?: number
-          mobile?: string
-          patient_id?: string | null
-          patient_name?: string
-          registration_number?: string
-          source_appointment_id?: string | null
-          source_visit_date: string
-          status?: string
-          updated_at?: string
-          used_visits?: number
-        }
-        Update: {
-          consent?: boolean
-          created_at?: string
-          department?: string | null
-          doctor_name?: string
-          expiry_date?: string
-          hospital_id?: string
-          id?: string
-          max_visits?: number
-          mobile?: string
-          patient_id?: string | null
-          patient_name?: string
-          registration_number?: string
-          source_appointment_id?: string | null
-          source_visit_date?: string
-          status?: string
-          updated_at?: string
-          used_visits?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_entitlements_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followup_policies: {
-        Row: {
-          created_at: string
-          department_wise: boolean
-          doctor_wise: boolean
-          enabled: boolean
-          hospital_id: string
-          id: string
-          max_visits: number
-          notes: string | null
-          push_enabled: boolean
-          reminder_days: number[]
-          reminder_enabled: boolean
-          sms_enabled: boolean
-          updated_at: string
-          updated_by: string | null
-          whatsapp_enabled: boolean
-          window_days: number
-        }
-        Insert: {
-          created_at?: string
-          department_wise?: boolean
-          doctor_wise?: boolean
-          enabled?: boolean
-          hospital_id: string
-          id?: string
-          max_visits?: number
-          notes?: string | null
-          push_enabled?: boolean
-          reminder_days?: number[]
-          reminder_enabled?: boolean
-          sms_enabled?: boolean
-          updated_at?: string
-          updated_by?: string | null
-          whatsapp_enabled?: boolean
-          window_days?: number
-        }
-        Update: {
-          created_at?: string
-          department_wise?: boolean
-          doctor_wise?: boolean
-          enabled?: boolean
-          hospital_id?: string
-          id?: string
-          max_visits?: number
-          notes?: string | null
-          push_enabled?: boolean
-          reminder_days?: number[]
-          reminder_enabled?: boolean
-          sms_enabled?: boolean
-          updated_at?: string
-          updated_by?: string | null
-          whatsapp_enabled?: boolean
-          window_days?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_policies_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: true
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followup_reminders: {
-        Row: {
-          channel: string
-          created_at: string
-          delivered_at: string | null
-          entitlement_id: string
-          error_message: string | null
-          hospital_id: string
-          id: string
-          message: string | null
-          offset_days: number
-          provider_ref: string | null
-          scheduled_for: string
-          sent_at: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          channel: string
-          created_at?: string
-          delivered_at?: string | null
-          entitlement_id: string
-          error_message?: string | null
-          hospital_id: string
-          id?: string
-          message?: string | null
-          offset_days?: number
-          provider_ref?: string | null
-          scheduled_for: string
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          channel?: string
-          created_at?: string
-          delivered_at?: string | null
-          entitlement_id?: string
-          error_message?: string | null
-          hospital_id?: string
-          id?: string
-          message?: string | null
-          offset_days?: number
-          provider_ref?: string | null
-          scheduled_for?: string
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_reminders_entitlement_id_fkey"
-            columns: ["entitlement_id"]
-            isOneToOne: false
-            referencedRelation: "followup_entitlements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "followup_reminders_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followup_visits: {
-        Row: {
-          appointment_id: string | null
-          booked_by: string | null
-          channel: string
-          created_at: string
-          doctor_name: string
-          entitlement_id: string
-          hospital_id: string
-          id: string
-          source_appointment_id: string | null
-          status: string
-          token_no: number | null
-          updated_at: string
-          visit_date: string
-        }
-        Insert: {
-          appointment_id?: string | null
-          booked_by?: string | null
-          channel?: string
-          created_at?: string
-          doctor_name: string
-          entitlement_id: string
-          hospital_id: string
-          id?: string
-          source_appointment_id?: string | null
-          status?: string
-          token_no?: number | null
-          updated_at?: string
-          visit_date: string
-        }
-        Update: {
-          appointment_id?: string | null
-          booked_by?: string | null
-          channel?: string
-          created_at?: string
-          doctor_name?: string
-          entitlement_id?: string
-          hospital_id?: string
-          id?: string
-          source_appointment_id?: string | null
-          status?: string
-          token_no?: number | null
-          updated_at?: string
-          visit_date?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followup_visits_entitlement_id_fkey"
-            columns: ["entitlement_id"]
-            isOneToOne: false
-            referencedRelation: "followup_entitlements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "followup_visits_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       hospital_holidays: {
         Row: {
           created_at: string
@@ -1536,146 +1121,45 @@ export type Database = {
           },
         ]
       }
-      hospital_subscriptions: {
-        Row: {
-          amount: number
-          billing_cycle: string
-          cancelled_at: string | null
-          created_at: string
-          currency: string
-          current_period_end: string | null
-          features: Json
-          hospital_id: string
-          id: string
-          max_patients_per_month: number | null
-          max_users: number | null
-          notes: string | null
-          plan: Database["public"]["Enums"]["subscription_plan"]
-          started_at: string
-          status: Database["public"]["Enums"]["subscription_status"]
-          trial_ends_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          billing_cycle?: string
-          cancelled_at?: string | null
-          created_at?: string
-          currency?: string
-          current_period_end?: string | null
-          features?: Json
-          hospital_id: string
-          id?: string
-          max_patients_per_month?: number | null
-          max_users?: number | null
-          notes?: string | null
-          plan?: Database["public"]["Enums"]["subscription_plan"]
-          started_at?: string
-          status?: Database["public"]["Enums"]["subscription_status"]
-          trial_ends_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          billing_cycle?: string
-          cancelled_at?: string | null
-          created_at?: string
-          currency?: string
-          current_period_end?: string | null
-          features?: Json
-          hospital_id?: string
-          id?: string
-          max_patients_per_month?: number | null
-          max_users?: number | null
-          notes?: string | null
-          plan?: Database["public"]["Enums"]["subscription_plan"]
-          started_at?: string
-          status?: Database["public"]["Enums"]["subscription_status"]
-          trial_ends_at?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hospital_subscriptions_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: true
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       hospitals: {
         Row: {
           address: string | null
-          ai_enabled: boolean
           city: string | null
-          country: string | null
           created_at: string
-          currency: string | null
           email: string | null
-          followup_enabled: boolean
-          gstin: string | null
           id: string
           is_active: boolean
           license_number: string | null
-          logo_url: string | null
           name: string
           phone: string | null
-          pincode: string | null
-          registration_prefix: string | null
           state: string | null
-          tagline: string | null
-          timezone: string | null
           updated_at: string
-          website: string | null
         }
         Insert: {
           address?: string | null
-          ai_enabled?: boolean
           city?: string | null
-          country?: string | null
           created_at?: string
-          currency?: string | null
           email?: string | null
-          followup_enabled?: boolean
-          gstin?: string | null
           id?: string
           is_active?: boolean
           license_number?: string | null
-          logo_url?: string | null
           name: string
           phone?: string | null
-          pincode?: string | null
-          registration_prefix?: string | null
           state?: string | null
-          tagline?: string | null
-          timezone?: string | null
           updated_at?: string
-          website?: string | null
         }
         Update: {
           address?: string | null
-          ai_enabled?: boolean
           city?: string | null
-          country?: string | null
           created_at?: string
-          currency?: string | null
           email?: string | null
-          followup_enabled?: boolean
-          gstin?: string | null
           id?: string
           is_active?: boolean
           license_number?: string | null
-          logo_url?: string | null
           name?: string
           phone?: string | null
-          pincode?: string | null
-          registration_prefix?: string | null
           state?: string | null
-          tagline?: string | null
-          timezone?: string | null
           updated_at?: string
-          website?: string | null
         }
         Relationships: []
       }
@@ -2509,7 +1993,6 @@ export type Database = {
           mobile: string
           name: string
           registration_number: string
-          reminder_consent: boolean
           updated_at: string
         }
         Insert: {
@@ -2525,7 +2008,6 @@ export type Database = {
           mobile: string
           name: string
           registration_number: string
-          reminder_consent?: boolean
           updated_at?: string
         }
         Update: {
@@ -2541,7 +2023,6 @@ export type Database = {
           mobile?: string
           name?: string
           registration_number?: string
-          reminder_consent?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -3104,8 +2585,6 @@ export type Database = {
       }
       purchase_bills: {
         Row: {
-          approval_status: string
-          approved_at: string | null
           approved_by: string | null
           approved_by_name: string | null
           bill_date: string
@@ -3141,8 +2620,6 @@ export type Database = {
           warnings: Json | null
         }
         Insert: {
-          approval_status?: string
-          approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
           bill_date?: string
@@ -3178,8 +2655,6 @@ export type Database = {
           warnings?: Json | null
         }
         Update: {
-          approval_status?: string
-          approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
           bill_date?: string
@@ -3424,44 +2899,6 @@ export type Database = {
         }
         Relationships: []
       }
-      specializations: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          hospital_id: string | null
-          id: string
-          is_global: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          hospital_id?: string | null
-          id?: string
-          is_global?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          hospital_id?: string | null
-          id?: string
-          is_global?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "specializations_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       staff_members: {
         Row: {
           aadhar_no: string | null
@@ -3554,55 +2991,6 @@ export type Database = {
           },
         ]
       }
-      staff_specializations: {
-        Row: {
-          created_at: string
-          hospital_id: string
-          id: string
-          is_primary: boolean
-          specialization_id: string
-          staff_id: string
-        }
-        Insert: {
-          created_at?: string
-          hospital_id: string
-          id?: string
-          is_primary?: boolean
-          specialization_id: string
-          staff_id: string
-        }
-        Update: {
-          created_at?: string
-          hospital_id?: string
-          id?: string
-          is_primary?: boolean
-          specialization_id?: string
-          staff_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "staff_specializations_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "staff_specializations_specialization_id_fkey"
-            columns: ["specialization_id"]
-            isOneToOne: false
-            referencedRelation: "specializations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "staff_specializations_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff_members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       stock_transfers: {
         Row: {
           created_at: string
@@ -3659,124 +3047,6 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      support_ticket_messages: {
-        Row: {
-          attachments: Json
-          body: string
-          created_at: string
-          id: string
-          internal_note: boolean
-          sender_id: string
-          sender_role: string
-          ticket_id: string
-        }
-        Insert: {
-          attachments?: Json
-          body: string
-          created_at?: string
-          id?: string
-          internal_note?: boolean
-          sender_id: string
-          sender_role: string
-          ticket_id: string
-        }
-        Update: {
-          attachments?: Json
-          body?: string
-          created_at?: string
-          id?: string
-          internal_note?: boolean
-          sender_id?: string
-          sender_role?: string
-          ticket_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "support_tickets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      support_tickets: {
-        Row: {
-          admin_unread_count: number
-          assigned_to: string | null
-          category: Database["public"]["Enums"]["ticket_category"]
-          closed_at: string | null
-          contact_number: string | null
-          created_at: string
-          created_by: string
-          description: string | null
-          first_response_at: string | null
-          hospital_id: string
-          hospital_unread_count: number
-          id: string
-          last_message_at: string
-          priority: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at: string | null
-          sla_due_at: string | null
-          status: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          ticket_no: string
-          updated_at: string
-        }
-        Insert: {
-          admin_unread_count?: number
-          assigned_to?: string | null
-          category?: Database["public"]["Enums"]["ticket_category"]
-          closed_at?: string | null
-          contact_number?: string | null
-          created_at?: string
-          created_by: string
-          description?: string | null
-          first_response_at?: string | null
-          hospital_id: string
-          hospital_unread_count?: number
-          id?: string
-          last_message_at?: string
-          priority?: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at?: string | null
-          sla_due_at?: string | null
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          ticket_no: string
-          updated_at?: string
-        }
-        Update: {
-          admin_unread_count?: number
-          assigned_to?: string | null
-          category?: Database["public"]["Enums"]["ticket_category"]
-          closed_at?: string | null
-          contact_number?: string | null
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          first_response_at?: string | null
-          hospital_id?: string
-          hospital_unread_count?: number
-          id?: string
-          last_message_at?: string
-          priority?: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at?: string | null
-          sla_due_at?: string | null
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject?: string
-          ticket_no?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_tickets_hospital_id_fkey"
-            columns: ["hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
             referencedColumns: ["id"]
           },
         ]
@@ -4088,20 +3358,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      book_followup_visit: {
-        Args: {
-          _appointment_date: string
-          _channel?: string
-          _entitlement_id: string
-          _time_slot?: string
-        }
-        Returns: Json
-      }
       create_pharmacy_sale: {
         Args: { _items: Json; _order: Json }
         Returns: Json
       }
-      expire_followup_entitlements: { Args: never; Returns: number }
       generate_doctor_slots: {
         Args: { _doctor_name: string; _from_date: string; _to_date: string }
         Returns: number
@@ -4114,10 +3374,20 @@ export type Database = {
         }
         Returns: boolean
       }
-      import_purchase_invoice: {
-        Args: { _audit?: Json; _invoice: Json; _items: Json; _supplier: Json }
-        Returns: Json
-      }
+      import_purchase_invoice:
+        | {
+            Args: { _invoice: Json; _items: Json; _supplier: Json }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _audit?: Json
+              _invoice: Json
+              _items: Json
+              _supplier: Json
+            }
+            Returns: Json
+          }
       next_pharmacy_invoice_no: {
         Args: { _hospital_id: string }
         Returns: string
@@ -4143,13 +3413,6 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
-      ai_event_status: "success" | "error" | "low_confidence" | "blocked"
-      ai_feature:
-        | "prescription_scan"
-        | "invoice_scan"
-        | "universal_search"
-        | "voice_transcribe"
-        | "medicine_scan"
       app_role:
         | "super_admin"
         | "hospital_admin"
@@ -4159,27 +3422,6 @@ export type Database = {
         | "lab_technician"
         | "pharmacist"
         | "receptionist"
-      subscription_plan: "trial" | "basic" | "professional" | "enterprise"
-      subscription_status:
-        | "trialing"
-        | "active"
-        | "past_due"
-        | "suspended"
-        | "cancelled"
-      ticket_category:
-        | "bug"
-        | "feature"
-        | "billing"
-        | "ai"
-        | "training"
-        | "other"
-      ticket_priority: "low" | "medium" | "high" | "urgent"
-      ticket_status:
-        | "open"
-        | "in_progress"
-        | "waiting_customer"
-        | "resolved"
-        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4307,14 +3549,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      ai_event_status: ["success", "error", "low_confidence", "blocked"],
-      ai_feature: [
-        "prescription_scan",
-        "invoice_scan",
-        "universal_search",
-        "voice_transcribe",
-        "medicine_scan",
-      ],
       app_role: [
         "super_admin",
         "hospital_admin",
@@ -4324,23 +3558,6 @@ export const Constants = {
         "lab_technician",
         "pharmacist",
         "receptionist",
-      ],
-      subscription_plan: ["trial", "basic", "professional", "enterprise"],
-      subscription_status: [
-        "trialing",
-        "active",
-        "past_due",
-        "suspended",
-        "cancelled",
-      ],
-      ticket_category: ["bug", "feature", "billing", "ai", "training", "other"],
-      ticket_priority: ["low", "medium", "high", "urgent"],
-      ticket_status: [
-        "open",
-        "in_progress",
-        "waiting_customer",
-        "resolved",
-        "closed",
       ],
     },
   },
