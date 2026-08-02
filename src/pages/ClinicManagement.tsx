@@ -200,17 +200,18 @@ const ClinicManagement = () => {
   const isPastDate = isBefore(startOfDay(slotDate), startOfDay(new Date()));
   const isTodayDate = isToday(slotDate);
 
+  // A slot is only frozen once its 30-minute window has fully elapsed.
+  // e.g. at 6:00 PM the 5:30 PM slot is closed, but at 6:20 PM the 6:00 PM slot is still open.
+  const SLOT_LENGTH_MIN = 30;
   const isSlotPast = (slotTime: string): boolean => {
-    if (!isTodayDate) return false;
-    const now = new Date();
+    if (isPastDate) return true;
+    if (!isTodayDate) return false; // future dates are never frozen
     const [time, period] = slotTime.split(" ");
     const [h, m] = time.split(":").map(Number);
     let hours = h;
     if (period === "PM" && h !== 12) hours += 12;
     if (period === "AM" && h === 12) hours = 0;
-    const slotDate_ = new Date();
-    slotDate_.setHours(hours, m, 0, 0);
-    return isBefore(slotDate_, now);
+    return nowMinutes >= hours * 60 + m + SLOT_LENGTH_MIN;
   };
 
   const editSlotDoctor = editSlotDoctorId ? dateSchedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
