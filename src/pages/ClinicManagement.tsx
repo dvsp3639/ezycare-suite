@@ -200,6 +200,19 @@ const ClinicManagement = () => {
   const isPastDate = isBefore(startOfDay(slotDate), startOfDay(new Date()));
   const isTodayDate = isToday(slotDate);
 
+  // Live clock (minutes since midnight) so slots freeze in realtime without a reload
+  const [nowMinutes, setNowMinutes] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const n = new Date();
+      setNowMinutes(n.getHours() * 60 + n.getMinutes());
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
   // A slot is only frozen once its 30-minute window has fully elapsed.
   // e.g. at 6:00 PM the 5:30 PM slot is closed, but at 6:20 PM the 6:00 PM slot is still open.
   const SLOT_LENGTH_MIN = 30;
