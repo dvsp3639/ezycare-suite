@@ -294,6 +294,19 @@ const ClinicManagement = () => {
   };
 
   const addSlotRange = () => setSlotRanges(prev => [...prev, { from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
+
+  // 30-min time options (6:00 AM – 10:00 PM) for slot range pickers
+  const timeOptions = useMemo(() => {
+    const opts: string[] = [];
+    for (let mins = 6 * 60; mins <= 22 * 60; mins += 30) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      const period = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      opts.push(`${h12}:${m.toString().padStart(2, "0")} ${period}`);
+    }
+    return opts;
+  }, []);
   const removeSlotRange = (idx: number) => setSlotRanges(prev => prev.filter((_, i) => i !== idx));
   const updateSlotRange = (idx: number, field: keyof SlotRange, value: string | number) => {
     setSlotRanges(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -656,6 +669,9 @@ const ClinicManagement = () => {
                     <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
+                  <Button size="sm" variant="outline" onClick={() => openManageSlots(doc.id)} disabled={isPastDate}>
+                    <ClockIcon className="h-3.5 w-3.5 mr-1.5" /> Manage Slots
+                  </Button>
                 </div>
                 {isPastDate && <Badge variant="outline" className="text-xs text-muted-foreground">Read Only</Badge>}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
@@ -831,6 +847,88 @@ const ClinicManagement = () => {
       </Tabs>
 
       {/* ─── Nurse Vitals Entry Dialog ─── */}
+      {/* ─── Manage Slots Dialog ─── */}
+      <Dialog open={!!editSlotDoctor} onOpenChange={(v) => !v && setEditSlotDoctorId(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {editSlotDoctor && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <ClockIcon className="h-5 w-5 text-primary" /> Manage Slots — {editSlotDoctor.doctorName}
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground">{format(slotDate, "EEE, dd/MM/yyyy")} · 30-minute slots</p>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                {slotRanges.map((range, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-muted/40 rounded-lg p-3">
+                    <div className="col-span-4 space-y-1.5">
+                      <Label className="text-xs">From</Label>
+                      <Select value={range.from} onValueChange={(v) => updateSlotRange(idx, "from", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-[260px]">
+                          {timeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4 space-y-1.5">
+                      <Label className="text-xs">To</Label>
+                      <Select value={range.to} onValueChange={(v) => updateSlotRange(idx, "to", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-[260px]">
+                          {timeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3 space-y-1.5">
+                      <Label className="text-xs">Tokens / slot</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={range.tokensPerSlot}
+                        onChange={(e) => updateSlotRange(idx, "tokensPerSlot", Math.max(1, Number(e.target.value) || 1))}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9"
+                        disabled={slotRanges.length === 1}
+                        onClick={() => removeSlotRange(idx)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" onClick={addSlotRange}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Session
+                </Button>
+
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Preview — {generateSlotsFromRanges(slotRanges).length} slots
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto">
+                    {generateSlotsFromRanges(slotRanges).map((s) => (
+                      <Badge key={s.time} variant="outline" className="text-[11px]">{s.time}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditSlotDoctorId(null)}>Cancel</Button>
+                <Button onClick={handleSaveSlotConfig} disabled={savingSlots}>
+                  <Save className="h-4 w-4 mr-1.5" /> {savingSlots ? "Saving…" : "Save Slots"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!vitalsPatient} onOpenChange={(v) => !v && setVitalsPatient(null)}>
         <DialogContent className="max-w-md">
           {vitalsPatient && (
