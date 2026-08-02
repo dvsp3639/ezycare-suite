@@ -244,11 +244,13 @@ const ClinicManagement = () => {
     const seen = new Set<string>();
     for (const range of ranges) {
       const fromMin = parseTime12(range.from);
-      const toMin = parseTime12(range.to);
-      if (toMin <= fromMin) continue;
+      let toMin = parseTime12(range.to);
+      // Overnight range (e.g. 10:00 PM → 2:00 AM) wraps past midnight
+      if (toMin <= fromMin) toMin += 24 * 60;
       for (let t = fromMin; t < toMin; t += 30) {
-        const h24 = Math.floor(t / 60);
-        const min = t % 60;
+        const tm = t % (24 * 60);
+        const h24 = Math.floor(tm / 60);
+        const min = tm % 60;
         const period = h24 < 12 ? "AM" : "PM";
         const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
         const timeStr = `${h12}:${min.toString().padStart(2, "0")} ${period}`;
