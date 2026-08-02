@@ -697,7 +697,7 @@ const ClinicManagement = () => {
                   <span>{doc.timeSlots.filter((s) => s.isActive).length} active slots</span>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {doc.timeSlots.filter(s => s.isActive).map((slot) => {
+                  {[...doc.timeSlots].filter(s => s.isActive).sort((a, b) => parseTime12(a.time) - parseTime12(b.time)).map((slot) => {
                     const past = isSlotPast(slot.time);
                     const max = Math.max(1, slot.maxPatients);
                     const left = Math.max(0, max - slot.bookedPatients);
