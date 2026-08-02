@@ -1417,6 +1417,45 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
           </div>
         ))}
       </div>
+
+      {/* Confirm Consult / Day Care action */}
+      <Dialog open={!!pendingAction} onOpenChange={(o) => !o && setPendingAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {pendingAction?.type === "consult" ? "Start Consultation?" : "Send to Day Care?"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {pendingAction?.type === "consult"
+              ? `Open the consultation record for ${pendingAction?.entry.patientName} (Token ${pendingAction?.entry.tokenNo}).`
+              : `${pendingAction?.entry.patientName} (Token ${pendingAction?.entry.tokenNo}) will be admitted to Day Care Services. Duplicate sessions for the same day are blocked.`}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingAction(null)} disabled={actionBusy}>Cancel</Button>
+            <Button
+              disabled={actionBusy}
+              onClick={async () => {
+                if (!pendingAction) return;
+                const { type, entry } = pendingAction;
+                setActionBusy(true);
+                try {
+                  if (type === "consult") {
+                    await handleOpenConsultDialog(entry);
+                  } else {
+                    await handleSendToDayCare(entry);
+                  }
+                  setPendingAction(null);
+                } finally {
+                  setActionBusy(false);
+                }
+              }}
+            >
+              {actionBusy ? "Please wait…" : pendingAction?.type === "consult" ? "Start Consultation" : "Send to Day Care"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
