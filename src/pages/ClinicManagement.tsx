@@ -294,6 +294,19 @@ const ClinicManagement = () => {
   };
 
   const addSlotRange = () => setSlotRanges(prev => [...prev, { from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
+
+  // 30-min time options (6:00 AM – 10:00 PM) for slot range pickers
+  const timeOptions = useMemo(() => {
+    const opts: string[] = [];
+    for (let mins = 6 * 60; mins <= 22 * 60; mins += 30) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      const period = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      opts.push(`${h12}:${m.toString().padStart(2, "0")} ${period}`);
+    }
+    return opts;
+  }, []);
   const removeSlotRange = (idx: number) => setSlotRanges(prev => prev.filter((_, i) => i !== idx));
   const updateSlotRange = (idx: number, field: keyof SlotRange, value: string | number) => {
     setSlotRanges(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
