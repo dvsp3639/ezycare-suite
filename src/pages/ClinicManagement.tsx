@@ -387,6 +387,18 @@ const ClinicManagement = () => {
 
   const handleSendToDayCare = async (entry: QueueEntry) => {
     try {
+      // Prevent duplicate Day Care sessions for the same patient on the same day
+      const today = format(new Date(), "yyyy-MM-dd");
+      const existing = await daycareService.getSessions(today);
+      const dup = (existing || []).some(
+        (s: any) =>
+          (s.registration_number || s.registrationNumber) === entry.registrationNumber &&
+          !["Discharged", "Cancelled", "Completed"].includes(s.status)
+      );
+      if (dup) {
+        toast.error(`${entry.patientName} already has an active Day Care session today`);
+        return;
+      }
       await daycareService.createSession({
         patient_name: entry.patientName,
         registration_number: entry.registrationNumber,
