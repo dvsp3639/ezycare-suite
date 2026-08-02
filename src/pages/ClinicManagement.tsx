@@ -40,7 +40,6 @@ import {
 } from "@/data/mockClinicData";
 import { labCategoryColors } from "@/data/mockDiagnosticsData";
 import { useLabTestCatalog, useLabOrders } from "@/modules/diagnostics/hooks";
-import DoctorAvailabilityEngine from "@/components/clinic/DoctorAvailabilityEngine";
 
 const formatDateDisplay = (dateStr: string) => {
   if (!dateStr) return "";
@@ -99,7 +98,6 @@ const ClinicManagement = () => {
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [editSlotDoctorId, setEditSlotDoctorId] = useState<string | null>(null);
-  const [engineDoctor, setEngineDoctor] = useState<{ name: string; specialization?: string } | null>(null);
   const [slotDate, setSlotDate] = useState<Date>(new Date());
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
@@ -658,11 +656,6 @@ const ClinicManagement = () => {
                     <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
-                  {!isPastDate && (
-                    <Button variant="outline" size="sm" onClick={() => setEngineDoctor({ name: doc.doctorName, specialization: doc.specialization })}>
-                      <Settings2 className="h-4 w-4 mr-1.5" /> Availability Engine
-                    </Button>
-                  )}
                 </div>
                 {isPastDate && <Badge variant="outline" className="text-xs text-muted-foreground">Read Only</Badge>}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
@@ -836,17 +829,6 @@ const ClinicManagement = () => {
           <TokenDisplayBoard queue={queue} schedules={schedules} />
         </TabsContent>
       </Tabs>
-
-      {/* ─── Doctor Availability Engine ─── */}
-      {engineDoctor && (
-        <DoctorAvailabilityEngine
-          open={!!engineDoctor}
-          onClose={() => setEngineDoctor(null)}
-          doctorName={engineDoctor.name}
-          specialization={engineDoctor.specialization}
-          onSlotsRegenerated={() => { refetchDateSchedules(); refreshData(); }}
-        />
-      )}
 
       {/* ─── Nurse Vitals Entry Dialog ─── */}
       <Dialog open={!!vitalsPatient} onOpenChange={(v) => !v && setVitalsPatient(null)}>
