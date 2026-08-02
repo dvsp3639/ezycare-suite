@@ -350,6 +350,7 @@ const ClinicManagement = () => {
       await clinicService.updateSchedule(editSlotDoctor.id, {
         availableFrom: slotRanges[0]?.from || "9:00 AM",
         availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM",
+        consultationDuration: 30,
       } as any);
 
       // Persist time slots: delete all old slots and recreate
