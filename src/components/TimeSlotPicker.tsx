@@ -43,7 +43,9 @@ const TimeSlotPicker = ({ open, onOpenChange, onSelect, selectedTime, slots, doc
   }, []);
   const checkToday = isToday(selectedDate);
 
-  const activeSlots = slots.filter((s) => s.isActive);
+  const activeSlots = [...slots]
+    .filter((s) => s.isActive)
+    .sort((a, b) => parseTime12(a.time) - parseTime12(b.time));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
