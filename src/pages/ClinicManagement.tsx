@@ -311,10 +311,10 @@ const ClinicManagement = () => {
 
   const addSlotRange = () => setSlotRanges(prev => [...prev, { from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
 
-  // 30-min time options (6:00 AM – 10:00 PM) for slot range pickers
+  // 30-min time options — full 24 hours, round the clock
   const timeOptions = useMemo(() => {
     const opts: string[] = [];
-    for (let mins = 6 * 60; mins <= 22 * 60; mins += 30) {
+    for (let mins = 0; mins < 24 * 60; mins += 30) {
       const h = Math.floor(mins / 60);
       const m = mins % 60;
       const period = h >= 12 ? "PM" : "AM";
@@ -331,10 +331,10 @@ const ClinicManagement = () => {
   // Save slot configuration to DB
   const handleSaveSlotConfig = async () => {
     if (!editSlotDoctor) return;
-    // Validate ranges
+    // Overnight ranges are allowed (they wrap past midnight); only reject identical from/to
     for (const range of slotRanges) {
-      if (parseTime12(range.to) <= parseTime12(range.from)) {
-        toast.error("'To' time must be after 'From' time in each range");
+      if (parseTime12(range.to) === parseTime12(range.from)) {
+        toast.error("'From' and 'To' times cannot be the same");
         return;
       }
     }
