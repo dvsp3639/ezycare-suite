@@ -669,6 +669,9 @@ const ClinicManagement = () => {
                     <h3 className="font-semibold text-foreground">{doc.doctorName}</h3>
                     <p className="text-xs text-muted-foreground">{doc.specialization}</p>
                   </div>
+                  <Button size="sm" variant="outline" onClick={() => openManageSlots(doc.id)} disabled={isPastDate}>
+                    <ClockIcon className="h-3.5 w-3.5 mr-1.5" /> Manage Slots
+                  </Button>
                 </div>
                 {isPastDate && <Badge variant="outline" className="text-xs text-muted-foreground">Read Only</Badge>}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
