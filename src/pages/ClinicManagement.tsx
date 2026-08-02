@@ -200,17 +200,31 @@ const ClinicManagement = () => {
   const isPastDate = isBefore(startOfDay(slotDate), startOfDay(new Date()));
   const isTodayDate = isToday(slotDate);
 
+  // Live clock (minutes since midnight) so slots freeze in realtime without a reload
+  const [nowMinutes, setNowMinutes] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const n = new Date();
+      setNowMinutes(n.getHours() * 60 + n.getMinutes());
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // A slot is only frozen once its 30-minute window has fully elapsed.
+  // e.g. at 6:00 PM the 5:30 PM slot is closed, but at 6:20 PM the 6:00 PM slot is still open.
+  const SLOT_LENGTH_MIN = 30;
   const isSlotPast = (slotTime: string): boolean => {
-    if (!isTodayDate) return false;
-    const now = new Date();
+    if (isPastDate) return true;
+    if (!isTodayDate) return false; // future dates are never frozen
     const [time, period] = slotTime.split(" ");
     const [h, m] = time.split(":").map(Number);
     let hours = h;
     if (period === "PM" && h !== 12) hours += 12;
     if (period === "AM" && h === 12) hours = 0;
-    const slotDate_ = new Date();
-    slotDate_.setHours(hours, m, 0, 0);
-    return isBefore(slotDate_, now);
+    return nowMinutes >= hours * 60 + m + SLOT_LENGTH_MIN;
   };
 
   const editSlotDoctor = editSlotDoctorId ? dateSchedules.find((d) => d.id === editSlotDoctorId) ?? null : null;
@@ -336,6 +350,7 @@ const ClinicManagement = () => {
       await clinicService.updateSchedule(editSlotDoctor.id, {
         availableFrom: slotRanges[0]?.from || "9:00 AM",
         availableTo: slotRanges[slotRanges.length - 1]?.to || "5:00 PM",
+        consultationDuration: 30,
       } as any);
 
       // Persist time slots: delete all old slots and recreate
@@ -681,15 +696,42 @@ const ClinicManagement = () => {
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {doc.timeSlots.filter(s => s.isActive).map((slot) => {
-                    const past = isPastDate || isSlotPast(slot.time);
-                    const full = slot.bookedPatients >= slot.maxPatients;
-                    const pct = (slot.bookedPatients / slot.maxPatients) * 100;
+                    const past = isSlotPast(slot.time);
+                    const max = Math.max(1, slot.maxPatients);
+                    const left = Math.max(0, max - slot.bookedPatients);
+                    const pct = (slot.bookedPatients / max) * 100;
+                    const full = left === 0;
+                    // Traffic colours: green = plenty free, amber = filling, orange = almost full, red = booked out
+                    const tone = full ? "full" : pct >= 80 ? "critical" : pct >= 50 ? "filling" : "open";
+                    const toneBox = {
+                      open: "border-success/40 bg-success/5",
+                      filling: "border-warning/40 bg-warning/5",
+                      critical: "border-orange-500/40 bg-orange-500/5",
+                      full: "border-destructive/40 bg-destructive/10",
+                    }[tone];
+                    const toneText = {
+                      open: "text-success",
+                      filling: "text-warning",
+                      critical: "text-orange-500",
+                      full: "text-destructive",
+                    }[tone];
+                    const toneBar = {
+                      open: "bg-success",
+                      filling: "bg-warning",
+                      critical: "bg-orange-500",
+                      full: "bg-destructive",
+                    }[tone];
                     return (
-                      <div key={slot.time} className={cn("rounded-lg border p-3 text-center transition-all", past ? "border-border/50 bg-muted/40 opacity-50" : full ? "border-destructive/30 bg-destructive/5" : pct >= 60 ? "border-warning/30 bg-warning/5" : "border-border bg-card")}>
-                        <p className="text-sm font-medium text-foreground">{slot.time}</p>
-                        <p className={cn("text-xs font-semibold mt-1", full ? "text-destructive" : pct >= 60 ? "text-warning" : "text-success")}>{slot.bookedPatients}/{slot.maxPatients}</p>
+                      <div key={slot.time} className={cn("rounded-lg border p-3 text-center transition-all", past ? "border-border/50 bg-muted/40 opacity-50" : toneBox)}>
+                        <p className={cn("text-sm font-medium", past ? "text-muted-foreground line-through" : "text-foreground")}>{slot.time}</p>
+                        <p className={cn("text-xs font-semibold mt-1", past ? "text-muted-foreground" : toneText)}>
+                          {past ? "Closed" : `${slot.bookedPatients}/${max}`}
+                        </p>
+                        {!past && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{full ? "No tokens left" : `${left} left`}</p>
+                        )}
                         <div className="w-full bg-muted rounded-full h-1.5 mt-1.5">
-                          <div className={cn("h-1.5 rounded-full transition-all", full ? "bg-destructive" : pct >= 60 ? "bg-warning" : "bg-success")} style={{ width: `${Math.min(pct, 100)}%` }} />
+                          <div className={cn("h-1.5 rounded-full transition-all", past ? "bg-muted-foreground/30" : toneBar)} style={{ width: `${Math.min(pct, 100)}%` }} />
                         </div>
                       </div>
                     );
@@ -698,7 +740,9 @@ const ClinicManagement = () => {
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success" /> Available</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-warning" /> Filling Up</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Almost Full</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-destructive" /> Full</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/40" /> Closed (past)</span>
                 </div>
               </div>
             ))}
