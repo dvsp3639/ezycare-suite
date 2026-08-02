@@ -192,6 +192,8 @@ const ClinicManagement = () => {
 
   // Vitals dialog (separate for nurse entry from queue)
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: "consult" | "daycare"; entry: QueueEntry } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [nurseVitals, setNurseVitals] = useState<Vitals>(emptyVitals());
 
   const printRef = useRef<HTMLDivElement>(null);
