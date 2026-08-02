@@ -66,15 +66,19 @@ export default function UsersRoles() {
   const [search, setSearch] = useState("");
 
   const apiCall = useCallback(async (path: string, method: string, body?: any) => {
-    const opts: any = {
-      headers: { Authorization: `Bearer ${session?.access_token}` },
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-api/${path}`;
+    const res = await fetch(url, {
       method,
-    };
-    if (body) opts.body = body;
-
-    const { data, error } = await supabase.functions.invoke(`admin-api/${path}`, opts);
-    if (error) throw new Error(error.message || "API error");
-    if (data?.error) throw new Error(data.error);
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(data?.error || `API error (${res.status})`);
     return data;
   }, [session]);
 
