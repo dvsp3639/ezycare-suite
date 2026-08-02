@@ -827,10 +827,10 @@ const ClinicManagement = () => {
                       )}
                       {q.status === "In Consultation" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
+                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "consult", entry: q })}>
                             <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleSendToDayCare(q)}>
+                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
                           </Button>
                         </>
