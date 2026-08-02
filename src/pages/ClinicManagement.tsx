@@ -192,6 +192,8 @@ const ClinicManagement = () => {
 
   // Vitals dialog (separate for nurse entry from queue)
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: "consult" | "daycare"; entry: QueueEntry } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [nurseVitals, setNurseVitals] = useState<Vitals>(emptyVitals());
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -244,11 +246,13 @@ const ClinicManagement = () => {
     const seen = new Set<string>();
     for (const range of ranges) {
       const fromMin = parseTime12(range.from);
-      const toMin = parseTime12(range.to);
-      if (toMin <= fromMin) continue;
+      let toMin = parseTime12(range.to);
+      // Overnight range (e.g. 10:00 PM → 2:00 AM) wraps past midnight
+      if (toMin <= fromMin) toMin += 24 * 60;
       for (let t = fromMin; t < toMin; t += 30) {
-        const h24 = Math.floor(t / 60);
-        const min = t % 60;
+        const tm = t % (24 * 60);
+        const h24 = Math.floor(tm / 60);
+        const min = tm % 60;
         const period = h24 < 12 ? "AM" : "PM";
         const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
         const timeStr = `${h12}:${min.toString().padStart(2, "0")} ${period}`;
@@ -309,10 +313,10 @@ const ClinicManagement = () => {
 
   const addSlotRange = () => setSlotRanges(prev => [...prev, { from: "9:00 AM", to: "5:00 PM", tokensPerSlot: 5 }]);
 
-  // 30-min time options (6:00 AM – 10:00 PM) for slot range pickers
+  // 30-min time options — full 24 hours, round the clock
   const timeOptions = useMemo(() => {
     const opts: string[] = [];
-    for (let mins = 6 * 60; mins <= 22 * 60; mins += 30) {
+    for (let mins = 0; mins < 24 * 60; mins += 30) {
       const h = Math.floor(mins / 60);
       const m = mins % 60;
       const period = h >= 12 ? "PM" : "AM";
@@ -329,10 +333,10 @@ const ClinicManagement = () => {
   // Save slot configuration to DB
   const handleSaveSlotConfig = async () => {
     if (!editSlotDoctor) return;
-    // Validate ranges
+    // Overnight ranges are allowed (they wrap past midnight); only reject identical from/to
     for (const range of slotRanges) {
-      if (parseTime12(range.to) <= parseTime12(range.from)) {
-        toast.error("'To' time must be after 'From' time in each range");
+      if (parseTime12(range.to) === parseTime12(range.from)) {
+        toast.error("'From' and 'To' times cannot be the same");
         return;
       }
     }
@@ -383,6 +387,18 @@ const ClinicManagement = () => {
 
   const handleSendToDayCare = async (entry: QueueEntry) => {
     try {
+      // Prevent duplicate Day Care sessions for the same patient on the same day
+      const today = format(new Date(), "yyyy-MM-dd");
+      const existing = await daycareService.getSessions(today);
+      const dup = (existing || []).some(
+        (s: any) =>
+          (s.registration_number || s.registrationNumber) === entry.registrationNumber &&
+          !["Discharged", "Cancelled", "Completed"].includes(s.status)
+      );
+      if (dup) {
+        toast.error(`${entry.patientName} already has an active Day Care session today`);
+        return;
+      }
       await daycareService.createSession({
         patient_name: entry.patientName,
         registration_number: entry.registrationNumber,
@@ -695,7 +711,7 @@ const ClinicManagement = () => {
                   <span>{doc.timeSlots.filter((s) => s.isActive).length} active slots</span>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {doc.timeSlots.filter(s => s.isActive).map((slot) => {
+                  {[...doc.timeSlots].filter(s => s.isActive).sort((a, b) => parseTime12(a.time) - parseTime12(b.time)).map((slot) => {
                     const past = isSlotPast(slot.time);
                     const max = Math.max(1, slot.maxPatients);
                     const left = Math.max(0, max - slot.bookedPatients);
@@ -811,10 +827,10 @@ const ClinicManagement = () => {
                       )}
                       {q.status === "In Consultation" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => handleOpenConsultDialog(q)}>
+                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "consult", entry: q })}>
                             <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleSendToDayCare(q)}>
+                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
                           </Button>
                         </>
@@ -1331,6 +1347,45 @@ const ClinicManagement = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Confirm Consult / Day Care action */}
+      <Dialog open={!!pendingAction} onOpenChange={(o) => !o && setPendingAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {pendingAction?.type === "consult" ? "Start Consultation?" : "Send to Day Care?"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {pendingAction?.type === "consult"
+              ? `Open the consultation record for ${pendingAction?.entry.patientName} (Token ${pendingAction?.entry.tokenNo}).`
+              : `${pendingAction?.entry.patientName} (Token ${pendingAction?.entry.tokenNo}) will be admitted to Day Care Services. Duplicate sessions for the same day are blocked.`}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingAction(null)} disabled={actionBusy}>Cancel</Button>
+            <Button
+              disabled={actionBusy}
+              onClick={async () => {
+                if (!pendingAction) return;
+                const { type, entry } = pendingAction;
+                setActionBusy(true);
+                try {
+                  if (type === "consult") {
+                    await handleOpenConsultDialog(entry);
+                  } else {
+                    await handleSendToDayCare(entry);
+                  }
+                  setPendingAction(null);
+                } finally {
+                  setActionBusy(false);
+                }
+              }}
+            >
+              {actionBusy ? "Please wait…" : pendingAction?.type === "consult" ? "Start Consultation" : "Send to Day Care"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Doctor dialog removed - doctors auto-pull from staff */}
     </div>
   );
@@ -1401,6 +1456,7 @@ const TokenDisplayBoard = ({ queue, schedules }: { queue: QueueEntry[]; schedule
           </div>
         ))}
       </div>
+
     </div>
   );
 };
