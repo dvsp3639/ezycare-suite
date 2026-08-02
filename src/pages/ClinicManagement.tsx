@@ -14,7 +14,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import {
-  Calendar as CalendarIcon, Clock, Users, Search, Settings2, Plus, Minus, Eye, FileText, Pill, ClockIcon,
+  Calendar as CalendarIcon, Clock, Users, Search, Plus, Minus, Eye, FileText, Pill, ClockIcon,
   CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
   CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
