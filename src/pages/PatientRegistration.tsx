@@ -182,6 +182,25 @@ const PatientRegistration = () => {
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
     setShowAddNew(false);
+    loadPatientContext(p.id, p.registrationNumber);
+  };
+
+  const loadPatientContext = async (patientId: string | null, regNo: string) => {
+    setHistoryLoading(true);
+    setHistory(null);
+    setFollowup(null);
+    try {
+      const [rows, status] = await Promise.all([
+        patientService.getHistory({ patientId, registrationNumber: regNo }),
+        patientService.getFollowupStatus({ patientId, registrationNumber: regNo }).catch(() => null),
+      ]);
+      setHistory(rows);
+      setFollowup(status);
+    } catch (err: any) {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const handleAddNewPatient = () => {
@@ -291,7 +310,6 @@ const PatientRegistration = () => {
       if (print) window.print();
       setShowOPD(false);
       setOpdDate("");
-      setOpdType("");
       setOpdDoctor("");
       setOpdTimeSlot("");
     } catch (err: any) {
@@ -309,6 +327,8 @@ const PatientRegistration = () => {
     setSearchResults(null);
     setShowOPD(false);
     setShowAddNew(false);
+    setHistory(null);
+    setFollowup(null);
   };
 
   return (
@@ -321,13 +341,42 @@ const PatientRegistration = () => {
         </div>
         <div className="flex gap-2">
           {isRegistered && (
-            <Button onClick={() => setShowOPD(true)} size="sm">
+            <Button onClick={() => setShowBookConfirm(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Book OPD
             </Button>
           )}
         </div>
       </div>
+
+      {/* Free follow-up status */}
+      {isRegistered && followup && (
+        <div
+          className={cn(
+            "rounded-xl border p-4 mb-6 flex flex-wrap items-center gap-3 animate-fade-in",
+            followup.eligible ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30",
+          )}
+        >
+          <Gift className={cn("h-4 w-4", followup.eligible ? "text-primary" : "text-muted-foreground")} />
+          {followup.eligible ? (
+            <>
+              <span className="text-sm font-semibold text-foreground">Free follow-up available</span>
+              <Badge variant="secondary">Valid till {formatDateDisplay(String(followup.expiry_date).slice(0, 10))}</Badge>
+              <Badge variant="outline">{followup.days_left} day(s) remaining</Badge>
+              {followup.doctor_name && <Badge variant="outline">Dr. {followup.doctor_name}</Badge>}
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              No free follow-up available
+              {followup.reason === "expired" && followup.expiry_date
+                ? ` — window closed on ${formatDateDisplay(String(followup.expiry_date).slice(0, 10))}`
+                : followup.reason === "no_previous_visit"
+                ? ` — first consultation (window ${followup.window_days || 15} days after visit)`
+                : ""}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Mobile Search */}
       <div className="bg-card rounded-xl border border-border p-5 mb-6">
