@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, UserPlus, Save, Printer, Calendar, Clock, X, Loader2 } from "lucide-react";
+import { Search, UserPlus, Save, Printer, Calendar, Clock, X, Loader2, Gift, Stethoscope, Pill, FlaskConical, Activity } from "lucide-react";
 import { useCreatePatient } from "@/modules/patients/hooks";
 import { patientService } from "@/modules/patients/services";
 import { useDoctorSchedules, useAppointments, useCreateAppointment } from "@/modules/clinic/hooks";
@@ -85,11 +85,18 @@ const PatientRegistration = () => {
 
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
+  const [showBookConfirm, setShowBookConfirm] = useState(false);
   const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
-  const [opdType, setOpdType] = useState("");
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Clinical history + free follow-up status
+  const [history, setHistory] = useState<any[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [followup, setFollowup] = useState<any | null>(null);
+
+  const opdType = followup?.eligible ? "Follow Up" : "Normal";
 
   const createPatient = useCreatePatient();
   const createAppointment = useCreateAppointment();
