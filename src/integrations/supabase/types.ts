@@ -3857,6 +3857,10 @@ export type Database = {
         Returns: Json
       }
       expire_followup_entitlements: { Args: never; Returns: number }
+      get_patient_followup_status: {
+        Args: { _patient_id?: string; _registration_number?: string }
+        Returns: Json
+      }
       get_user_hospital_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

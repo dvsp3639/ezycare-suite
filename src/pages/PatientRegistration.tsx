@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, UserPlus, Save, Printer, Calendar, Clock, X, Loader2 } from "lucide-react";
+import { Search, UserPlus, Save, Printer, Calendar, Clock, X, Loader2, Gift, Stethoscope, Pill, FlaskConical, Activity } from "lucide-react";
 import { useCreatePatient } from "@/modules/patients/hooks";
 import { patientService } from "@/modules/patients/services";
 import { useDoctorSchedules, useAppointments, useCreateAppointment } from "@/modules/clinic/hooks";
@@ -85,11 +85,18 @@ const PatientRegistration = () => {
 
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
+  const [showBookConfirm, setShowBookConfirm] = useState(false);
   const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
-  const [opdType, setOpdType] = useState("");
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Clinical history + free follow-up status
+  const [history, setHistory] = useState<any[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [followup, setFollowup] = useState<any | null>(null);
+
+  const opdType = followup?.eligible ? "Follow Up" : "Normal";
 
   const createPatient = useCreatePatient();
   const createAppointment = useCreateAppointment();
@@ -175,6 +182,25 @@ const PatientRegistration = () => {
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
     setShowAddNew(false);
+    loadPatientContext(p.id, p.registrationNumber);
+  };
+
+  const loadPatientContext = async (patientId: string | null, regNo: string) => {
+    setHistoryLoading(true);
+    setHistory(null);
+    setFollowup(null);
+    try {
+      const [rows, status] = await Promise.all([
+        patientService.getHistory({ patientId, registrationNumber: regNo }),
+        patientService.getFollowupStatus({ patientId, registrationNumber: regNo }).catch(() => null),
+      ]);
+      setHistory(rows);
+      setFollowup(status);
+    } catch (err: any) {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const handleAddNewPatient = () => {
@@ -284,7 +310,6 @@ const PatientRegistration = () => {
       if (print) window.print();
       setShowOPD(false);
       setOpdDate("");
-      setOpdType("");
       setOpdDoctor("");
       setOpdTimeSlot("");
     } catch (err: any) {
@@ -302,6 +327,8 @@ const PatientRegistration = () => {
     setSearchResults(null);
     setShowOPD(false);
     setShowAddNew(false);
+    setHistory(null);
+    setFollowup(null);
   };
 
   return (
@@ -314,13 +341,42 @@ const PatientRegistration = () => {
         </div>
         <div className="flex gap-2">
           {isRegistered && (
-            <Button onClick={() => setShowOPD(true)} size="sm">
+            <Button onClick={() => setShowBookConfirm(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Book OPD
             </Button>
           )}
         </div>
       </div>
+
+      {/* Free follow-up status */}
+      {isRegistered && followup && (
+        <div
+          className={cn(
+            "rounded-xl border p-4 mb-6 flex flex-wrap items-center gap-3 animate-fade-in",
+            followup.eligible ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30",
+          )}
+        >
+          <Gift className={cn("h-4 w-4", followup.eligible ? "text-primary" : "text-muted-foreground")} />
+          {followup.eligible ? (
+            <>
+              <span className="text-sm font-semibold text-foreground">Free follow-up available</span>
+              <Badge variant="secondary">Valid till {formatDateDisplay(String(followup.expiry_date).slice(0, 10))}</Badge>
+              <Badge variant="outline">{followup.days_left} day(s) remaining</Badge>
+              {followup.doctor_name && <Badge variant="outline">Dr. {followup.doctor_name}</Badge>}
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              No free follow-up available
+              {followup.reason === "expired" && followup.expiry_date
+                ? ` — window closed on ${formatDateDisplay(String(followup.expiry_date).slice(0, 10))}`
+                : followup.reason === "no_previous_visit"
+                ? ` — first consultation (window ${followup.window_days || 15} days after visit)`
+                : ""}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Mobile Search */}
       <div className="bg-card rounded-xl border border-border p-5 mb-6">
@@ -467,6 +523,135 @@ const PatientRegistration = () => {
         </div>
       )}
 
+      {/* Medical History */}
+      {isRegistered && selectedPatient && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Medical History</h3>
+            {history && <span className="text-xs text-muted-foreground">{history.length} visit(s)</span>}
+          </div>
+          {historyLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading history...
+            </div>
+          ) : !history || history.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No previous visits recorded for this patient.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map((v: any) => (
+                <div key={v.id} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge variant="outline">{formatDateDisplay(v.appointmentDate)}</Badge>
+                    <span className="text-sm font-semibold text-foreground">Dr. {v.doctorName}</span>
+                    <Badge variant="secondary" className="text-[10px]">{v.opdType}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{v.status}</Badge>
+                    {v.tokenNo ? <span className="text-xs text-muted-foreground">Token {v.tokenNo}</span> : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-1">
+                        <Stethoscope className="h-3 w-3" /> Diagnosis & Notes
+                      </p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {v.diagnosis || "—"}
+                      </p>
+                      {v.doctorNotes && (
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{v.doctorNotes}</p>
+                      )}
+                      {(v.vitals || []).length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          {[
+                            v.vitals[0].bp && `BP ${v.vitals[0].bp}`,
+                            v.vitals[0].temperature && `Temp ${v.vitals[0].temperature}`,
+                            v.vitals[0].pulse && `Pulse ${v.vitals[0].pulse}`,
+                            v.vitals[0].spo2 && `SpO2 ${v.vitals[0].spo2}`,
+                            v.vitals[0].weight && `Wt ${v.vitals[0].weight}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "No vitals"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-1">
+                        <Pill className="h-3 w-3" /> Prescription
+                      </p>
+                      {(v.prescriptions || []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {v.prescriptions.map((rx: any) => (
+                            <li key={rx.id} className="text-sm text-foreground">
+                              {rx.medicine}
+                              <span className="text-xs text-muted-foreground">
+                                {[rx.dosage, rx.frequency, rx.duration].filter(Boolean).length
+                                  ? ` — ${[rx.dosage, rx.frequency, rx.duration].filter(Boolean).join(" · ")}`
+                                  : ""}
+                                {rx.instructions ? ` (${rx.instructions})` : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {(v.labOrders || []).length > 0 && (
+                        <>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mt-3 mb-1">
+                            <FlaskConical className="h-3 w-3" /> Investigations
+                          </p>
+                          <ul className="space-y-1">
+                            {v.labOrders.map((lo: any) => (
+                              <li key={lo.id} className="text-sm text-foreground">
+                                {lo.testName}
+                                <span className="text-xs text-muted-foreground"> — {lo.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Book OPD Confirmation */}
+      <Dialog open={showBookConfirm} onOpenChange={setShowBookConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Book OPD?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-1">
+            <p className="text-sm text-foreground font-medium">{form.name}</p>
+            <p className="text-xs font-mono text-muted-foreground">{registrationNumber}</p>
+            <p className="text-sm text-muted-foreground pt-2">
+              This visit will be booked as <span className="font-semibold text-foreground">{opdType}</span>
+              {followup?.eligible ? " (free follow-up)" : ""}. Continue?
+            </p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowBookConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setShowBookConfirm(false);
+                setShowOPD(true);
+              }}
+            >
+              Proceed
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* OPD Booking Modal */}
       <Dialog open={showOPD} onOpenChange={setShowOPD}>
         <DialogContent className="max-w-lg">
@@ -481,14 +666,11 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
-              <Select value={opdType} onValueChange={setOpdType}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Normal">Normal</SelectItem>
-                  <SelectItem value="Emergency">Emergency</SelectItem>
-                  <SelectItem value="Follow Up">Follow Up</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="h-10 flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3">
+                <span className="text-sm font-medium text-foreground">{opdType}</span>
+                {followup?.eligible && <Badge variant="secondary" className="text-[10px]">Free</Badge>}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Set automatically from follow-up eligibility</p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Doctor *</Label>
