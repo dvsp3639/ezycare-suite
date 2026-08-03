@@ -523,6 +523,135 @@ const PatientRegistration = () => {
         </div>
       )}
 
+      {/* Medical History */}
+      {isRegistered && selectedPatient && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Medical History</h3>
+            {history && <span className="text-xs text-muted-foreground">{history.length} visit(s)</span>}
+          </div>
+          {historyLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading history...
+            </div>
+          ) : !history || history.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No previous visits recorded for this patient.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map((v: any) => (
+                <div key={v.id} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge variant="outline">{formatDateDisplay(v.appointmentDate)}</Badge>
+                    <span className="text-sm font-semibold text-foreground">Dr. {v.doctorName}</span>
+                    <Badge variant="secondary" className="text-[10px]">{v.opdType}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{v.status}</Badge>
+                    {v.tokenNo ? <span className="text-xs text-muted-foreground">Token {v.tokenNo}</span> : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-1">
+                        <Stethoscope className="h-3 w-3" /> Diagnosis & Notes
+                      </p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {v.diagnosis || "—"}
+                      </p>
+                      {v.doctorNotes && (
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{v.doctorNotes}</p>
+                      )}
+                      {(v.vitals || []).length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          {[
+                            v.vitals[0].bp && `BP ${v.vitals[0].bp}`,
+                            v.vitals[0].temperature && `Temp ${v.vitals[0].temperature}`,
+                            v.vitals[0].pulse && `Pulse ${v.vitals[0].pulse}`,
+                            v.vitals[0].spo2 && `SpO2 ${v.vitals[0].spo2}`,
+                            v.vitals[0].weight && `Wt ${v.vitals[0].weight}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "No vitals"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-1">
+                        <Pill className="h-3 w-3" /> Prescription
+                      </p>
+                      {(v.prescriptions || []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {v.prescriptions.map((rx: any) => (
+                            <li key={rx.id} className="text-sm text-foreground">
+                              {rx.medicine}
+                              <span className="text-xs text-muted-foreground">
+                                {[rx.dosage, rx.frequency, rx.duration].filter(Boolean).length
+                                  ? ` — ${[rx.dosage, rx.frequency, rx.duration].filter(Boolean).join(" · ")}`
+                                  : ""}
+                                {rx.instructions ? ` (${rx.instructions})` : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {(v.labOrders || []).length > 0 && (
+                        <>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mt-3 mb-1">
+                            <FlaskConical className="h-3 w-3" /> Investigations
+                          </p>
+                          <ul className="space-y-1">
+                            {v.labOrders.map((lo: any) => (
+                              <li key={lo.id} className="text-sm text-foreground">
+                                {lo.testName}
+                                <span className="text-xs text-muted-foreground"> — {lo.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Book OPD Confirmation */}
+      <Dialog open={showBookConfirm} onOpenChange={setShowBookConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Book OPD?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-1">
+            <p className="text-sm text-foreground font-medium">{form.name}</p>
+            <p className="text-xs font-mono text-muted-foreground">{registrationNumber}</p>
+            <p className="text-sm text-muted-foreground pt-2">
+              This visit will be booked as <span className="font-semibold text-foreground">{opdType}</span>
+              {followup?.eligible ? " (free follow-up)" : ""}. Continue?
+            </p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowBookConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setShowBookConfirm(false);
+                setShowOPD(true);
+              }}
+            >
+              Proceed
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* OPD Booking Modal */}
       <Dialog open={showOPD} onOpenChange={setShowOPD}>
         <DialogContent className="max-w-lg">
