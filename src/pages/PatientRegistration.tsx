@@ -537,14 +537,11 @@ const PatientRegistration = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
-              <Select value={opdType} onValueChange={setOpdType}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Normal">Normal</SelectItem>
-                  <SelectItem value="Emergency">Emergency</SelectItem>
-                  <SelectItem value="Follow Up">Follow Up</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="h-10 flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3">
+                <span className="text-sm font-medium text-foreground">{opdType}</span>
+                {followup?.eligible && <Badge variant="secondary" className="text-[10px]">Free</Badge>}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Set automatically from follow-up eligibility</p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Doctor *</Label>
