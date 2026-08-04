@@ -27,6 +27,11 @@ export const ipdService = {
     if (error) throw error;
   },
 
+  async deleteWard(id: string): Promise<void> {
+    const { error } = await supabase.from("wards").delete().eq("id", id);
+    if (error) throw error;
+  },
+
   async getBeds(wardId?: string): Promise<Bed[]> {
     let query = supabase.from("beds").select("*").order("bed_number");
     if (wardId) query = query.eq("ward_id", wardId);
@@ -43,6 +48,11 @@ export const ipdService = {
 
   async updateBed(id: string, updates: Partial<Bed>): Promise<void> {
     const { error } = await supabase.from("beds").update(camelToSnake(updates) as any).eq("id", id);
+    if (error) throw error;
+  },
+
+  async deleteBed(id: string): Promise<void> {
+    const { error } = await supabase.from("beds").delete().eq("id", id);
     if (error) throw error;
   },
 
