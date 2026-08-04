@@ -58,6 +58,7 @@ interface UIPatient {
   name: string;
   mobile: string;
   dob: string;
+  age: number | null;
   gender: string;
   emergencyContact: string;
   bloodGroup: string;
@@ -66,7 +67,7 @@ interface UIPatient {
 }
 
 const emptyForm = {
-  name: "", mobile: "", dob: "", gender: "Male", emergencyContact: "",
+  name: "", mobile: "", age: "", gender: "Male", emergencyContact: "",
   bloodGroup: "", address: "", chronicConditions: "",
 };
 
@@ -74,7 +75,6 @@ const PatientRegistration = () => {
   const [searchMobile, setSearchMobile] = useState("");
   const [searchResults, setSearchResults] = useState<UIPatient[] | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [dobDisplay, setDobDisplay] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<UIPatient | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
@@ -86,10 +86,13 @@ const PatientRegistration = () => {
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
   const [showBookConfirm, setShowBookConfirm] = useState(false);
+  const [pendingPrint, setPendingPrint] = useState(false);
   const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [doctorFees, setDoctorFees] = useState<Record<string, number>>({});
 
   // Clinical history + free follow-up status
   const [history, setHistory] = useState<any[] | null>(null);
@@ -173,11 +176,10 @@ const PatientRegistration = () => {
   const selectPatient = (p: UIPatient) => {
     setSelectedPatient(p);
     setForm({
-      name: p.name, mobile: p.mobile, dob: p.dob, gender: p.gender,
+      name: p.name, mobile: p.mobile, age: p.age != null ? String(p.age) : "", gender: p.gender,
       emergencyContact: p.emergencyContact || "", bloodGroup: p.bloodGroup || "",
       address: p.address || "", chronicConditions: p.chronicConditions || "",
     });
-    setDobDisplay(isoToDisplay(p.dob));
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
@@ -209,7 +211,6 @@ const PatientRegistration = () => {
     setIsRegistered(false);
     setRegistrationNumber("");
     setForm({ ...emptyForm, mobile: searchMobile });
-    setDobDisplay("");
   };
 
   const updateField = (key: string, value: string) => {
@@ -217,12 +218,13 @@ const PatientRegistration = () => {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.mobile || !form.dob || !form.address) {
+    if (!form.name || !form.mobile || !form.age || !form.address) {
       toast.error("Please fill all required fields");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob)) {
-      toast.error("Enter Date of Birth as dd/mm/yyyy");
+    const ageNum = parseInt(form.age, 10);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) {
+      toast.error("Enter a valid age (0-120)");
       return;
     }
     setSaving(true);
@@ -243,7 +245,8 @@ const PatientRegistration = () => {
         registrationNumber: regNum,
         name: form.name,
         mobile: form.mobile,
-        dob: form.dob,
+        dob: null,
+        age: ageNum,
         gender: form.gender as "Male" | "Female" | "Other",
         emergencyContact: form.emergencyContact,
         bloodGroup: form.bloodGroup,
