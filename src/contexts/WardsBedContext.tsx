@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useWards as useIpdWards, useBeds as useIpdBeds } from "@/modules/ipd/hooks";
 import { ipdService } from "@/modules/ipd/services";
 
@@ -54,9 +54,9 @@ interface WardsBedContextType {
   wards: Ward[];
   beds: Bed[];
   setBeds: React.Dispatch<React.SetStateAction<Bed[]>>;
-  addWard: (data: { name: string; department: Department; totalBeds: number; chargePerDay: number; type?: WardType; floor?: string }) => void;
-  updateWard: (id: string, data: { name: string; department: Department; totalBeds: number; chargePerDay: number }) => void;
-  deleteWard: (id: string) => void;
+  addWard: (data: { name: string; department: Department; totalBeds: number; chargePerDay: number; type?: WardType; floor?: string }) => Promise<void>;
+  updateWard: (id: string, data: { name: string; department: Department; totalBeds: number; chargePerDay: number }) => Promise<void>;
+  deleteWard: (id: string) => Promise<void>;
   toggleBedMaintenance: (bedInventoryId: string) => void;
 }
 
@@ -87,78 +87,128 @@ export const WardsBedProvider = ({ children }: { children: ReactNode }) => {
   const [localWards, setLocalWards] = useState<Ward[]>([]);
   const [localBeds, setLocalBeds] = useState<Bed[]>([]);
 
-  // Sync DB wards to local state
+  // Sync DB wards to local state (including empty results, so deletes reflect immediately)
   useEffect(() => {
-    if (dbWards.length > 0) {
-      setLocalWards(dbWards.map((w: any) => ({
-        id: w.id,
-        name: w.name,
-        type: w.type || guessWardType(w.name),
-        floor: w.floor || "Ground Floor",
-        totalBeds: w.totalBeds ?? 0,
-        chargePerDay: w.chargePerDay ?? 0,
-      })));
-    }
+    setLocalWards((dbWards as any[]).map((w: any) => ({
+      id: w.id,
+      name: w.name,
+      type: w.type || guessWardType(w.name),
+      floor: w.floor || "Ground Floor",
+      totalBeds: w.totalBeds ?? 0,
+      chargePerDay: Number(w.chargePerDay ?? 0),
+    })));
   }, [dbWards]);
 
   // Sync DB beds to local state
   useEffect(() => {
-    if (dbBeds.length > 0) {
-      setLocalBeds(dbBeds.map((b: any) => {
-        const ward = localWards.find(w => w.id === b.wardId);
-        return {
-          id: b.id,
-          bedNumber: b.bedNumber || "",
-          wardId: b.wardId || "",
-          wardName: ward?.name || "",
-          status: (b.status || "Available") as BedStatus,
-          patientId: b.patientId || undefined,
-          admissionId: b.admissionId || undefined,
-        };
-      }));
-    }
-  }, [dbBeds, localWards]);
+    setLocalBeds((dbBeds as any[]).map((b: any) => {
+      const ward = (dbWards as any[]).find((w: any) => w.id === b.wardId);
+      return {
+        id: b.id,
+        bedNumber: b.bedNumber || "",
+        wardId: b.wardId || "",
+        wardName: ward?.name || "",
+        status: (b.status || "Available") as BedStatus,
+        patientId: b.patientId || undefined,
+        admissionId: b.admissionId || undefined,
+      };
+    }));
+  }, [dbBeds, dbWards]);
 
   const wards = localWards;
   const beds = localBeds;
 
+  // Wards surfaced as inventory-shaped rows for the Inventory → Beds & Wards tab
+  const wardInventoryItems: InventoryItem[] = useMemo(
+    () =>
+      localWards.map((w) => {
+        const wardBeds = localBeds.filter((b) => b.wardId === w.id);
+        return {
+          id: w.id,
+          name: w.name,
+          category: "Wards",
+          sku: `WRD-${w.id.slice(0, 6).toUpperCase()}`,
+          batchNo: "",
+          manufacturer: "",
+          unitPrice: 0,
+          sellingPrice: w.chargePerDay,
+          stock: wardBeds.length || w.totalBeds,
+          minStock: 0,
+          unit: "Bed",
+          hsnCode: "",
+          gstPercent: 0,
+          department: (w.floor as Department) || ("Ward A" as Department),
+          barcode: "",
+          lastUpdated: new Date().toISOString().split("T")[0],
+          vendor: "",
+          purchaseDate: "",
+          consumptionRate: 0,
+        } as InventoryItem;
+      }),
+    [localWards, localBeds]
+  );
+
   const addWard = useCallback(async (data: { name: string; department: Department; totalBeds: number; chargePerDay: number; type?: WardType; floor?: string }) => {
-    try {
-      const wardType = data.type || guessWardType(data.name);
-      const floor = data.floor || "Ground Floor";
-      await ipdService.createWard({
-        name: data.name,
-        type: wardType,
-        floor,
-        total_beds: data.totalBeds,
-        charge_per_day: data.chargePerDay,
+    const wardType = data.type || guessWardType(data.name);
+    const floor = data.floor || data.department || "Ground Floor";
+    const ward = await ipdService.createWard({
+      name: data.name,
+      type: wardType,
+      floor,
+      total_beds: data.totalBeds,
+      charge_per_day: data.chargePerDay,
+    } as any);
+
+    // Physically create the beds that belong to this ward
+    const count = Math.max(0, Math.floor(data.totalBeds || 0));
+    const prefix = data.name
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 3) || "BED";
+    for (let i = 1; i <= count; i++) {
+      await ipdService.createBed({
+        ward_id: (ward as any).id,
+        bed_number: `${prefix}-${String(i).padStart(2, "0")}`,
+        status: "Available",
       } as any);
-      refetchWards();
-      refetchBeds();
-    } catch (err) {
-      console.error("Failed to add ward:", err);
     }
+    await Promise.all([refetchWards(), refetchBeds()]);
   }, [refetchWards, refetchBeds]);
 
   const updateWard = useCallback(async (id: string, data: { name: string; department: Department; totalBeds: number; chargePerDay: number }) => {
-    try {
-      await ipdService.updateWard(id, {
-        name: data.name,
-        total_beds: data.totalBeds,
-        charge_per_day: data.chargePerDay,
-      } as any);
-      refetchWards();
-      refetchBeds();
-    } catch (err) {
-      console.error("Failed to update ward:", err);
+    await ipdService.updateWard(id, {
+      name: data.name,
+      total_beds: data.totalBeds,
+      charge_per_day: data.chargePerDay,
+    } as any);
+
+    // Reconcile bed rows with the new total
+    const existing = await ipdService.getBeds(id);
+    const target = Math.max(0, Math.floor(data.totalBeds || 0));
+    const prefix = data.name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 3) || "BED";
+    if (existing.length < target) {
+      for (let i = existing.length + 1; i <= target; i++) {
+        await ipdService.createBed({
+          ward_id: id,
+          bed_number: `${prefix}-${String(i).padStart(2, "0")}`,
+          status: "Available",
+        } as any);
+      }
+    } else if (existing.length > target) {
+      const removable = (existing as any[]).filter((b) => b.status !== "Occupied").slice(target);
+      for (const b of removable) {
+        await ipdService.deleteBed(b.id);
+      }
     }
+    await Promise.all([refetchWards(), refetchBeds()]);
   }, [refetchWards, refetchBeds]);
 
   const deleteWard = useCallback(async (id: string) => {
-    // Remove locally
-    setLocalWards(prev => prev.filter(w => w.id !== id));
-    setLocalBeds(prev => prev.filter(b => b.wardId !== id));
-  }, []);
+    await ipdService.deleteWard(id);
+    await Promise.all([refetchWards(), refetchBeds()]);
+  }, [refetchWards, refetchBeds]);
 
   const toggleBedMaintenance = useCallback(async (bedId: string) => {
     setLocalBeds(prev => prev.map(b => {
@@ -171,7 +221,7 @@ export const WardsBedProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <WardsBedContext.Provider value={{
-      wardInventoryItems: [],
+      wardInventoryItems,
       wards,
       beds,
       setBeds: setLocalBeds,
