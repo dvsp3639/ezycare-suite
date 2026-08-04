@@ -2253,6 +2253,7 @@ export type Database = {
       patients: {
         Row: {
           address: string | null
+          age: number | null
           blood_group: string | null
           chronic_conditions: string | null
           created_at: string
@@ -2269,6 +2270,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          age?: number | null
           blood_group?: string | null
           chronic_conditions?: string | null
           created_at?: string
@@ -2285,6 +2287,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          age?: number | null
           blood_group?: string | null
           chronic_conditions?: string | null
           created_at?: string
@@ -3225,6 +3228,7 @@ export type Database = {
           bank_name: string | null
           base_salary: number | null
           blood_group: string | null
+          consultation_fee: number
           created_at: string
           department: string | null
           designation: string | null
@@ -3252,6 +3256,7 @@ export type Database = {
           bank_name?: string | null
           base_salary?: number | null
           blood_group?: string | null
+          consultation_fee?: number
           created_at?: string
           department?: string | null
           designation?: string | null
@@ -3279,6 +3284,7 @@ export type Database = {
           bank_name?: string | null
           base_salary?: number | null
           blood_group?: string | null
+          consultation_fee?: number
           created_at?: string
           department?: string | null
           designation?: string | null
