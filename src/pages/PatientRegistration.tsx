@@ -465,18 +465,15 @@ const PatientRegistration = () => {
               <Input value={form.mobile} onChange={(e) => updateField("mobile", e.target.value)} placeholder="Mobile" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Date of Birth *</Label>
+              <Label className="text-xs text-muted-foreground">Age *</Label>
               <Input
-                type="text"
+                type="number"
                 inputMode="numeric"
-                placeholder="dd/mm/yyyy"
-                value={dobDisplay}
-                onChange={(e) => {
-                  const masked = maskDobInput(e.target.value);
-                  setDobDisplay(masked);
-                  updateField("dob", displayToIso(masked));
-                }}
-                maxLength={10}
+                min={0}
+                max={120}
+                placeholder="Age in years"
+                value={form.age}
+                onChange={(e) => updateField("age", e.target.value.replace(/\D/g, "").slice(0, 3))}
               />
             </div>
             <div className="space-y-2">
