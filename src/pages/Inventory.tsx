@@ -260,6 +260,7 @@ const Inventory = () => {
   // Ward CRUD
   const [showWardDialog, setShowWardDialog] = useState(false);
   const [wardEditId, setWardEditId] = useState<string | null>(null);
+  const [savingWard, setSavingWard] = useState(false);
   const [wardForm, setWardForm] = useState<{ name: string; department: Department; totalBeds: number; chargePerDay: number }>({ name: "", department: "Ward A", totalBeds: 10, chargePerDay: 500 });
 
   // Report tab
@@ -693,7 +694,7 @@ const Inventory = () => {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
@@ -1271,9 +1272,13 @@ const Inventory = () => {
                                 }}>
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => {
-                                  deleteWard(ward.id);
-                                  toast.success(`${ward.name} removed`);
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={async () => {
+                                  try {
+                                    await deleteWard(ward.id);
+                                    toast.success(`${ward.name} removed`);
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Could not delete ward");
+                                  }
                                 }}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -2039,18 +2044,29 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowWardDialog(false); setWardEditId(null); }}>Cancel</Button>
-            <Button onClick={() => {
-              if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
-              if (wardEditId) {
-                updateWard(wardEditId, wardForm);
-                toast.success(`${wardForm.name} updated`);
-              } else {
-                addWard(wardForm);
-                toast.success(`${wardForm.name} added`);
-              }
-              setShowWardDialog(false);
-              setWardEditId(null);
-            }}>{wardEditId ? "Save Changes" : "Add Ward"}</Button>
+            <Button
+              disabled={savingWard}
+              onClick={async () => {
+                if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
+                if (!wardForm.totalBeds || wardForm.totalBeds < 1) { toast.error("Enter at least 1 bed"); return; }
+                setSavingWard(true);
+                try {
+                  if (wardEditId) {
+                    await updateWard(wardEditId, wardForm);
+                    toast.success(`${wardForm.name} updated`);
+                  } else {
+                    await addWard(wardForm);
+                    toast.success(`${wardForm.name} added with ${wardForm.totalBeds} bed(s)`);
+                  }
+                  setShowWardDialog(false);
+                  setWardEditId(null);
+                } catch (err: any) {
+                  toast.error(err?.message || "Could not save ward");
+                } finally {
+                  setSavingWard(false);
+                }
+              }}
+            >{savingWard ? "Saving…" : wardEditId ? "Save Changes" : "Add Ward"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -203,6 +203,8 @@ const ClinicManagement = () => {
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
   const [pendingAction, setPendingAction] = useState<{ type: "consult" | "daycare"; entry: QueueEntry } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  // Consultations already opened once in this session — reopening skips the confirmation prompt
+  const [openedConsults, setOpenedConsults] = useState<Set<string>>(new Set());
   const [nurseVitals, setNurseVitals] = useState<Vitals>(emptyVitals());
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -441,6 +443,7 @@ const ClinicManagement = () => {
 
   const handleOpenConsultDialog = async (entry: QueueEntry) => {
     setConsultPatient(entry);
+    setOpenedConsults((prev) => new Set(prev).add(entry.id));
     setConsultTab("vitals");
     setConsultDiagnosis(entry.diagnosis || "");
     setConsultNotes(entry.doctorNotes || "");
@@ -516,10 +519,7 @@ const ClinicManagement = () => {
 
   const handleCompleteConsultation = () => {
     if (!consultPatient) return;
-    if (!consultDiagnosis.trim()) {
-      toast.error("Please enter a diagnosis before completing");
-      return;
-    }
+    // Every clinical field (vitals, diagnosis, Rx, labs) is optional.
     const prescriptionLines = consultPrescriptions
       .filter((p) => p.medicine.trim())
       .map((p) => `${p.medicine} ${p.dosage} – ${p.frequency}${p.duration ? ` for ${p.duration}` : ""}${p.instructions ? ` (${p.instructions})` : ""}`);
@@ -631,7 +631,7 @@ const ClinicManagement = () => {
   const isReadOnly = consultPatient?.status === "Completed";
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-display font-bold text-foreground">Clinic Management</h1>
         <p className="text-sm text-muted-foreground">Manage doctor schedules, monitor OP queue & view patient data</p>
@@ -836,8 +836,16 @@ const ClinicManagement = () => {
                       )}
                       {q.status === "In Consultation" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "consult", entry: q })}>
-                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // Only confirm the first time; afterwards reopen the record directly
+                              if (openedConsults.has(q.id) || q.diagnosis) handleOpenConsultDialog(q);
+                              else setPendingAction({ type: "consult", entry: q });
+                            }}
+                          >
+                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> {openedConsults.has(q.id) || q.diagnosis ? "Resume" : "Consult"}
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
