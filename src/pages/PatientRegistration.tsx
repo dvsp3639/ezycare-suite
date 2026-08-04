@@ -142,8 +142,30 @@ const PatientRegistration = () => {
     autoCreate();
   }, [rawSchedules, opdDate]);
 
-  // Only show doctors who have time slots configured
-  const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
+  // Only show doctors who have time slots configured (deduped by doctor name)
+  const schedules = (() => {
+    const withSlots = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
+    const seen = new Map<string, any>();
+    for (const s of withSlots) {
+      const key = (s.doctorName || "").toLowerCase().trim();
+      const prev = seen.get(key);
+      if (!prev || (s.timeSlots || []).length > (prev.timeSlots || []).length) seen.set(key, s);
+    }
+    return Array.from(seen.values());
+  })();
+
+  // Load doctor OPD consultation fees from staff records
+  useEffect(() => {
+    (async () => {
+      try {
+        const { staffService } = await import("@/modules/staff/services");
+        const docs = await staffService.getStaff({ role: "Doctor", status: "Active" });
+        const map: Record<string, number> = {};
+        docs.forEach((d: any) => { map[(d.name || "").toLowerCase().trim()] = Number(d.consultation_fee) || 0; });
+        setDoctorFees(map);
+      } catch { /* ignore */ }
+    })();
+  }, []);
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
