@@ -809,6 +809,9 @@ const StaffPayroll = () => {
                 <Detail label="Bank" value={`${selectedStaff.bank_name || ""} (${selectedStaff.ifsc_code || ""})`} />
                 <Detail label="Account" value={selectedStaff.bank_account || "—"} />
                 <Detail label="Base Salary" value={`₹${(selectedStaff.base_salary || 0).toLocaleString()}`} />
+                {selectedStaff.role === "Doctor" && (
+                  <Detail label="OPD Consultation Fee" value={`₹${(selectedStaff.consultation_fee || 0).toLocaleString()}`} />
+                )}
                 <Detail label="Emergency Contact" value={selectedStaff.emergency_contact || "—"} />
               </div>
               <div><Detail label="Address" value={selectedStaff.address || "—"} /></div>
