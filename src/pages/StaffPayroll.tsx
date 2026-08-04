@@ -181,6 +181,7 @@ const StaffPayroll = () => {
         bank_name: staffForm.bank_name || "",
         ifsc_code: staffForm.ifsc_code || "",
         base_salary: staffForm.base_salary || 0,
+        consultation_fee: staffForm.consultation_fee || 0,
         status: "Active",
       });
 
@@ -695,6 +696,20 @@ const StaffPayroll = () => {
               <div><Label>Emergency Contact</Label><Input value={staffForm.emergency_contact || ""} onChange={(e) => setStaffForm({ ...staffForm, emergency_contact: e.target.value })} /></div>
               <div><Label>Base Salary (₹)</Label><Input type="number" value={staffForm.base_salary || 0} onChange={(e) => setStaffForm({ ...staffForm, base_salary: +e.target.value })} /></div>
             </div>
+            {staffForm.role === "Doctor" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>OPD Consultation Fee (₹)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={staffForm.consultation_fee ?? 0}
+                    onChange={(e) => setStaffForm({ ...staffForm, consultation_fee: +e.target.value })}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Used automatically when booking an OPD appointment.</p>
+                </div>
+              </div>
+            )}
             <div>
               <Label>Joining Date</Label>
               <Input
@@ -794,6 +809,9 @@ const StaffPayroll = () => {
                 <Detail label="Bank" value={`${selectedStaff.bank_name || ""} (${selectedStaff.ifsc_code || ""})`} />
                 <Detail label="Account" value={selectedStaff.bank_account || "—"} />
                 <Detail label="Base Salary" value={`₹${(selectedStaff.base_salary || 0).toLocaleString()}`} />
+                {selectedStaff.role === "Doctor" && (
+                  <Detail label="OPD Consultation Fee" value={`₹${(selectedStaff.consultation_fee || 0).toLocaleString()}`} />
+                )}
                 <Detail label="Emergency Contact" value={selectedStaff.emergency_contact || "—"} />
               </div>
               <div><Detail label="Address" value={selectedStaff.address || "—"} /></div>

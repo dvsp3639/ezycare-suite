@@ -7,6 +7,7 @@ export interface Patient {
   name: string;
   mobile: string;
   dob: string | null;
+  age: number | null;
   gender: "Male" | "Female" | "Other";
   emergencyContact: string;
   bloodGroup: string;

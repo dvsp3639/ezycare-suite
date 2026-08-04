@@ -152,7 +152,16 @@ const ClinicManagement = () => {
   }, [dateSchedulesRaw, slotDateStr]);
 
   const dateSchedules: DoctorSchedule[] = useMemo(() => {
-    return (dateSchedulesRaw || []).map((s: any) => ({
+    const deduped = (() => {
+      const seen = new Map<string, any>();
+      for (const s of (dateSchedulesRaw || []) as any[]) {
+        const key = (s.doctorName || "").toLowerCase().trim();
+        const prev = seen.get(key);
+        if (!prev || (s.timeSlots || []).length > (prev.timeSlots || []).length) seen.set(key, s);
+      }
+      return Array.from(seen.values());
+    })();
+    return deduped.map((s: any) => ({
       id: s.id,
       doctorName: s.doctorName,
       specialization: s.specialization || "",

@@ -40,6 +40,9 @@ export interface Appointment {
   doctorNotes: string;
   followUpDate: string | null;
   appointmentDate: string;
+  consultationFee?: number;
+  paymentMode?: string;
+  paymentStatus?: string;
   createdAt: string;
   updatedAt: string;
   vitals?: Vitals[];

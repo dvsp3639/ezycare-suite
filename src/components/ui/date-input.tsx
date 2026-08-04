@@ -1,6 +1,9 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
 
 // Shared masked dd/mm/yyyy date input. Stores ISO yyyy-mm-dd via onChange.
 // Drop-in replacement for <Input type="date" value onChange /> across the app.
@@ -37,11 +40,14 @@ export interface DateInputProps
   onChange: (isoValue: string) => void;
   min?: string;
   max?: string;
+  /** Show a calendar picker that opens when the field is clicked/focused. */
+  showCalendar?: boolean;
 }
 
 export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
-  ({ value, onChange, className, placeholder = "dd/mm/yyyy", min, max, ...rest }, ref) => {
+  ({ value, onChange, className, placeholder = "dd/mm/yyyy", min, max, showCalendar, ...rest }, ref) => {
     const [text, setText] = React.useState<string>(isoToDisplay(value || ""));
+    const [calendarOpen, setCalendarOpen] = React.useState(false);
 
     React.useEffect(() => {
       const iso = value || "";
@@ -64,7 +70,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       }
     };
 
-    return (
+    const inputEl = (
       <Input
         {...rest}
         ref={ref}
@@ -74,8 +80,51 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         value={text}
         onChange={handleChange}
         maxLength={10}
-        className={cn(className)}
+        className={cn(showCalendar && "pr-9", className)}
+        onClick={(e) => {
+          rest.onClick?.(e);
+          if (showCalendar) setCalendarOpen(true);
+        }}
       />
+    );
+
+    if (!showCalendar) return inputEl;
+
+    const selected = value ? new Date(`${String(value).slice(0, 10)}T00:00:00`) : undefined;
+
+    return (
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <PopoverTrigger asChild>
+          <div className="relative">
+            {inputEl}
+            <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selected}
+            defaultMonth={selected}
+            onSelect={(d) => {
+              if (!d) return;
+              const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              if (min && iso < min) return;
+              if (max && iso > max) return;
+              setText(isoToDisplay(iso));
+              onChange(iso);
+              setCalendarOpen(false);
+            }}
+            disabled={(d) => {
+              const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              if (min && iso < min) return true;
+              if (max && iso > max) return true;
+              return false;
+            }}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
     );
   }
 );

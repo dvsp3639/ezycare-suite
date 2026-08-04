@@ -58,6 +58,7 @@ interface UIPatient {
   name: string;
   mobile: string;
   dob: string;
+  age: number | null;
   gender: string;
   emergencyContact: string;
   bloodGroup: string;
@@ -66,7 +67,7 @@ interface UIPatient {
 }
 
 const emptyForm = {
-  name: "", mobile: "", dob: "", gender: "Male", emergencyContact: "",
+  name: "", mobile: "", age: "", gender: "Male", emergencyContact: "",
   bloodGroup: "", address: "", chronicConditions: "",
 };
 
@@ -74,7 +75,6 @@ const PatientRegistration = () => {
   const [searchMobile, setSearchMobile] = useState("");
   const [searchResults, setSearchResults] = useState<UIPatient[] | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [dobDisplay, setDobDisplay] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<UIPatient | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState("");
@@ -86,10 +86,13 @@ const PatientRegistration = () => {
   // OPD Booking
   const [showOPD, setShowOPD] = useState(false);
   const [showBookConfirm, setShowBookConfirm] = useState(false);
+  const [pendingPrint, setPendingPrint] = useState(false);
   const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [doctorFees, setDoctorFees] = useState<Record<string, number>>({});
 
   // Clinical history + free follow-up status
   const [history, setHistory] = useState<any[] | null>(null);
@@ -139,8 +142,30 @@ const PatientRegistration = () => {
     autoCreate();
   }, [rawSchedules, opdDate]);
 
-  // Only show doctors who have time slots configured
-  const schedules = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
+  // Only show doctors who have time slots configured (deduped by doctor name)
+  const schedules = (() => {
+    const withSlots = (rawSchedules || []).filter((s: any) => (s.timeSlots || []).length > 0) as any[];
+    const seen = new Map<string, any>();
+    for (const s of withSlots) {
+      const key = (s.doctorName || "").toLowerCase().trim();
+      const prev = seen.get(key);
+      if (!prev || (s.timeSlots || []).length > (prev.timeSlots || []).length) seen.set(key, s);
+    }
+    return Array.from(seen.values());
+  })();
+
+  // Load doctor OPD consultation fees from staff records
+  useEffect(() => {
+    (async () => {
+      try {
+        const { staffService } = await import("@/modules/staff/services");
+        const docs = await staffService.getStaff({ role: "Doctor", status: "Active" });
+        const map: Record<string, number> = {};
+        docs.forEach((d: any) => { map[(d.name || "").toLowerCase().trim()] = Number(d.consultation_fee) || 0; });
+        setDoctorFees(map);
+      } catch { /* ignore */ }
+    })();
+  }, []);
 
   // Fetch today's appointments for token calculation
   const todayStr = new Date().toISOString().split("T")[0];
@@ -173,11 +198,10 @@ const PatientRegistration = () => {
   const selectPatient = (p: UIPatient) => {
     setSelectedPatient(p);
     setForm({
-      name: p.name, mobile: p.mobile, dob: p.dob, gender: p.gender,
+      name: p.name, mobile: p.mobile, age: p.age != null ? String(p.age) : "", gender: p.gender,
       emergencyContact: p.emergencyContact || "", bloodGroup: p.bloodGroup || "",
       address: p.address || "", chronicConditions: p.chronicConditions || "",
     });
-    setDobDisplay(isoToDisplay(p.dob));
     setIsRegistered(true);
     setRegistrationNumber(p.registrationNumber);
     setSearchResults(null);
@@ -209,7 +233,6 @@ const PatientRegistration = () => {
     setIsRegistered(false);
     setRegistrationNumber("");
     setForm({ ...emptyForm, mobile: searchMobile });
-    setDobDisplay("");
   };
 
   const updateField = (key: string, value: string) => {
@@ -217,12 +240,13 @@ const PatientRegistration = () => {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.mobile || !form.dob || !form.address) {
+    if (!form.name || !form.mobile || !form.age || !form.address) {
       toast.error("Please fill all required fields");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob)) {
-      toast.error("Enter Date of Birth as dd/mm/yyyy");
+    const ageNum = parseInt(form.age, 10);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) {
+      toast.error("Enter a valid age (0-120)");
       return;
     }
     setSaving(true);
@@ -243,7 +267,8 @@ const PatientRegistration = () => {
         registrationNumber: regNum,
         name: form.name,
         mobile: form.mobile,
-        dob: form.dob,
+        dob: null,
+        age: ageNum,
         gender: form.gender as "Male" | "Female" | "Other",
         emergencyContact: form.emergencyContact,
         bloodGroup: form.bloodGroup,
@@ -266,6 +291,9 @@ const PatientRegistration = () => {
 
   // Get selected doctor's schedule for time slots
   const selectedDoctorSchedule = schedules.find((d: any) => d.id === opdDoctor);
+  const consultationFee = followup?.eligible
+    ? 0
+    : (doctorFees[(selectedDoctorSchedule?.doctorName || "").toLowerCase().trim()] ?? 0);
 
   const handleOPDSave = async (print: boolean) => {
     if (!opdDate || !opdType || !opdDoctor || !opdTimeSlot) {
@@ -296,6 +324,9 @@ const PatientRegistration = () => {
         diagnosis: "",
         doctorNotes: "",
         followUpDate: null,
+        consultationFee,
+        paymentMode: followup?.eligible ? "Free Follow-up" : paymentMode,
+        paymentStatus: followup?.eligible ? "Waived" : "Paid",
       });
 
       // Increment booked count on the slot
@@ -319,7 +350,6 @@ const PatientRegistration = () => {
 
   const resetForm = () => {
     setForm(emptyForm);
-    setDobDisplay("");
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
@@ -341,7 +371,7 @@ const PatientRegistration = () => {
         </div>
         <div className="flex gap-2">
           {isRegistered && (
-            <Button onClick={() => setShowBookConfirm(true)} size="sm">
+            <Button onClick={() => setShowOPD(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Book OPD
             </Button>
@@ -423,7 +453,10 @@ const PatientRegistration = () => {
               >
                 <div>
                   <p className="font-semibold text-foreground">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.registrationNumber} · {p.gender} · DOB: {formatDateDisplay(p.dob)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.registrationNumber} · {p.gender}
+                    {p.age != null ? ` · Age: ${p.age}` : p.dob ? ` · DOB: ${formatDateDisplay(p.dob)}` : ""}
+                  </p>
                 </div>
                 <span className="text-xs text-primary font-medium">Select →</span>
               </button>
@@ -463,18 +496,15 @@ const PatientRegistration = () => {
               <Input value={form.mobile} onChange={(e) => updateField("mobile", e.target.value)} placeholder="Mobile" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Date of Birth *</Label>
+              <Label className="text-xs text-muted-foreground">Age *</Label>
               <Input
-                type="text"
+                type="number"
                 inputMode="numeric"
-                placeholder="dd/mm/yyyy"
-                value={dobDisplay}
-                onChange={(e) => {
-                  const masked = maskDobInput(e.target.value);
-                  setDobDisplay(masked);
-                  updateField("dob", displayToIso(masked));
-                }}
-                maxLength={10}
+                min={0}
+                max={120}
+                placeholder="Age in years"
+                value={form.age}
+                onChange={(e) => updateField("age", e.target.value.replace(/\D/g, "").slice(0, 3))}
               />
             </div>
             <div className="space-y-2">
@@ -625,15 +655,21 @@ const PatientRegistration = () => {
       <Dialog open={showBookConfirm} onOpenChange={setShowBookConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-display">Book OPD?</DialogTitle>
+            <DialogTitle className="font-display">Confirm OPD Booking</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-1">
             <p className="text-sm text-foreground font-medium">{form.name}</p>
             <p className="text-xs font-mono text-muted-foreground">{registrationNumber}</p>
-            <p className="text-sm text-muted-foreground pt-2">
-              This visit will be booked as <span className="font-semibold text-foreground">{opdType}</span>
-              {followup?.eligible ? " (free follow-up)" : ""}. Continue?
-            </p>
+            <div className="text-sm text-muted-foreground pt-2 space-y-1">
+              <p>Type: <span className="font-semibold text-foreground">{opdType}</span>{followup?.eligible ? " (free follow-up)" : ""}</p>
+              {selectedDoctorSchedule && <p>Doctor: <span className="font-semibold text-foreground">{selectedDoctorSchedule.doctorName}</span></p>}
+              <p>Date & time: <span className="font-semibold text-foreground">{formatDateDisplay(opdDate)} · {opdTimeSlot || "—"}</span></p>
+              <p>
+                Fee: <span className="font-semibold text-foreground">₹{consultationFee.toLocaleString()}</span>
+                {!followup?.eligible && <span> · {paymentMode}</span>}
+              </p>
+              {pendingPrint && <p className="text-xs">Receipt will be printed after saving.</p>}
+            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setShowBookConfirm(false)}>
@@ -641,12 +677,13 @@ const PatientRegistration = () => {
             </Button>
             <Button
               className="flex-1"
-              onClick={() => {
+              disabled={createAppointment.isPending}
+              onClick={async () => {
                 setShowBookConfirm(false);
-                setShowOPD(true);
+                await handleOPDSave(pendingPrint);
               }}
             >
-              Proceed
+              Confirm
             </Button>
           </div>
         </DialogContent>
@@ -662,7 +699,12 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <DateInput value={opdDate} onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} />
+              <DateInput
+                showCalendar
+                value={opdDate}
+                onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }}
+                min={new Date().toISOString().split("T")[0]}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
@@ -734,12 +776,43 @@ const PatientRegistration = () => {
               </span>
             </div>
           )}
+
+          {opdDoctor && (
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Consultation Fee</span>
+                <span className="text-base font-semibold text-foreground">
+                  ₹{consultationFee.toLocaleString()}
+                  {followup?.eligible && <span className="ml-2 text-xs font-normal text-primary">Free follow-up</span>}
+                </span>
+              </div>
+              {!followup?.eligible && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Mode of Payment *</Label>
+                  <div className="flex gap-2">
+                    {["Cash", "Card", "UPI"].map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant={paymentMode === m ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() => setPaymentMode(m)}
+                      >
+                        {m}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex gap-3 mt-4 pt-4 border-t border-border">
-            <Button onClick={() => handleOPDSave(false)} disabled={createAppointment.isPending}>
+            <Button onClick={() => { setPendingPrint(false); setShowBookConfirm(true); }} disabled={createAppointment.isPending}>
               {createAppointment.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save
             </Button>
-            <Button variant="outline" onClick={() => handleOPDSave(true)} disabled={createAppointment.isPending}>
+            <Button variant="outline" onClick={() => { setPendingPrint(true); setShowBookConfirm(true); }} disabled={createAppointment.isPending}>
               <Printer className="mr-2 h-4 w-4" />
               Save & Print
             </Button>
