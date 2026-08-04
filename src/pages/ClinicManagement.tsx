@@ -443,6 +443,7 @@ const ClinicManagement = () => {
 
   const handleOpenConsultDialog = async (entry: QueueEntry) => {
     setConsultPatient(entry);
+    setOpenedConsults((prev) => new Set(prev).add(entry.id));
     setConsultTab("vitals");
     setConsultDiagnosis(entry.diagnosis || "");
     setConsultNotes(entry.doctorNotes || "");
