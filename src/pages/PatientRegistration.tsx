@@ -322,7 +322,6 @@ const PatientRegistration = () => {
 
   const resetForm = () => {
     setForm(emptyForm);
-    setDobDisplay("");
     setSelectedPatient(null);
     setIsRegistered(false);
     setRegistrationNumber("");
