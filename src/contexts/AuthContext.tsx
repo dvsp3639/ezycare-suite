@@ -43,6 +43,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.functions.invoke("admin-api/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      const status = (error as any)?.context?.status;
+      if (status === 401 || status === 403) {
+        // Stale/revoked session — clear it so the login screen renders instead of a blank page.
+        await supabase.auth.signOut({ scope: "local" });
+        setProfile(null);
+        setRoles([]);
+        setAllowedModules([]);
+        setUser(null);
+        setSession(null);
+        return;
+      }
       if (!error && data) {
         setProfile(data.profile);
         setRoles(data.roles || []);
