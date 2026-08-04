@@ -491,7 +491,7 @@ const Diagnostics = () => {
 
   if (ordersLoading) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
         <div className="text-center py-16 text-muted-foreground">
           <FlaskConical className="h-12 w-12 mx-auto mb-3 opacity-30 animate-pulse" />
           <p className="text-sm">Loading diagnostics data...</p>
@@ -503,7 +503,7 @@ const Diagnostics = () => {
   return (
     <>
     {printOrder && <PrintableLabReport order={printOrder} />}
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-display font-bold text-foreground">Diagnostics</h1>
         <p className="text-sm text-muted-foreground">Lab workflow — Doctor prescribes → Lab executes → Report returns</p>
