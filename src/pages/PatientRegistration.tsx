@@ -328,8 +328,8 @@ const PatientRegistration = () => {
         doctorNotes: "",
         followUpDate: null,
         consultationFee,
-        paymentMode: followup?.eligible ? "Free Follow-up" : paymentMode,
-        paymentStatus: followup?.eligible ? "Waived" : "Paid",
+        paymentMode: followupApplies ? "Free Follow-up" : paymentMode,
+        paymentStatus: followupApplies ? "Waived" : "Paid",
       });
 
       // Increment booked count on the slot
@@ -664,12 +664,12 @@ const PatientRegistration = () => {
             <p className="text-sm text-foreground font-medium">{form.name}</p>
             <p className="text-xs font-mono text-muted-foreground">{registrationNumber}</p>
             <div className="text-sm text-muted-foreground pt-2 space-y-1">
-              <p>Type: <span className="font-semibold text-foreground">{opdType}</span>{followup?.eligible ? " (free follow-up)" : ""}</p>
+              <p>Type: <span className="font-semibold text-foreground">{opdType}</span>{followupApplies ? " (free follow-up)" : ""}</p>
               {selectedDoctorSchedule && <p>Doctor: <span className="font-semibold text-foreground">{selectedDoctorSchedule.doctorName}</span></p>}
               <p>Date & time: <span className="font-semibold text-foreground">{formatDateDisplay(opdDate)} · {opdTimeSlot || "—"}</span></p>
               <p>
                 Fee: <span className="font-semibold text-foreground">₹{consultationFee.toLocaleString()}</span>
-                {!followup?.eligible && <span> · {paymentMode}</span>}
+                {!followupApplies && <span> · {paymentMode}</span>}
               </p>
               {pendingPrint && <p className="text-xs">Receipt will be printed after saving.</p>}
             </div>
@@ -713,7 +713,7 @@ const PatientRegistration = () => {
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
               <div className="h-10 flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3">
                 <span className="text-sm font-medium text-foreground">{opdType}</span>
-                {followup?.eligible && <Badge variant="secondary" className="text-[10px]">Free</Badge>}
+                {followupApplies && <Badge variant="secondary" className="text-[10px]">Free</Badge>}
               </div>
               <p className="text-[11px] text-muted-foreground">Set automatically from follow-up eligibility</p>
             </div>
@@ -786,10 +786,10 @@ const PatientRegistration = () => {
                 <span className="text-sm text-muted-foreground">Consultation Fee</span>
                 <span className="text-base font-semibold text-foreground">
                   ₹{consultationFee.toLocaleString()}
-                  {followup?.eligible && <span className="ml-2 text-xs font-normal text-primary">Free follow-up</span>}
+                  {followupApplies && <span className="ml-2 text-xs font-normal text-primary">Free follow-up</span>}
                 </span>
               </div>
-              {!followup?.eligible && (
+              {!followupApplies && (
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Mode of Payment *</Label>
                   <div className="flex gap-2">
