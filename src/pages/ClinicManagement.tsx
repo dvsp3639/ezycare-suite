@@ -836,8 +836,16 @@ const ClinicManagement = () => {
                       )}
                       {q.status === "In Consultation" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "consult", entry: q })}>
-                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> Consult
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // Only confirm the first time; afterwards reopen the record directly
+                              if (openedConsults.has(q.id) || q.diagnosis) handleOpenConsultDialog(q);
+                              else setPendingAction({ type: "consult", entry: q });
+                            }}
+                          >
+                            <Stethoscope className="h-3.5 w-3.5 mr-1" /> {openedConsults.has(q.id) || q.diagnosis ? "Resume" : "Consult"}
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
