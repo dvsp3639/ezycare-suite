@@ -2039,18 +2039,29 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowWardDialog(false); setWardEditId(null); }}>Cancel</Button>
-            <Button onClick={() => {
-              if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
-              if (wardEditId) {
-                updateWard(wardEditId, wardForm);
-                toast.success(`${wardForm.name} updated`);
-              } else {
-                addWard(wardForm);
-                toast.success(`${wardForm.name} added`);
-              }
-              setShowWardDialog(false);
-              setWardEditId(null);
-            }}>{wardEditId ? "Save Changes" : "Add Ward"}</Button>
+            <Button
+              disabled={savingWard}
+              onClick={async () => {
+                if (!wardForm.name.trim()) { toast.error("Ward name is required"); return; }
+                if (!wardForm.totalBeds || wardForm.totalBeds < 1) { toast.error("Enter at least 1 bed"); return; }
+                setSavingWard(true);
+                try {
+                  if (wardEditId) {
+                    await updateWard(wardEditId, wardForm);
+                    toast.success(`${wardForm.name} updated`);
+                  } else {
+                    await addWard(wardForm);
+                    toast.success(`${wardForm.name} added with ${wardForm.totalBeds} bed(s)`);
+                  }
+                  setShowWardDialog(false);
+                  setWardEditId(null);
+                } catch (err: any) {
+                  toast.error(err?.message || "Could not save ward");
+                } finally {
+                  setSavingWard(false);
+                }
+              }}
+            >{savingWard ? "Saving…" : wardEditId ? "Save Changes" : "Add Ward"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
