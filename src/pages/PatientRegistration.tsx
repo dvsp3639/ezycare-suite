@@ -655,15 +655,21 @@ const PatientRegistration = () => {
       <Dialog open={showBookConfirm} onOpenChange={setShowBookConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-display">Book OPD?</DialogTitle>
+            <DialogTitle className="font-display">Confirm OPD Booking</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-1">
             <p className="text-sm text-foreground font-medium">{form.name}</p>
             <p className="text-xs font-mono text-muted-foreground">{registrationNumber}</p>
-            <p className="text-sm text-muted-foreground pt-2">
-              This visit will be booked as <span className="font-semibold text-foreground">{opdType}</span>
-              {followup?.eligible ? " (free follow-up)" : ""}. Continue?
-            </p>
+            <div className="text-sm text-muted-foreground pt-2 space-y-1">
+              <p>Type: <span className="font-semibold text-foreground">{opdType}</span>{followup?.eligible ? " (free follow-up)" : ""}</p>
+              {selectedDoctorSchedule && <p>Doctor: <span className="font-semibold text-foreground">{selectedDoctorSchedule.doctorName}</span></p>}
+              <p>Date & time: <span className="font-semibold text-foreground">{formatDateDisplay(opdDate)} · {opdTimeSlot || "—"}</span></p>
+              <p>
+                Fee: <span className="font-semibold text-foreground">₹{consultationFee.toLocaleString()}</span>
+                {!followup?.eligible && <span> · {paymentMode}</span>}
+              </p>
+              {pendingPrint && <p className="text-xs">Receipt will be printed after saving.</p>}
+            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setShowBookConfirm(false)}>
@@ -671,12 +677,13 @@ const PatientRegistration = () => {
             </Button>
             <Button
               className="flex-1"
-              onClick={() => {
+              disabled={createAppointment.isPending}
+              onClick={async () => {
                 setShowBookConfirm(false);
-                setShowOPD(true);
+                await handleOPDSave(pendingPrint);
               }}
             >
-              Proceed
+              Confirm
             </Button>
           </div>
         </DialogContent>
