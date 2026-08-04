@@ -692,7 +692,12 @@ const PatientRegistration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Date *</Label>
-              <DateInput value={opdDate} onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }} min={new Date().toISOString().split("T")[0]} />
+              <DateInput
+                showCalendar
+                value={opdDate}
+                onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }}
+                min={new Date().toISOString().split("T")[0]}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">OPD Type *</Label>
@@ -764,12 +769,43 @@ const PatientRegistration = () => {
               </span>
             </div>
           )}
+
+          {opdDoctor && (
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Consultation Fee</span>
+                <span className="text-base font-semibold text-foreground">
+                  ₹{consultationFee.toLocaleString()}
+                  {followup?.eligible && <span className="ml-2 text-xs font-normal text-primary">Free follow-up</span>}
+                </span>
+              </div>
+              {!followup?.eligible && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Mode of Payment *</Label>
+                  <div className="flex gap-2">
+                    {["Cash", "Card", "UPI"].map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant={paymentMode === m ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() => setPaymentMode(m)}
+                      >
+                        {m}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex gap-3 mt-4 pt-4 border-t border-border">
-            <Button onClick={() => handleOPDSave(false)} disabled={createAppointment.isPending}>
+            <Button onClick={() => { setPendingPrint(false); setShowBookConfirm(true); }} disabled={createAppointment.isPending}>
               {createAppointment.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save
             </Button>
-            <Button variant="outline" onClick={() => handleOPDSave(true)} disabled={createAppointment.isPending}>
+            <Button variant="outline" onClick={() => { setPendingPrint(true); setShowBookConfirm(true); }} disabled={createAppointment.isPending}>
               <Printer className="mr-2 h-4 w-4" />
               Save & Print
             </Button>
