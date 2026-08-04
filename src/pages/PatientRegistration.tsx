@@ -99,8 +99,6 @@ const PatientRegistration = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [followup, setFollowup] = useState<any | null>(null);
 
-  const opdType = followup?.eligible ? "Follow Up" : "Normal";
-
   const createPatient = useCreatePatient();
   const createAppointment = useCreateAppointment();
 
