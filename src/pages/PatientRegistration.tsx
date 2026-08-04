@@ -291,6 +291,9 @@ const PatientRegistration = () => {
 
   // Get selected doctor's schedule for time slots
   const selectedDoctorSchedule = schedules.find((d: any) => d.id === opdDoctor);
+  const consultationFee = followup?.eligible
+    ? 0
+    : (doctorFees[(selectedDoctorSchedule?.doctorName || "").toLowerCase().trim()] ?? 0);
 
   const handleOPDSave = async (print: boolean) => {
     if (!opdDate || !opdType || !opdDoctor || !opdTimeSlot) {
@@ -321,6 +324,9 @@ const PatientRegistration = () => {
         diagnosis: "",
         doctorNotes: "",
         followUpDate: null,
+        consultationFee,
+        paymentMode: followup?.eligible ? "Free Follow-up" : paymentMode,
+        paymentStatus: followup?.eligible ? "Waived" : "Paid",
       });
 
       // Increment booked count on the slot
