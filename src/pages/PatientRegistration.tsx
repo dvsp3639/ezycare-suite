@@ -343,7 +343,7 @@ const PatientRegistration = () => {
         </div>
         <div className="flex gap-2">
           {isRegistered && (
-            <Button onClick={() => setShowBookConfirm(true)} size="sm">
+            <Button onClick={() => setShowOPD(true)} size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Book OPD
             </Button>
@@ -425,7 +425,10 @@ const PatientRegistration = () => {
               >
                 <div>
                   <p className="font-semibold text-foreground">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.registrationNumber} · {p.gender} · DOB: {formatDateDisplay(p.dob)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.registrationNumber} · {p.gender}
+                    {p.age != null ? ` · Age: ${p.age}` : p.dob ? ` · DOB: ${formatDateDisplay(p.dob)}` : ""}
+                  </p>
                 </div>
                 <span className="text-xs text-primary font-medium">Select →</span>
               </button>
