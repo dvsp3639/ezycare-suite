@@ -29,6 +29,7 @@ export interface StaffMember {
   bank_name: string;
   ifsc_code: string;
   base_salary: number;
+  consultation_fee: number;
   status: "Active" | "Inactive" | "On Leave";
   created_at: string;
   updated_at: string;
