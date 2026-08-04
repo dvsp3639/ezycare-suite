@@ -289,9 +289,14 @@ const PatientRegistration = () => {
 
   // Get selected doctor's schedule for time slots
   const selectedDoctorSchedule = schedules.find((d: any) => d.id === opdDoctor);
-  const consultationFee = followup?.eligible
-    ? 0
-    : (doctorFees[(selectedDoctorSchedule?.doctorName || "").toLowerCase().trim()] ?? 0);
+  const selectedDoctorName = (selectedDoctorSchedule?.doctorName || "").toLowerCase().trim();
+  // A free follow-up is only valid with the SAME doctor the patient previously consulted.
+  const followupApplies =
+    !!followup?.eligible &&
+    !!selectedDoctorName &&
+    (followup.doctor_name || "").toLowerCase().trim() === selectedDoctorName;
+  const opdType = followupApplies ? "Follow Up" : "Normal";
+  const consultationFee = followupApplies ? 0 : (doctorFees[selectedDoctorName] ?? 0);
 
   const handleOPDSave = async (print: boolean) => {
     if (!opdDate || !opdType || !opdDoctor || !opdTimeSlot) {
