@@ -260,6 +260,7 @@ const Inventory = () => {
   // Ward CRUD
   const [showWardDialog, setShowWardDialog] = useState(false);
   const [wardEditId, setWardEditId] = useState<string | null>(null);
+  const [savingWard, setSavingWard] = useState(false);
   const [wardForm, setWardForm] = useState<{ name: string; department: Department; totalBeds: number; chargePerDay: number }>({ name: "", department: "Ward A", totalBeds: 10, chargePerDay: 500 });
 
   // Report tab
@@ -1271,9 +1272,13 @@ const Inventory = () => {
                                 }}>
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => {
-                                  deleteWard(ward.id);
-                                  toast.success(`${ward.name} removed`);
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={async () => {
+                                  try {
+                                    await deleteWard(ward.id);
+                                    toast.success(`${ward.name} removed`);
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Could not delete ward");
+                                  }
                                 }}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
