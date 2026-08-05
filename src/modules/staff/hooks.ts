@@ -49,6 +49,22 @@ export function useUpdateStaff() {
 export function useCreateSalaryRecord() {
   const qc = useQueryClient();
   return useMutation({
+    mutationFn: (record: Partial<SalaryRecord>) => staffService.createSalaryRecord(record as any),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["staff"] }),
+  });
+}
+
+export function useDeleteStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => staffService.deleteStaff(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["staff"] }),
+  });
+}
+
+function __unusedCreateSalaryRecord() {
+  const qc = useQueryClient();
+  return useMutation({
     mutationFn: (record: Partial<SalaryRecord>) => staffService.createSalaryRecord(record),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["staff", "salary"] }),
   });
