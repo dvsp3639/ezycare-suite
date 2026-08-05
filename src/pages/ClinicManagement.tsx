@@ -789,6 +789,7 @@ const ClinicManagement = () => {
                 <SelectItem value="In Consultation">In Consultation</SelectItem>
                 <SelectItem value="Completed">Completed</SelectItem>
                 <SelectItem value="No Show">No Show</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -853,6 +854,30 @@ const ClinicManagement = () => {
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
+                          </Button>
+                        </>
+                      )}
+                      {(q.status === "Waiting" || q.status === "In Consultation") && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setRescheduleTarget({
+                                id: q.id,
+                                patientName: q.patientName,
+                                registrationNumber: q.registrationNumber,
+                                doctorName: q.doctorName,
+                                timeSlot: q.timeSlot,
+                                tokenNo: q.tokenNo,
+                                status: q.status,
+                              })
+                            }
+                          >
+                            <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Reschedule
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(q)}>
+                            <X className="h-3.5 w-3.5 mr-1" /> Cancel
                           </Button>
                         </>
                       )}
