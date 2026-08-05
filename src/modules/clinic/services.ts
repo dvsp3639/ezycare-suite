@@ -111,6 +111,47 @@ export const clinicService = {
   },
 
   // ─── Vitals ───
+  // ─── Reschedule ───
+  async getAvailableSlots(doctorName: string, date: string) {
+    const { data, error } = await supabase
+      .from("doctor_schedules")
+      .select("id, doctor_name, schedule_date, time_slots(*)")
+      .eq("schedule_date", date);
+    if (error) throw error;
+    const match = (data || []).find(
+      (s: any) => (s.doctor_name || "").toLowerCase().trim() === (doctorName || "").toLowerCase().trim()
+    );
+    const slots = ((match as any)?.time_slots || []).map((ts: any) => ({
+      id: ts.id,
+      time: ts.time as string,
+      maxPatients: ts.max_patients ?? 0,
+      bookedPatients: ts.booked_patients ?? 0,
+      isActive: ts.is_active ?? true,
+    }));
+    return slots as { id: string; time: string; maxPatients: number; bookedPatients: number; isActive: boolean }[];
+  },
+
+  async rescheduleAppointment(params: { appointmentId: string; newDate: string; newTimeSlot: string; reason?: string }) {
+    const { data, error } = await (supabase as any).rpc("reschedule_appointment", {
+      _appointment_id: params.appointmentId,
+      _new_date: params.newDate,
+      _new_time_slot: params.newTimeSlot,
+      _reason: params.reason || "",
+    });
+    if (error) throw error;
+    return data as { new_token_no: number; new_date: string; new_time_slot: string; old_token_no: number };
+  },
+
+  async getRescheduleHistory(appointmentId: string) {
+    const { data, error } = await (supabase as any)
+      .from("appointment_reschedules")
+      .select("*")
+      .eq("appointment_id", appointmentId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return snakeToCamel(data || []);
+  },
+
   async saveVitals(vitals: Omit<Vitals, "id" | "recordedAt">): Promise<Vitals> {
     const { data, error } = await supabase
       .from("vitals")

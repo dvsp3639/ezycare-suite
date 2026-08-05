@@ -73,7 +73,7 @@ export interface QueueEntry {
   doctorName: string;
   timeSlot: string;
   opdType: "Normal" | "Emergency" | "Follow Up";
-  status: "Waiting" | "In Consultation" | "Completed" | "No Show";
+  status: "Waiting" | "In Consultation" | "Completed" | "No Show" | "Cancelled";
   checkInTime: string;
   diagnosis?: string;
   prescription?: string[];
