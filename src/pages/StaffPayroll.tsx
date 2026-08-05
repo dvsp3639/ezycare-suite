@@ -164,6 +164,39 @@ const StaffPayroll = () => {
 
     setCreatingUser(true);
     try {
+      if (editingStaffId) {
+        await updateStaffMut.mutateAsync({
+          id: editingStaffId,
+          updates: {
+            employee_id: staffForm.employee_id,
+            name: staffForm.name,
+            role: staffForm.role,
+            employment_type: staffForm.employment_type,
+            joining_date: displayToIso(joiningDateDisplay) || null,
+            phone: staffForm.phone || "",
+            email: staffForm.email || "",
+            address: staffForm.address || "",
+            emergency_contact: staffForm.emergency_contact || "",
+            blood_group: staffForm.blood_group || "",
+            qualification: staffForm.qualification || "",
+            specialization: staffForm.specialization || "",
+            aadhar_no: staffForm.aadhar_no || "",
+            pan_no: staffForm.pan_no || "",
+            bank_account: staffForm.bank_account || "",
+            bank_name: staffForm.bank_name || "",
+            ifsc_code: staffForm.ifsc_code || "",
+            base_salary: staffForm.base_salary || 0,
+            consultation_fee: staffForm.consultation_fee || 0,
+            status: staffForm.status || "Active",
+          },
+        });
+        toast.success(`${staffForm.name} updated`);
+        setShowAddStaff(false);
+        setEditingStaffId(null);
+        setStaffForm({});
+        setJoiningDateDisplay("");
+        return;
+      }
       await createStaff.mutateAsync({
         employee_id: staffForm.employee_id,
         name: staffForm.name,
@@ -737,6 +770,7 @@ const StaffPayroll = () => {
             </div>
 
             {/* Login Creation Section */}
+            {!editingStaffId && (
             <div className="border-t border-border pt-4 mt-4">
               <div className="flex items-center gap-2 mb-3">
                 <Checkbox
