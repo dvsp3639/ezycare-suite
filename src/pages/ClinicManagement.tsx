@@ -1433,6 +1433,39 @@ const ClinicManagement = () => {
       </Dialog>
 
       {/* Add Doctor dialog removed - doctors auto-pull from staff */}
+
+      {/* ─── Reschedule Appointment ─── */}
+      <RescheduleDialog
+        target={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onDone={() => { refreshData(); refetchDateSchedules(); }}
+      />
+
+      {/* ─── Cancel Appointment confirmation ─── */}
+      <Dialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancel Appointment?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {cancelTarget?.patientName} (Token {cancelTarget?.tokenNo}) will be removed from today's active queue.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Keep Appointment</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!cancelTarget) return;
+                updateQueueStatus(cancelTarget.id, "Cancelled");
+                toast.success(`Appointment cancelled for ${cancelTarget.patientName}`);
+                setCancelTarget(null);
+              }}
+            >
+              Cancel Appointment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
