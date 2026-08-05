@@ -830,6 +830,34 @@ const StaffPayroll = () => {
       </Dialog>
 
       {/* Staff Profile Dialog */}
+      <Dialog open={!!deleteStaffTarget} onOpenChange={(o) => !o && setDeleteStaffTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Delete Staff Member?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {deleteStaffTarget?.name} ({deleteStaffTarget?.employee_id}) will be permanently removed from the staff records.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteStaffTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteStaffMut.isPending}
+              onClick={async () => {
+                if (!deleteStaffTarget) return;
+                try {
+                  await deleteStaffMut.mutateAsync(deleteStaffTarget.id);
+                  toast.success(`${deleteStaffTarget.name} deleted`);
+                  setDeleteStaffTarget(null);
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to delete staff member");
+                }
+              }}
+            >
+              {deleteStaffMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showStaffProfile} onOpenChange={setShowStaffProfile}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Staff Profile — {selectedStaff?.name}</DialogTitle></DialogHeader>
