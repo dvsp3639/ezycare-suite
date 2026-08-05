@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
+import { RescheduleDialog, type RescheduleTarget } from "@/components/clinic/RescheduleDialog";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
@@ -52,6 +53,7 @@ const statusColor: Record<QueueEntry["status"], string> = {
   "In Consultation": "bg-info/10 text-info border-info/20",
   Completed: "bg-success/10 text-success border-success/20",
   "No Show": "bg-destructive/10 text-destructive border-destructive/20",
+  Cancelled: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 const opdTypeColor: Record<string, string> = {
@@ -202,6 +204,8 @@ const ClinicManagement = () => {
   // Vitals dialog (separate for nurse entry from queue)
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
   const [pendingAction, setPendingAction] = useState<{ type: "consult" | "daycare"; entry: QueueEntry } | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleTarget | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<QueueEntry | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   // Consultations already opened once in this session — reopening skips the confirmation prompt
   const [openedConsults, setOpenedConsults] = useState<Set<string>>(new Set());
