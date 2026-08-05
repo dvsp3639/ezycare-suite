@@ -821,6 +821,7 @@ const StaffPayroll = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
           <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending || creatingUser}>
             {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} {editingStaffId ? "Save Changes" : "Add Staff"}
