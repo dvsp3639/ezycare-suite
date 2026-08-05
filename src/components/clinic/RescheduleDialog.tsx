@@ -85,7 +85,6 @@ export function RescheduleDialog({ target, onClose, onDone }: Props) {
       .filter((s) => s.isActive)
       .filter((s) => s.bookedPatients < s.maxPatients)
       .filter((s) => !(isToday && nowMinutes >= parseTime12(s.time) + 30))
-      .filter((s) => !(dateStr === format(new Date(), "yyyy-MM-dd") && s.time === target?.timeSlot && false))
       .sort((a, b) => parseTime12(a.time) - parseTime12(b.time));
   }, [slots, isToday, nowMinutes, dateStr, target?.timeSlot]);
 
