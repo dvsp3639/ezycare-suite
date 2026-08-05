@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
+import { RescheduleDialog, type RescheduleTarget } from "@/components/clinic/RescheduleDialog";
 import { usePatients } from "@/modules/patients/hooks";
 import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
@@ -52,6 +53,7 @@ const statusColor: Record<QueueEntry["status"], string> = {
   "In Consultation": "bg-info/10 text-info border-info/20",
   Completed: "bg-success/10 text-success border-success/20",
   "No Show": "bg-destructive/10 text-destructive border-destructive/20",
+  Cancelled: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 const opdTypeColor: Record<string, string> = {
@@ -202,6 +204,8 @@ const ClinicManagement = () => {
   // Vitals dialog (separate for nurse entry from queue)
   const [vitalsPatient, setVitalsPatient] = useState<QueueEntry | null>(null);
   const [pendingAction, setPendingAction] = useState<{ type: "consult" | "daycare"; entry: QueueEntry } | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleTarget | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<QueueEntry | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   // Consultations already opened once in this session — reopening skips the confirmation prompt
   const [openedConsults, setOpenedConsults] = useState<Set<string>>(new Set());
@@ -785,6 +789,7 @@ const ClinicManagement = () => {
                 <SelectItem value="In Consultation">In Consultation</SelectItem>
                 <SelectItem value="Completed">Completed</SelectItem>
                 <SelectItem value="No Show">No Show</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -849,6 +854,30 @@ const ClinicManagement = () => {
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
                             <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
+                          </Button>
+                        </>
+                      )}
+                      {(q.status === "Waiting" || q.status === "In Consultation") && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setRescheduleTarget({
+                                id: q.id,
+                                patientName: q.patientName,
+                                registrationNumber: q.registrationNumber,
+                                doctorName: q.doctorName,
+                                timeSlot: q.timeSlot,
+                                tokenNo: q.tokenNo,
+                                status: q.status,
+                              })
+                            }
+                          >
+                            <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Reschedule
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(q)}>
+                            <X className="h-3.5 w-3.5 mr-1" /> Cancel
                           </Button>
                         </>
                       )}
@@ -1404,6 +1433,39 @@ const ClinicManagement = () => {
       </Dialog>
 
       {/* Add Doctor dialog removed - doctors auto-pull from staff */}
+
+      {/* ─── Reschedule Appointment ─── */}
+      <RescheduleDialog
+        target={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onDone={() => { refreshData(); refetchDateSchedules(); }}
+      />
+
+      {/* ─── Cancel Appointment confirmation ─── */}
+      <Dialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancel Appointment?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {cancelTarget?.patientName} (Token {cancelTarget?.tokenNo}) will be removed from today's active queue.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Keep Appointment</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!cancelTarget) return;
+                updateQueueStatus(cancelTarget.id, "Cancelled");
+                toast.success(`Appointment cancelled for ${cancelTarget.patientName}`);
+                setCancelTarget(null);
+              }}
+            >
+              Cancel Appointment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

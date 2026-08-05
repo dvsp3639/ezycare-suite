@@ -13,14 +13,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
-  Users, Search, Plus, User, Eye, CheckCircle, XCircle,
+  Users, Search, Plus, User, Eye, Pencil, Trash2, CheckCircle, XCircle,
   Clock, IndianRupee, Calendar, FileText, ClipboardList, BadgeCheck,
   AlertTriangle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useStaffMembers, useSalaryRecords, useSalaryAdvances, useAttendance, useLeaveRequests,
-  useCreateStaff, useUpdateStaff, useCreateSalaryRecord, useUpdateSalaryRecord,
+  useCreateStaff, useUpdateStaff, useDeleteStaff, useCreateSalaryRecord, useUpdateSalaryRecord,
   useCreateAttendance, useUpdateAttendance, useCreateLeaveRequest, useUpdateLeaveRequest,
   useCreateAdvance, useUpdateAdvance,
 } from "@/modules/staff/hooks";
@@ -100,6 +100,8 @@ const StaffPayroll = () => {
 
   // Dialogs
   const [showAddStaff, setShowAddStaff] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [deleteStaffTarget, setDeleteStaffTarget] = useState<StaffMember | null>(null);
   const [showStaffProfile, setShowStaffProfile] = useState(false);
   const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -127,6 +129,8 @@ const StaffPayroll = () => {
 
   // Mutations
   const createStaff = useCreateStaff();
+  const updateStaffMut = useUpdateStaff();
+  const deleteStaffMut = useDeleteStaff();
   const createAttendanceMut = useCreateAttendance();
   const updateAttendanceMut = useUpdateAttendance();
   const createLeaveMut = useCreateLeaveRequest();
@@ -160,12 +164,43 @@ const StaffPayroll = () => {
 
     setCreatingUser(true);
     try {
+      if (editingStaffId) {
+        await updateStaffMut.mutateAsync({
+          id: editingStaffId,
+          updates: {
+            employee_id: staffForm.employee_id,
+            name: staffForm.name,
+            role: staffForm.role,
+            employment_type: staffForm.employment_type,
+            joining_date: displayToIso(joiningDateDisplay) || null,
+            phone: staffForm.phone || "",
+            email: staffForm.email || "",
+            address: staffForm.address || "",
+            emergency_contact: staffForm.emergency_contact || "",
+            blood_group: staffForm.blood_group || "",
+            qualification: staffForm.qualification || "",
+            specialization: staffForm.specialization || "",
+            aadhar_no: staffForm.aadhar_no || "",
+            pan_no: staffForm.pan_no || "",
+            bank_account: staffForm.bank_account || "",
+            bank_name: staffForm.bank_name || "",
+            ifsc_code: staffForm.ifsc_code || "",
+            base_salary: staffForm.base_salary || 0,
+            consultation_fee: staffForm.consultation_fee || 0,
+            status: staffForm.status || "Active",
+          },
+        });
+        toast.success(`${staffForm.name} updated`);
+        setShowAddStaff(false);
+        setEditingStaffId(null);
+        setStaffForm({});
+        setJoiningDateDisplay("");
+        return;
+      }
       await createStaff.mutateAsync({
         employee_id: staffForm.employee_id,
         name: staffForm.name,
         role: staffForm.role || "Admin",
-        department: staffForm.department || "",
-        designation: staffForm.designation || "",
         employment_type: staffForm.employment_type || "Full-Time",
         joining_date: displayToIso(joiningDateDisplay) || null,
         phone: staffForm.phone || "",
@@ -390,7 +425,6 @@ const StaffPayroll = () => {
                   <TableHead>Employee</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Department</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Salary</TableHead>
@@ -403,7 +437,6 @@ const StaffPayroll = () => {
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{s.employee_id}</TableCell>
                     <TableCell><Badge variant="outline" className={cn("text-xs", roleColors[s.role] || "")}>{s.role}</Badge></TableCell>
-                    <TableCell className="text-sm">{s.department}</TableCell>
                     <TableCell className="text-xs">{s.phone}</TableCell>
                     <TableCell className="text-xs">{s.employment_type}</TableCell>
                     <TableCell className="text-sm font-medium">₹{(s.base_salary || 0).toLocaleString()}</TableCell>
@@ -411,11 +444,28 @@ const StaffPayroll = () => {
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedStaff(s); setShowStaffProfile(true); }}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setEditingStaffId(s.id);
+                          setStaffForm(s);
+                          setJoiningDateDisplay(s.joining_date ? s.joining_date.split("-").reverse().join("/") : "");
+                          setCreateLogin(false);
+                          setShowAddStaff(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteStaffTarget(s)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
                 {filteredStaff.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff members found. Click "Add Staff" to create one.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No staff members found. Click "Add Staff" to create one.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -647,9 +697,9 @@ const StaffPayroll = () => {
       {/* ═══════════ DIALOGS ═══════════ */}
 
       {/* Add Staff Dialog */}
-      <Dialog open={showAddStaff} onOpenChange={setShowAddStaff}>
+      <Dialog open={showAddStaff} onOpenChange={(o) => { setShowAddStaff(o); if (!o) { setEditingStaffId(null); setStaffForm({}); setJoiningDateDisplay(""); } }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Add Staff Member</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingStaffId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Name</Label><Input value={staffForm.name || ""} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} /></div>
@@ -662,10 +712,8 @@ const StaffPayroll = () => {
                   <SelectContent>{staffRoles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>Department</Label><Input value={staffForm.department || ""} onChange={(e) => setStaffForm({ ...staffForm, department: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Designation</Label><Input value={staffForm.designation || ""} onChange={(e) => setStaffForm({ ...staffForm, designation: e.target.value })} /></div>
               <div><Label>Employment Type</Label>
                 <Select value={staffForm.employment_type || "Full-Time"} onValueChange={(v) => setStaffForm({ ...staffForm, employment_type: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -722,6 +770,7 @@ const StaffPayroll = () => {
             </div>
 
             {/* Login Creation Section */}
+            {!editingStaffId && (
             <div className="border-t border-border pt-4 mt-4">
               <div className="flex items-center gap-2 mb-3">
                 <Checkbox
@@ -772,14 +821,43 @@ const StaffPayroll = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
           <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending || creatingUser}>
-            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
+            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} {editingStaffId ? "Save Changes" : "Add Staff"}
           </Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Staff Profile Dialog */}
+      <Dialog open={!!deleteStaffTarget} onOpenChange={(o) => !o && setDeleteStaffTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Delete Staff Member?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {deleteStaffTarget?.name} ({deleteStaffTarget?.employee_id}) will be permanently removed from the staff records.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteStaffTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteStaffMut.isPending}
+              onClick={async () => {
+                if (!deleteStaffTarget) return;
+                try {
+                  await deleteStaffMut.mutateAsync(deleteStaffTarget.id);
+                  toast.success(`${deleteStaffTarget.name} deleted`);
+                  setDeleteStaffTarget(null);
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to delete staff member");
+                }
+              }}
+            >
+              {deleteStaffMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showStaffProfile} onOpenChange={setShowStaffProfile}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Staff Profile — {selectedStaff?.name}</DialogTitle></DialogHeader>
@@ -791,7 +869,7 @@ const StaffPayroll = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground">{selectedStaff.name}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedStaff.designation} • {selectedStaff.department}</p>
+                  <p className="text-sm text-muted-foreground">{selectedStaff.specialization || selectedStaff.qualification || ""}</p>
                   <Badge variant="outline" className={cn("text-xs", roleColors[selectedStaff.role] || "")}>{selectedStaff.role}</Badge>
                 </div>
               </div>
@@ -884,7 +962,7 @@ const StaffPayroll = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{s.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.role} • {s.department}</p>
+                    <p className="text-[10px] text-muted-foreground">{s.role}</p>
                   </div>
                 </div>
                 <div className="flex gap-1.5">

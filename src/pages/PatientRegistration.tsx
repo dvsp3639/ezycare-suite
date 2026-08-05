@@ -311,6 +311,19 @@ const PatientRegistration = () => {
     const checkInTime = `${now.getHours() > 12 ? now.getHours() - 12 : now.getHours()}:${now.getMinutes().toString().padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
     try {
+      // Guard: block duplicate active OPD for same patient + doctor + date
+      const sameDayAppointments = await clinicService.getAppointments(opdDate);
+      const duplicate = (sameDayAppointments || []).find(
+        (a: any) =>
+          (a.registrationNumber || "") === registrationNumber &&
+          (a.doctorName || "").toLowerCase().trim() === (doctor.doctorName || "").toLowerCase().trim() &&
+          !["Completed", "Cancelled", "No Show"].includes(a.status)
+      );
+      if (duplicate) {
+        toast.error(`${form.name} already has an active appointment (Token ${duplicate.tokenNo}) with ${doctor.doctorName} on this date.`);
+        return;
+      }
+
       const maxToken = (rawAppointments || []).reduce((max: number, a: any) => Math.max(max, a.tokenNo || 0), 0);
 
       await createAppointment.mutateAsync({

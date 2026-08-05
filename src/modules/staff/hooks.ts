@@ -54,6 +54,14 @@ export function useCreateSalaryRecord() {
   });
 }
 
+export function useDeleteStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => staffService.deleteStaff(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["staff"] }),
+  });
+}
+
 export function useUpdateSalaryRecord() {
   const qc = useQueryClient();
   return useMutation({
