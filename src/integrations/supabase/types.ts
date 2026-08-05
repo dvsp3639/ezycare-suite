@@ -76,6 +76,81 @@ export type Database = {
           },
         ]
       }
+      appointment_reschedules: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          doctor_name: string
+          hospital_id: string
+          id: string
+          new_date: string
+          new_time_slot: string
+          new_token_no: number | null
+          notify_status: string
+          old_date: string
+          old_time_slot: string
+          old_token_no: number | null
+          patient_name: string
+          reason: string
+          registration_number: string
+          rescheduled_by: string | null
+          rescheduled_by_name: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          doctor_name?: string
+          hospital_id: string
+          id?: string
+          new_date: string
+          new_time_slot?: string
+          new_token_no?: number | null
+          notify_status?: string
+          old_date: string
+          old_time_slot?: string
+          old_token_no?: number | null
+          patient_name?: string
+          reason?: string
+          registration_number?: string
+          rescheduled_by?: string | null
+          rescheduled_by_name?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          doctor_name?: string
+          hospital_id?: string
+          id?: string
+          new_date?: string
+          new_time_slot?: string
+          new_token_no?: number | null
+          notify_status?: string
+          old_date?: string
+          old_time_slot?: string
+          old_token_no?: number | null
+          patient_name?: string
+          reason?: string
+          registration_number?: string
+          rescheduled_by?: string | null
+          rescheduled_by_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_reschedules_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_reschedules_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -3899,6 +3974,15 @@ export type Database = {
           _medicine_name: string
         }
         Returns: undefined
+      }
+      reschedule_appointment: {
+        Args: {
+          _appointment_id: string
+          _new_date: string
+          _new_time_slot: string
+          _reason?: string
+        }
+        Returns: Json
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
