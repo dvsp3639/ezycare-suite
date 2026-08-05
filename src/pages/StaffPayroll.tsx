@@ -411,6 +411,23 @@ const StaffPayroll = () => {
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedStaff(s); setShowStaffProfile(true); }}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setEditingStaffId(s.id);
+                          setStaffForm(s);
+                          setJoiningDateDisplay(s.joining_date ? s.joining_date.split("-").reverse().join("/") : "");
+                          setCreateLogin(false);
+                          setShowAddStaff(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteStaffTarget(s)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -647,9 +664,9 @@ const StaffPayroll = () => {
       {/* ═══════════ DIALOGS ═══════════ */}
 
       {/* Add Staff Dialog */}
-      <Dialog open={showAddStaff} onOpenChange={setShowAddStaff}>
+      <Dialog open={showAddStaff} onOpenChange={(o) => { setShowAddStaff(o); if (!o) { setEditingStaffId(null); setStaffForm({}); setJoiningDateDisplay(""); } }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Add Staff Member</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingStaffId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Name</Label><Input value={staffForm.name || ""} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} /></div>
@@ -772,7 +789,7 @@ const StaffPayroll = () => {
             </div>
           </div>
           <DialogFooter><Button onClick={handleAddStaff} disabled={createStaff.isPending || creatingUser}>
-            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Add Staff
+            {(createStaff.isPending || creatingUser) && <Loader2 className="h-4 w-4 animate-spin mr-1" />} {editingStaffId ? "Save Changes" : "Add Staff"}
           </Button></DialogFooter>
         </DialogContent>
       </Dialog>
