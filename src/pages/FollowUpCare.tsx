@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +14,7 @@ import { followupService } from "@/modules/followup/services";
 import { daysLeft, formatIndian, type FollowupAuditEntry, type FollowupEntitlement, type FollowupReminder, type FollowupVisit } from "@/modules/followup/types";
 import { EligibilityCard } from "@/components/followup/EligibilityCard";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => istDateStr();
 
 export default function FollowUpCare() {
   const { hospitalId } = useHospitalConfig();

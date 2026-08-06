@@ -8,6 +8,7 @@
  * - Floating "Add Medicine" available everywhere
  * ────────────────────────────────────────────────────────────────────── */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { istDateStr } from "@/lib/datetime";
 import {
   ScanLine, Camera, Upload, Sparkles, Loader2, ChevronLeft, ChevronRight,
   Plus, Trash2, CheckCircle2, AlertTriangle, Pill, User, ClipboardCheck,
@@ -903,7 +904,7 @@ function FinishTab({
         sale_channel: scan.sale_type === "Direct Sale" ? "Direct" : "Patient",
         doctor_name: scan.doctor_json?.name || "",
         issue_type: issueType,
-        issue_date: new Date().toISOString().split("T")[0],
+        issue_date: istDateStr(),
         age: Number(scan.patient_json?.age) || null,
         gender: scan.patient_json?.gender || "",
         mobile: scan.patient_json?.mobile || "",

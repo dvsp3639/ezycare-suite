@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import {
@@ -536,7 +537,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
         });
       });
     }
-    if (!meta.invoiceDate) meta.invoiceDate = new Date().toISOString().slice(0, 10);
+    if (!meta.invoiceDate) meta.invoiceDate = istDateStr();
     return { supplier: sup, meta, items: allItems };
   }
 
@@ -1169,7 +1170,7 @@ export function UniversalScanner({ open, onClose, onScannedBarcode }: Props) {
       const total = payload.reduce((s, p) => s + p.mrp * (p.stock || 0), 0);
       await supabase.from("purchase_bills").insert({
         bill_type: "Pharmacy", vendor: "Bulk Excel Import",
-        invoice_no: `XLS-${Date.now()}`, bill_date: new Date().toISOString().slice(0, 10),
+        invoice_no: `XLS-${Date.now()}`, bill_date: istDateStr(),
         subtotal: total, gst_amount: 0, discount: 0, total_amount: total,
         payment_mode: "Pending", payment_status: "Pending",
         notes: `Imported ${payload.length} medicines from Excel`,

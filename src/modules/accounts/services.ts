@@ -63,7 +63,8 @@ export const accountsService = {
     const [opd, pharmacy, lab, ipd, daycare] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, appointment_date, doctor_name, patient_name, registration_number, consultation_fee, payment_mode, payment_status, opd_type")
+        .select("id, appointment_date, doctor_name, patient_name, registration_number, consultation_fee, payment_mode, payment_status, opd_type, status")
+        .neq("status", "Cancelled")
         .gte("appointment_date", from)
         .lte("appointment_date", to),
       supabase

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -279,7 +280,7 @@ const IPD = () => {
     if (!selectedAdmission || !noteForm.notes) { toast.error("Notes required"); return; }
     try {
       await ipdService.createDoctorNote({
-        admission_id: selectedAdmission.id, visit_date: new Date().toISOString().split("T")[0],
+        admission_id: selectedAdmission.id, visit_date: istDateStr(),
         visit_time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         doctor: noteForm.doctor || "Dr. Unknown", notes: noteForm.notes, instructions: noteForm.instructions,
       } as any);
@@ -295,7 +296,7 @@ const IPD = () => {
     if (!selectedAdmission) return;
     try {
       await ipdService.createNurseNote({
-        admission_id: selectedAdmission.id, note_date: new Date().toISOString().split("T")[0],
+        admission_id: selectedAdmission.id, note_date: istDateStr(),
         note_time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         nurse: nurseForm.nurse || "Nurse", bp: nurseForm.bp, temp: nurseForm.temp, pulse: nurseForm.pulse, spo2: nurseForm.spo2, notes: nurseForm.notes,
       } as any);
@@ -311,7 +312,7 @@ const IPD = () => {
     if (!selectedAdmission || !medForm.medicineName) { toast.error("Medicine name required"); return; }
     try {
       await ipdService.createMedicineEntry({
-        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        admission_id: selectedAdmission.id, entry_date: istDateStr(),
         medicine_name: medForm.medicineName, dosage: medForm.dosage, frequency: medForm.frequency,
         quantity: medForm.quantity, unit_price: medForm.unitPrice, total: medForm.quantity * medForm.unitPrice,
       } as any);
@@ -327,7 +328,7 @@ const IPD = () => {
     if (!selectedAdmission || !surgForm.procedureName) { toast.error("Procedure name required"); return; }
     try {
       await ipdService.createSurgicalEntry({
-        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        admission_id: selectedAdmission.id, entry_date: istDateStr(),
         procedure_name: surgForm.procedureName, surgeon: surgForm.surgeon, notes: surgForm.notes, cost: surgForm.cost,
       } as any);
       const se = await ipdService.getSurgicalEntries(selectedAdmission.id);
@@ -342,7 +343,7 @@ const IPD = () => {
     if (!selectedAdmission || !diagForm.testName) { toast.error("Test name required"); return; }
     try {
       await ipdService.createDiagnosticEntry({
-        admission_id: selectedAdmission.id, entry_date: new Date().toISOString().split("T")[0],
+        admission_id: selectedAdmission.id, entry_date: istDateStr(),
         test_name: diagForm.testName, cost: diagForm.cost,
       } as any);
       const de = await ipdService.getDiagnosticEntries(selectedAdmission.id);

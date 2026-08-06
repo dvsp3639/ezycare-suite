@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export function EligibilityCard({ entitlement: e, hospitalName, onBook, compact }: Props) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = istDateStr();
   const [date, setDate] = useState(today);
   const [busy, setBusy] = useState(false);
   const left = daysLeft(e.expiry_date);

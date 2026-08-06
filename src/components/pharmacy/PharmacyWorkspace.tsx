@@ -5,6 +5,7 @@
  * Every state change persists to Supabase; both devices stay in sync.
  * ────────────────────────────────────────────────────────────────────── */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -1356,7 +1357,7 @@ function DeductionStage({ scan, onSave }: { scan: WorkspaceScan; onSave: (p: Par
         sale_channel: scan.sale_type === "Direct Sale" ? "Direct" : "Patient",
         doctor_name: scan.doctor_json?.name || "",
         issue_type: issueType,
-        issue_date: new Date().toISOString().split("T")[0],
+        issue_date: istDateStr(),
         age: Number(scan.patient_json?.age) || null,
         gender: scan.patient_json?.gender || "",
         mobile: scan.patient_json?.mobile || "",

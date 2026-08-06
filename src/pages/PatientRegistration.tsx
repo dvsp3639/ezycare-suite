@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ const PatientRegistration = () => {
   const [showOPD, setShowOPD] = useState(false);
   const [showBookConfirm, setShowBookConfirm] = useState(false);
   const [pendingPrint, setPendingPrint] = useState(false);
-  const [opdDate, setOpdDate] = useState(new Date().toISOString().split("T")[0]);
+  const [opdDate, setOpdDate] = useState(istDateStr());
   const [opdDoctor, setOpdDoctor] = useState("");
   const [opdTimeSlot, setOpdTimeSlot] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -166,7 +167,7 @@ const PatientRegistration = () => {
   }, []);
 
   // Fetch today's appointments for token calculation
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = istDateStr();
   const { data: rawAppointments } = useAppointments(opdDate || todayStr);
 
   const handleSearch = async () => {
@@ -719,7 +720,7 @@ const PatientRegistration = () => {
                 showCalendar
                 value={opdDate}
                 onChange={(v) => { setOpdDate(v); setOpdTimeSlot(""); setOpdDoctor(""); }}
-                min={new Date().toISOString().split("T")[0]}
+                min={istDateStr()}
               />
             </div>
             <div className="space-y-2">

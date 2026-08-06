@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -278,7 +279,7 @@ const Pharmacy = () => {
           patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
           customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           sale_channel: isDirectSale ? "Direct" : "Patient",
-          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: new Date().toISOString().split("T")[0],
+          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: istDateStr(),
           age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           total_amount: subtotal, discount: discountAmount, gst_amount: gstAmount, net_amount: netAmount,
           payment_mode: finalPaymentMode, status: "Completed",
