@@ -407,7 +407,7 @@ const IPD = () => {
     if (!printRef.current) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    const lh = buildLetterhead(hospitalProfile as any, { title: "Discharge Summary" });
+    const lh = buildLetterhead(hospitalProfile as any, { title: "Discharge Summary", module: "ipd" });
     printWindow.document.write(`
       <html><head><title>Discharge Summary</title>
       <style>

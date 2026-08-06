@@ -584,7 +584,7 @@ const ClinicManagement = () => {
     if (!printWindow || !consultPatient) return;
     const rxLines = consultPrescriptions.filter((p) => p.medicine.trim());
     const e = escapeHtml;
-    const lh = buildLetterhead(hospitalProfile as any, { title: "Medical Prescription" });
+    const lh = buildLetterhead(hospitalProfile as any, { title: "Medical Prescription", module: "opd" });
     printWindow.document.write(`
       <html><head><title>Prescription – ${e(consultPatient.patientName)}</title>
       <style>

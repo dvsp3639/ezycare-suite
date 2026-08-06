@@ -324,7 +324,7 @@ const Pharmacy = () => {
     const pw = window.open("", "_blank");
     if (!pw) return;
     const e = escapeHtml;
-    const lh = buildLetterhead(hospitalProfile as any, { title: `${issueType} Receipt` });
+    const lh = buildLetterhead(hospitalProfile as any, { title: `${issueType} Receipt`, module: "pharmacy" });
     pw.document.write(`
       <html><head><title>${e(issueType)} Receipt – ${e(selectedPatient?.name)}</title>
       <style>
