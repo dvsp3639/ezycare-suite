@@ -852,9 +852,6 @@ const ClinicManagement = () => {
                           >
                             <Stethoscope className="h-3.5 w-3.5 mr-1" /> {openedConsults.has(q.id) || q.diagnosis ? "Resume" : "Consult"}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
-                            <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
-                          </Button>
                         </>
                       )}
                       {(q.status === "Waiting" || q.status === "In Consultation") && (
@@ -1338,9 +1335,15 @@ const ClinicManagement = () => {
               </Tabs>
 
               <div className="flex items-center justify-between pt-4 border-t border-border">
-                <Button variant="outline" size="sm" onClick={handlePrintPrescription}>
-                  <Printer className="h-4 w-4 mr-1.5" /> Print Prescription
-                </Button>
+                {!isReadOnly && consultPatient ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPendingAction({ type: "daycare", entry: consultPatient })}
+                  >
+                    <Sun className="h-4 w-4 mr-1.5" /> Send to Day Care
+                  </Button>
+                ) : <span />}
                 <div className="flex items-center gap-2">
                   <Button variant="outline" onClick={() => setConsultPatient(null)}>{isReadOnly ? "Close" : "Cancel"}</Button>
                   {!isReadOnly && (
