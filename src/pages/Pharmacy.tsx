@@ -541,6 +541,37 @@ const Pharmacy = () => {
             </div>
           </div>}
 
+          {/* Return against a previous bill */}
+          {isReturn && selectedPatient && (
+            <div className="bg-card rounded-xl border border-destructive/20 p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-destructive" />
+                <h3 className="font-semibold text-sm text-foreground">Return Against Previous Bill</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Pick an earlier pharmacy bill to pull its medicines into the return cart, then adjust quantities. Returned stock is added back to inventory automatically.
+              </p>
+              {loadingBills ? (
+                <p className="text-xs text-muted-foreground">Loading previous bills…</p>
+              ) : returnBills.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No completed bills found for this patient. You can still add medicines manually below.</p>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select value={selectedReturnBill} onValueChange={handleLoadReturnBill}>
+                    <SelectTrigger className="sm:max-w-md"><SelectValue placeholder="Select a previous bill" /></SelectTrigger>
+                    <SelectContent>
+                      {returnBills.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {(b.invoice_no || "Bill")} · {b.issue_date} · ₹{Number(b.net_amount || 0).toFixed(2)} · {(b.pharmacy_order_items || []).length} items
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Order Source Selection */}
           {orderSource === null && (
             <div className="bg-card rounded-xl border border-border p-6 mb-6">
