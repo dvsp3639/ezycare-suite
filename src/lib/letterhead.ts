@@ -1,22 +1,54 @@
 import type { HospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import { escapeHtml } from "@/lib/escapeHtml";
 
+/** Document families that can carry their own letterhead overrides. */
+export type LetterheadModule =
+  | "opd"
+  | "diagnostics"
+  | "pharmacy"
+  | "ipd"
+  | "daycare"
+  | "accounts";
+
+export const LETTERHEAD_MODULES: { key: LetterheadModule; label: string; hint: string }[] = [
+  { key: "opd", label: "OP / Prescriptions", hint: "Consultation prescriptions & OP receipts" },
+  { key: "diagnostics", label: "Diagnostics", hint: "Lab & radiology reports" },
+  { key: "pharmacy", label: "Pharmacy", hint: "Pharmacy bills, receipts & returns" },
+  { key: "ipd", label: "IPD", hint: "Admission & discharge summaries" },
+  { key: "daycare", label: "Day Care", hint: "Day care session bills" },
+  { key: "accounts", label: "Accounts", hint: "Financial statements & reports" },
+];
+
+export interface LetterheadModuleConfig {
+  showHeader?: boolean;
+  showFooter?: boolean;
+  footerNote?: string;
+  accentColor?: string;
+  titleOverride?: string;
+}
+
 /**
  * Builds a branded HTML header + footer + shared print styles based on the
  * hospital profile. If the admin has uploaded a letterhead image, it is used
  * as the header (edge-to-edge). Otherwise, a textual header composed from the
  * logo, hospital name, tagline and contact details is rendered.
  *
+ * Per-module overrides (configured in Hospital Profile → Branding) let admins
+ * tune the header/footer independently for OP, Diagnostics, Pharmacy, IPD, etc.
+ *
  * Consumed by receipts / prescriptions / discharge summaries across modules.
  */
 export function buildLetterhead(
   profile: HospitalProfile | null | undefined,
-  opts: { title?: string; showFooter?: boolean } = {}
+  opts: { title?: string; showFooter?: boolean; module?: LetterheadModule } = {}
 ) {
   const e = escapeHtml;
-  const accent = profile?.accentColor || "#0d9488";
-  const showHeader = profile?.showLetterheadHeader !== false;
-  const showFooter = opts.showFooter !== false && profile?.showLetterheadFooter !== false;
+  const mod: LetterheadModuleConfig =
+    (opts.module && profile?.letterheadModules?.[opts.module]) || {};
+  const accent = mod.accentColor || profile?.accentColor || "#0d9488";
+  const showHeader = mod.showHeader ?? profile?.showLetterheadHeader !== false;
+  const showFooter =
+    opts.showFooter !== false && (mod.showFooter ?? profile?.showLetterheadFooter !== false);
 
   const styles = `
     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; }
@@ -53,9 +85,10 @@ export function buildLetterhead(
     }
   }
 
-  const title = opts.title ? `<div class="lh-title">${e(opts.title)}</div>` : "";
+  const titleText = mod.titleOverride?.trim() || opts.title;
+  const title = titleText ? `<div class="lh-title">${e(titleText)}</div>` : "";
 
-  const footerNoteRaw = profile?.footerNote?.trim();
+  const footerNoteRaw = (mod.footerNote?.trim() || profile?.footerNote?.trim()) || "";
   const legal = [
     profile?.licenseNumber ? `Lic: ${e(profile.licenseNumber)}` : "",
     profile?.gstin ? `GSTIN: ${e(profile.gstin)}` : "",
