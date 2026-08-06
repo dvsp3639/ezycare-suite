@@ -89,25 +89,29 @@ export const accountsService = {
         .lte("created_at", `${to}T23:59:59`),
     ]);
 
+    // Surface failures instead of silently dropping a whole revenue stream
+    // (e.g. OPD consultation fees disappearing from the P&L).
+    const firstError = [opd, pharmacy, lab, ipd, daycare].find((r: any) => r.error)?.error;
+    if (firstError) throw firstError;
+
     const txns: RevenueTransaction[] = [];
 
     (opd.data || []).forEach((a: any) => {
       const fee = Number(a.consultation_fee) || 0;
-      if (fee > 0) {
-        txns.push({
-          id: `opd-${a.id}`,
-          date: a.appointment_date,
-          source: "OPD",
-          reference: a.registration_number,
-          patient: a.patient_name,
-          amount: fee,
-          gst: 0,
-          paymentMode: a.payment_mode || "Cash",
-          paymentStatus: a.payment_status || "Paid",
-          doctor: a.doctor_name,
-          department: a.opd_type,
-        });
-      }
+      if (fee <= 0) return; // waived / free follow-up visits carry no revenue
+      txns.push({
+        id: `opd-${a.id}`,
+        date: a.appointment_date,
+        source: "OPD",
+        reference: a.registration_number || "—",
+        patient: a.patient_name,
+        amount: fee,
+        gst: 0,
+        paymentMode: a.payment_mode || "Cash",
+        paymentStatus: a.payment_status || "Paid",
+        doctor: a.doctor_name,
+        department: a.opd_type,
+      });
     });
 
     (pharmacy.data || []).forEach((p: any) => {
