@@ -79,6 +79,11 @@ const Pharmacy = () => {
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
   const [activeScanId, setActiveScanId] = useState<string>("");
 
+  // ─── Returns against a previous bill ───
+  const [returnBills, setReturnBills] = useState<any[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [selectedReturnBill, setSelectedReturnBill] = useState<string>("");
+
   // Search patients
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -126,6 +131,52 @@ const Pharmacy = () => {
   );
   const discountAmount = (subtotal * globalDiscount) / 100;
   const netAmount = subtotal + gstAmount - discountAmount;
+
+  const isReturnFlow = issueType.includes("Return");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!isReturnFlow || !selectedPatient) { setReturnBills([]); return; }
+      setLoadingBills(true);
+      try {
+        const { data, error } = await supabase
+          .from("pharmacy_orders")
+          .select("id, invoice_no, issue_date, net_amount, issue_type, pharmacy_order_items(*)")
+          .eq("registration_number", selectedPatient.registrationNumber)
+          .eq("status", "Completed")
+          .order("issue_date", { ascending: false })
+          .limit(20);
+        if (error) throw error;
+        if (!cancelled) setReturnBills((data || []).filter((b: any) => !String(b.issue_type || "").includes("Return")));
+      } catch {
+        if (!cancelled) setReturnBills([]);
+      } finally {
+        if (!cancelled) setLoadingBills(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [isReturnFlow, selectedPatient?.registrationNumber]);
+
+  const handleLoadReturnBill = (billId: string) => {
+    const bill = returnBills.find((b) => b.id === billId);
+    if (!bill) return;
+    const items: PharmacyOrderItem[] = (bill.pharmacy_order_items || []).map((it: any) => ({
+      medicineId: it.medicine_id || "",
+      medicineName: it.medicine_name,
+      batchNo: it.batch_no || "",
+      quantity: it.quantity,
+      mrp: Number(it.mrp) || 0,
+      discount: Number(it.discount) || 0,
+      gstPercent: Number(it.gst_percent) ?? 12,
+      amount: (Number(it.mrp) || 0) * (it.quantity || 0),
+    }));
+    setSelectedReturnBill(billId);
+    setOrderItems(items);
+    setOrderSource("manual");
+    toast.success(`Loaded ${items.length} item(s) from ${bill.invoice_no || "previous bill"} — adjust quantities to return`);
+  };
 
   const handleSelectPatient = (patient: ClinicPatient) => {
     setSelectedPatient(patient);
