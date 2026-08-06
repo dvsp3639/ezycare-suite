@@ -27,7 +27,6 @@ import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
 import { daycareService } from "@/modules/daycare/services";
 import { useAuth } from "@/contexts/AuthContext";
-import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
 import {
   type DoctorSchedule,
   type QueueEntry,
