@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,11 @@ const Pharmacy = () => {
   const [directCustomer, setDirectCustomer] = useState({ name: "", mobile: "" });
   const [activeScanId, setActiveScanId] = useState<string>("");
 
+  // ─── Returns against a previous bill ───
+  const [returnBills, setReturnBills] = useState<any[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [selectedReturnBill, setSelectedReturnBill] = useState<string>("");
+
   // Search patients
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -125,6 +131,52 @@ const Pharmacy = () => {
   );
   const discountAmount = (subtotal * globalDiscount) / 100;
   const netAmount = subtotal + gstAmount - discountAmount;
+
+  const isReturnFlow = issueType.includes("Return");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!isReturnFlow || !selectedPatient) { setReturnBills([]); return; }
+      setLoadingBills(true);
+      try {
+        const { data, error } = await supabase
+          .from("pharmacy_orders")
+          .select("id, invoice_no, issue_date, net_amount, issue_type, pharmacy_order_items(*)")
+          .eq("registration_number", selectedPatient.registrationNumber)
+          .eq("status", "Completed")
+          .order("issue_date", { ascending: false })
+          .limit(20);
+        if (error) throw error;
+        if (!cancelled) setReturnBills((data || []).filter((b: any) => !String(b.issue_type || "").includes("Return")));
+      } catch {
+        if (!cancelled) setReturnBills([]);
+      } finally {
+        if (!cancelled) setLoadingBills(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [isReturnFlow, selectedPatient?.registrationNumber]);
+
+  const handleLoadReturnBill = (billId: string) => {
+    const bill = returnBills.find((b) => b.id === billId);
+    if (!bill) return;
+    const items: PharmacyOrderItem[] = (bill.pharmacy_order_items || []).map((it: any) => ({
+      medicineId: it.medicine_id || "",
+      medicineName: it.medicine_name,
+      batchNo: it.batch_no || "",
+      quantity: it.quantity,
+      mrp: Number(it.mrp) || 0,
+      discount: Number(it.discount) || 0,
+      gstPercent: Number(it.gst_percent) ?? 12,
+      amount: (Number(it.mrp) || 0) * (it.quantity || 0),
+    }));
+    setSelectedReturnBill(billId);
+    setOrderItems(items);
+    setOrderSource("manual");
+    toast.success(`Loaded ${items.length} item(s) from ${bill.invoice_no || "previous bill"} — adjust quantities to return`);
+  };
 
   const handleSelectPatient = (patient: ClinicPatient) => {
     setSelectedPatient(patient);
@@ -278,7 +330,7 @@ const Pharmacy = () => {
           patient_name: customerName, registration_number: selectedPatient?.registrationNumber || "",
           customer_name: customerName, customer_mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           sale_channel: isDirectSale ? "Direct" : "Patient",
-          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: new Date().toISOString().split("T")[0],
+          doctor_name: doctorPrescription?.doctorName || "", issue_type: isDirectSale ? "OP Sale" : issueType, issue_date: istDateStr(),
           age: selectedPatient?.age || null, gender: selectedPatient?.gender || "", mobile: isDirectSale ? directCustomer.mobile.trim() : selectedPatient?.mobile || "",
           total_amount: subtotal, discount: discountAmount, gst_amount: gstAmount, net_amount: netAmount,
           payment_mode: finalPaymentMode, status: "Completed",
@@ -324,7 +376,7 @@ const Pharmacy = () => {
     const pw = window.open("", "_blank");
     if (!pw) return;
     const e = escapeHtml;
-    const lh = buildLetterhead(hospitalProfile as any, { title: `${issueType} Receipt` });
+    const lh = buildLetterhead(hospitalProfile as any, { title: `${issueType} Receipt`, module: "pharmacy" });
     pw.document.write(`
       <html><head><title>${e(issueType)} Receipt – ${e(selectedPatient?.name)}</title>
       <style>
@@ -488,6 +540,37 @@ const Pharmacy = () => {
               ))}
             </div>
           </div>}
+
+          {/* Return against a previous bill */}
+          {isReturn && selectedPatient && (
+            <div className="bg-card rounded-xl border border-destructive/20 p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-destructive" />
+                <h3 className="font-semibold text-sm text-foreground">Return Against Previous Bill</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Pick an earlier pharmacy bill to pull its medicines into the return cart, then adjust quantities. Returned stock is added back to inventory automatically.
+              </p>
+              {loadingBills ? (
+                <p className="text-xs text-muted-foreground">Loading previous bills…</p>
+              ) : returnBills.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No completed bills found for this patient. You can still add medicines manually below.</p>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select value={selectedReturnBill} onValueChange={handleLoadReturnBill}>
+                    <SelectTrigger className="sm:max-w-md"><SelectValue placeholder="Select a previous bill" /></SelectTrigger>
+                    <SelectContent>
+                      {returnBills.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {(b.invoice_no || "Bill")} · {b.issue_date} · ₹{Number(b.net_amount || 0).toFixed(2)} · {(b.pharmacy_order_items || []).length} items
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Order Source Selection */}
           {orderSource === null && (

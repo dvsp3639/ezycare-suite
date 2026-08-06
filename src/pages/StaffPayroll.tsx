@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +97,7 @@ const StaffPayroll = () => {
   const [staffSearch, setStaffSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [attendanceDate, setAttendanceDate] = useState(istDateStr());
 
   // Dialogs
   const [showAddStaff, setShowAddStaff] = useState(false);
@@ -327,7 +328,7 @@ const StaffPayroll = () => {
   };
 
   const handlePaySalary = async (id: string) => {
-    await updateSalaryMut.mutateAsync({ id, updates: { status: "Paid", paid_date: new Date().toISOString().split("T")[0] } });
+    await updateSalaryMut.mutateAsync({ id, updates: { status: "Paid", paid_date: istDateStr() } });
     toast.success("Salary marked as paid");
   };
 

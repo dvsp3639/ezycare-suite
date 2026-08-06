@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, Save, Building2, Palette, FileSignature, ShieldCheck, Image as ImageIcon, Trash2 } from "lucide-react";
+import { LETTERHEAD_MODULES, type LetterheadModuleConfig } from "@/lib/letterhead";
 
 interface Branding {
   displayName?: string;
@@ -21,6 +22,7 @@ interface Branding {
   watermarkText?: string;
   letterheadPath?: string;
   letterhead?: { showHeader?: boolean; showFooter?: boolean; footerNote?: string };
+  letterheadModules?: Record<string, LetterheadModuleConfig>;
 }
 interface Contact { address?: string; city?: string; state?: string; pincode?: string; phone?: string; email?: string; website?: string; supportEmail?: string; }
 interface Compliance { licenseNumber?: string; gstin?: string; accreditation?: string[]; }
@@ -317,6 +319,75 @@ const HospitalProfilePage = () => {
                 <Switch checked={!!branding.letterhead?.showFooter} onCheckedChange={(v) => setBranding({ ...branding, letterhead: { ...branding.letterhead, showFooter: v } })} />
               </div>
               <div><Label>Footer note</Label><Textarea rows={2} placeholder="This is a computer-generated document…" value={branding.letterhead?.footerNote || ""} onChange={(e) => setBranding({ ...branding, letterhead: { ...branding.letterhead, footerNote: e.target.value } })} /></div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Module-wise Letterhead Customization</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Override the global letterhead for individual document families. Leave a field empty to inherit the settings above.
+              </p>
+              {LETTERHEAD_MODULES.map((m) => {
+                const cfg: LetterheadModuleConfig = branding.letterheadModules?.[m.key] || {};
+                const setCfg = (patch: Partial<LetterheadModuleConfig>) =>
+                  setBranding({
+                    ...branding,
+                    letterheadModules: { ...(branding.letterheadModules || {}), [m.key]: { ...cfg, ...patch } },
+                  });
+                return (
+                  <div key={m.key} className="rounded-lg border border-border p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{m.label}</p>
+                        <p className="text-xs text-muted-foreground">{m.hint}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          Header
+                          <Switch
+                            checked={cfg.showHeader ?? branding.letterhead?.showHeader !== false}
+                            onCheckedChange={(v) => setCfg({ showHeader: v })}
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          Footer
+                          <Switch
+                            checked={cfg.showFooter ?? branding.letterhead?.showFooter !== false}
+                            onCheckedChange={(v) => setCfg({ showFooter: v })}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Document title override</Label>
+                        <Input value={cfg.titleOverride || ""} placeholder="Default" onChange={(e) => setCfg({ titleOverride: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Accent colour</Label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={cfg.accentColor || branding.accentColor || "#0d9488"}
+                            onChange={(e) => setCfg({ accentColor: e.target.value })}
+                            className="h-10 w-14 rounded border"
+                          />
+                          {cfg.accentColor && (
+                            <Button variant="ghost" size="sm" onClick={() => setCfg({ accentColor: undefined })}>Reset</Button>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Footer note</Label>
+                        <Input value={cfg.footerNote || ""} placeholder="Inherit global footer" onChange={(e) => setCfg({ footerNote: e.target.value })} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>

@@ -15,11 +15,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import {
   Calendar as CalendarIcon, Clock, Users, Search, Plus, Minus, Eye, FileText, Pill, ClockIcon,
-  CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, Printer, FlaskConical,
+  CalendarDays, Monitor, Stethoscope, X, Heart, Thermometer, Weight, Activity, FlaskConical,
   CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { RescheduleDialog, type RescheduleTarget } from "@/components/clinic/RescheduleDialog";
@@ -28,8 +27,6 @@ import { useDoctorSchedules } from "@/modules/clinic/hooks";
 import { clinicService } from "@/modules/clinic/services";
 import { daycareService } from "@/modules/daycare/services";
 import { useAuth } from "@/contexts/AuthContext";
-import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
-import { buildLetterhead } from "@/lib/letterhead";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -86,7 +83,6 @@ const ClinicManagement = () => {
   } = useClinicData();
   const { roles } = useAuth();
   const hospitalId = roles?.[0]?.hospital_id || "";
-  const { data: hospitalProfile } = useHospitalProfile();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const labCatEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
@@ -579,45 +575,6 @@ const ClinicManagement = () => {
 
   const removeLabOrder = (id: string) => setConsultLabOrders((prev) => prev.filter((l) => l.id !== id));
 
-  const handlePrintPrescription = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow || !consultPatient) return;
-    const rxLines = consultPrescriptions.filter((p) => p.medicine.trim());
-    const e = escapeHtml;
-    const lh = buildLetterhead(hospitalProfile as any, { title: "Medical Prescription" });
-    printWindow.document.write(`
-      <html><head><title>Prescription – ${e(consultPatient.patientName)}</title>
-      <style>
-        ${lh.styles}
-        .patient-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
-        .section { margin-bottom: 16px; }
-        .section h3 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-        th { background: #f5f5f5; }
-        .footer { margin-top: 48px; display: flex; justify-content: space-between; font-size: 12px; }
-      </style></head><body><div class="lh-doc">
-      ${lh.header}
-      <div class="patient-info">
-        <div><strong>Patient:</strong> ${e(consultPatient.patientName)}<br/><strong>Reg No:</strong> ${e(consultPatient.registrationNumber)}</div>
-        <div><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}<br/><strong>Doctor:</strong> ${e(consultPatient.doctorName)}</div>
-      </div>
-      ${consultVitals.bp ? `<div class="section"><h3>Vitals</h3><p>BP: ${e(consultVitals.bp)} | Temp: ${e(consultVitals.temperature)}°F | Wt: ${e(consultVitals.weight)}kg | SpO2: ${e(consultVitals.spo2)}% | Pulse: ${e(consultVitals.pulse)}/min</p></div>` : ""}
-      <div class="section"><h3>Diagnosis</h3><p>${e(consultDiagnosis)}</p></div>
-      <div class="section"><h3>Prescription</h3>
-      <table><thead><tr><th>#</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead>
-      <tbody>${rxLines.map((r, i) => `<tr><td>${i + 1}</td><td>${e(r.medicine)}</td><td>${e(r.dosage)}</td><td>${e(r.frequency)}</td><td>${e(r.duration)}</td><td>${e(r.instructions)}</td></tr>`).join("")}</tbody></table></div>
-      ${consultLabOrders.length > 0 ? `<div class="section"><h3>Lab Orders</h3><ul>${consultLabOrders.map((l) => `<li>${e(l.testName)} (${e(l.priority)})</li>`).join("")}</ul></div>` : ""}
-      ${consultFollowUp ? `<div class="section"><h3>Follow-up</h3><p>${format(consultFollowUp, "dd/MM/yyyy")}</p></div>` : ""}
-      ${consultNotes ? `<div class="section"><h3>Doctor's Notes</h3><p>${e(consultNotes)}</p></div>` : ""}
-      <div class="footer"><span>Signature: ___________________</span><span>Date: ${format(new Date(), "dd/MM/yyyy")}</span></div>
-      ${lh.footer}
-      </div></body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  };
-
   const filteredQueue = queueFilter === "all" ? queue : queue.filter((q) => q.status === queueFilter);
 
   const { data: dbPatients = [] } = usePatients();
@@ -851,9 +808,6 @@ const ClinicManagement = () => {
                             }}
                           >
                             <Stethoscope className="h-3.5 w-3.5 mr-1" /> {openedConsults.has(q.id) || q.diagnosis ? "Resume" : "Consult"}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPendingAction({ type: "daycare", entry: q })}>
-                            <Sun className="h-3.5 w-3.5 mr-1" /> Day Care
                           </Button>
                         </>
                       )}
@@ -1338,9 +1292,15 @@ const ClinicManagement = () => {
               </Tabs>
 
               <div className="flex items-center justify-between pt-4 border-t border-border">
-                <Button variant="outline" size="sm" onClick={handlePrintPrescription}>
-                  <Printer className="h-4 w-4 mr-1.5" /> Print Prescription
-                </Button>
+                {!isReadOnly && consultPatient ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPendingAction({ type: "daycare", entry: consultPatient })}
+                  >
+                    <Sun className="h-4 w-4 mr-1.5" /> Send to Day Care
+                  </Button>
+                ) : <span />}
                 <div className="flex items-center gap-2">
                   <Button variant="outline" onClick={() => setConsultPatient(null)}>{isReadOnly ? "Close" : "Cancel"}</Button>
                   {!isReadOnly && (
@@ -1419,6 +1379,7 @@ const ClinicManagement = () => {
                     await handleOpenConsultDialog(entry);
                   } else {
                     await handleSendToDayCare(entry);
+                    setConsultPatient(null);
                   }
                   setPendingAction(null);
                 } finally {

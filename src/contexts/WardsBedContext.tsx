@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { istDateStr } from "@/lib/datetime";
 import { useWards as useIpdWards, useBeds as useIpdBeds } from "@/modules/ipd/hooks";
 import { ipdService } from "@/modules/ipd/services";
 
@@ -139,7 +140,7 @@ export const WardsBedProvider = ({ children }: { children: ReactNode }) => {
           gstPercent: 0,
           department: (w.floor as Department) || ("Ward A" as Department),
           barcode: "",
-          lastUpdated: new Date().toISOString().split("T")[0],
+          lastUpdated: istDateStr(),
           vendor: "",
           purchaseDate: "",
           consumptionRate: 0,
