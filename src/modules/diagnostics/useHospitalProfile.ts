@@ -19,6 +19,14 @@ export interface HospitalProfile {
   footerNote?: string;
   showLetterheadHeader?: boolean;
   showLetterheadFooter?: boolean;
+  /** Per-document-family letterhead overrides keyed by module. */
+  letterheadModules?: Record<string, {
+    showHeader?: boolean;
+    showFooter?: boolean;
+    footerNote?: string;
+    accentColor?: string;
+    titleOverride?: string;
+  }>;
   website?: string;
   gstin?: string;
   reportConfig?: Partial<LabReportConfig>;
@@ -94,6 +102,7 @@ export function useHospitalProfile() {
         footerNote: branding.letterhead?.footerNote || "",
         showLetterheadHeader: branding.letterhead?.showHeader !== false,
         showLetterheadFooter: branding.letterhead?.showFooter !== false,
+        letterheadModules: branding.letterheadModules || {},
         website: contact.website || "",
         gstin: compliance.gstin || "",
         reportConfig: {
