@@ -19,7 +19,6 @@ import {
   CalendarPlus, Trash2, CheckCircle2, Save, Download, Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { escapeHtml } from "@/lib/escapeHtml";
 import { resolveLabReportUrl } from "@/lib/labReports";
 import { useClinicData } from "@/contexts/ClinicDataContext";
 import { RescheduleDialog, type RescheduleTarget } from "@/components/clinic/RescheduleDialog";
@@ -29,7 +28,6 @@ import { clinicService } from "@/modules/clinic/services";
 import { daycareService } from "@/modules/daycare/services";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHospitalProfile } from "@/modules/diagnostics/useHospitalProfile";
-import { buildLetterhead } from "@/lib/letterhead";
 import {
   type DoctorSchedule,
   type QueueEntry,
@@ -86,7 +84,6 @@ const ClinicManagement = () => {
   } = useClinicData();
   const { roles } = useAuth();
   const hospitalId = roles?.[0]?.hospital_id || "";
-  const { data: hospitalProfile } = useHospitalProfile();
 
   const { data: labTestCatalog = [] } = useLabTestCatalog();
   const labCatEmojis: Record<string, string> = { Blood: "🩸", Urine: "🧪", Radiology: "📷", Serology: "🔬" };
