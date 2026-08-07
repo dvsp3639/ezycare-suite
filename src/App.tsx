@@ -15,6 +15,7 @@ import Pharmacy from "./pages/Pharmacy";
 import Diagnostics from "./pages/Diagnostics";
 import Inventory from "./pages/Inventory";
 import DayCare from "./pages/DayCare";
+import DayCareCase from "./pages/DayCareCase";
 import IPD from "./pages/IPD";
 import StaffPayroll from "./pages/StaffPayroll";
 import Accounts from "./pages/Accounts";
@@ -76,6 +77,7 @@ const AppRoutes = () => (
     <Route path="/diagnostics" element={<ProtectedRoute><Diagnostics /></ProtectedRoute>} />
     <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
     <Route path="/day-care" element={<ProtectedRoute><DayCare /></ProtectedRoute>} />
+    <Route path="/day-care/:id" element={<ProtectedRoute><DayCareCase /></ProtectedRoute>} />
     <Route path="/ipd" element={<ProtectedRoute><IPD /></ProtectedRoute>} />
     <Route path="/staff-payroll" element={<ProtectedRoute><StaffPayroll /></ProtectedRoute>} />
     <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
