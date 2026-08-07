@@ -565,6 +565,81 @@ export type Database = {
           },
         ]
       }
+      daycare_case_items: {
+        Row: {
+          created_at: string
+          doctor_name: string | null
+          dosage: string | null
+          duration: string | null
+          frequency: string | null
+          hospital_id: string
+          id: string
+          item_type: string
+          name: string
+          notes: string | null
+          qty: number
+          ref_id: string | null
+          session_id: string
+          status: string
+          total: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name?: string | null
+          dosage?: string | null
+          duration?: string | null
+          frequency?: string | null
+          hospital_id: string
+          id?: string
+          item_type: string
+          name: string
+          notes?: string | null
+          qty?: number
+          ref_id?: string | null
+          session_id: string
+          status?: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string | null
+          dosage?: string | null
+          duration?: string | null
+          frequency?: string | null
+          hospital_id?: string
+          id?: string
+          item_type?: string
+          name?: string
+          notes?: string | null
+          qty?: number
+          ref_id?: string | null
+          session_id?: string
+          status?: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daycare_case_items_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daycare_case_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "daycare_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daycare_session_treatments: {
         Row: {
           end_time: string | null
@@ -627,53 +702,89 @@ export type Database = {
         Row: {
           admission_time: string | null
           age: number | null
+          chief_complaint: string | null
           created_at: string
+          department: string | null
           diagnosis: string | null
+          discharge_instructions: string | null
+          discharge_medicines: string | null
+          doctor_advice: string | null
+          doctor_charge: number
           doctor_name: string
+          final_diagnosis: string | null
+          followup_date: string | null
           gender: string | null
           hospital_id: string
           id: string
           mobile: string | null
+          notes: string | null
+          nursing_charge: number
           patient_id: string | null
           patient_name: string
           registration_number: string
+          remarks: string | null
           session_date: string
           status: string
           updated_at: string
+          vitals: Json
         }
         Insert: {
           admission_time?: string | null
           age?: number | null
+          chief_complaint?: string | null
           created_at?: string
+          department?: string | null
           diagnosis?: string | null
+          discharge_instructions?: string | null
+          discharge_medicines?: string | null
+          doctor_advice?: string | null
+          doctor_charge?: number
           doctor_name: string
+          final_diagnosis?: string | null
+          followup_date?: string | null
           gender?: string | null
           hospital_id: string
           id?: string
           mobile?: string | null
+          notes?: string | null
+          nursing_charge?: number
           patient_id?: string | null
           patient_name: string
           registration_number: string
+          remarks?: string | null
           session_date?: string
           status?: string
           updated_at?: string
+          vitals?: Json
         }
         Update: {
           admission_time?: string | null
           age?: number | null
+          chief_complaint?: string | null
           created_at?: string
+          department?: string | null
           diagnosis?: string | null
+          discharge_instructions?: string | null
+          discharge_medicines?: string | null
+          doctor_advice?: string | null
+          doctor_charge?: number
           doctor_name?: string
+          final_diagnosis?: string | null
+          followup_date?: string | null
           gender?: string | null
           hospital_id?: string
           id?: string
           mobile?: string | null
+          notes?: string | null
+          nursing_charge?: number
           patient_id?: string | null
           patient_name?: string
           registration_number?: string
+          remarks?: string | null
           session_date?: string
           status?: string
           updated_at?: string
+          vitals?: Json
         }
         Relationships: [
           {
@@ -688,6 +799,51 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daycare_timeline: {
+        Row: {
+          actor: string | null
+          created_at: string
+          details: string | null
+          event: string
+          hospital_id: string
+          id: string
+          session_id: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          details?: string | null
+          event: string
+          hospital_id: string
+          id?: string
+          session_id: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          details?: string | null
+          event?: string
+          hospital_id?: string
+          id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daycare_timeline_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daycare_timeline_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "daycare_sessions"
             referencedColumns: ["id"]
           },
         ]
