@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { daycareService, daycareCaseService } from "./services";
+import { daycareService } from "./services";
 import type { DayCareTreatment, DayCareSession, DayCareSessionTreatment, DayCareBill, DayCareBillItem } from "./types";
 
 const KEYS = {
@@ -67,49 +67,4 @@ export function useCreateDayCareBill() {
       daycareService.createBill(bill, items),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["daycare"] }),
   });
-}
-
-/* ── Case workflow hooks ── */
-
-export function useDayCareCase(id: string) {
-  return useQuery({
-    queryKey: ["daycare", "case", id],
-    queryFn: () => daycareCaseService.getCase(id),
-    enabled: !!id,
-  });
-}
-
-export function useDayCareCaseMutations(sessionId: string) {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["daycare", "case", sessionId] });
-    qc.invalidateQueries({ queryKey: ["daycare", "sessions"] });
-  };
-  return {
-    invalidate,
-    addItem: async (item: any, log?: string) => {
-      const created = await daycareCaseService.addItem({ ...item, session_id: sessionId });
-      if (log) await daycareCaseService.logEvent(sessionId, log, item.name || "");
-      invalidate();
-      return created;
-    },
-    updateItem: async (id: string, updates: any) => {
-      await daycareCaseService.updateItem(id, updates);
-      invalidate();
-    },
-    deleteItem: async (id: string, name?: string) => {
-      await daycareCaseService.deleteItem(id);
-      if (name) await daycareCaseService.logEvent(sessionId, "Item Removed", name);
-      invalidate();
-    },
-    updateCase: async (updates: any, log?: string, details = "") => {
-      await daycareCaseService.updateCase(sessionId, updates);
-      if (log) await daycareCaseService.logEvent(sessionId, log, details);
-      invalidate();
-    },
-    logEvent: async (event: string, details = "") => {
-      await daycareCaseService.logEvent(sessionId, event, details);
-      invalidate();
-    },
-  };
 }
